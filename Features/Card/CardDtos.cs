@@ -16,8 +16,8 @@ public record CardDto
      DateTime? ReminderDate ,
      bool IsArchived ,
       DateTime CreatedAt ,
-     DateTime? UpdatedAt ,
-        Guid CreatedBy ,
+     DateTime? UpdatedAt , 
+     Guid CreatedBy ,
      Guid? UpdatedBy
 ): 
 
