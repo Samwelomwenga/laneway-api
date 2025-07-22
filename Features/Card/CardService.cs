@@ -176,7 +176,7 @@ public class CardService: ICardService
             _context.Cards.Remove(card);
             await _context.SaveChangesAsync();
 
-            return ApiResponse<bool>.SuccessResponse(true, "Card deleted successfully");
+            return ApiResponse<bool>.SuccessResponse(true, "Card deleted successfully", 204);
         }
         catch (Exception e)
         {

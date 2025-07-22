@@ -2,7 +2,7 @@ namespace DefaultNamespace;
 
 public interface ILabelService
 {
-    Task<List<Label>> GetAllAsync();
+    Task<List<Label>> GetAllAsync(LabelSearchDto searchDto);
     Task<Label?> GetByIdAsync(Guid id);
     Task<Label> CreateAsync(Label label);
     Task<Label> UpdateAsync(Label label);
