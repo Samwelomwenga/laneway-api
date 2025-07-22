@@ -1,9 +1,0 @@
-<Project>
-    <PropertyGroup>
-       <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    </PropertyGroup>
-    <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="9.0.7"/>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.7"/>
-    </ItemGroup>
-</Project>
