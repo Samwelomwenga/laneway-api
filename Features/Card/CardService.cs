@@ -148,14 +148,13 @@ public class CardService: ICardService
 
             var cardDtos = cards.Select(MapToDto).ToList();
 
-            var pagedResponse = new PagedResponse<CardDto>
-            {
-                Data = cardDtos,
-                TotalCount = totalCount,
-                PageSize = searchDto.PageSize,
-                CurrentPage = searchDto.PageNumber,
-                TotalPages = totalPages
-            };
+            var pagedResponse = PagedResponse<CardDto>.SuccessResponse(
+                cardDtos,
+                totalCount,
+                searchDto.PageSize,
+                searchDto.PageNumber,
+                "Cards retrieved successfully"
+            );
 
             return ApiResponse<PagedResponse<CardDto>>.SuccessResponse(pagedResponse, "Cards retrieved successfully");
         }

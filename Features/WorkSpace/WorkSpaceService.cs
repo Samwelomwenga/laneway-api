@@ -50,14 +50,13 @@ public class WorkSpaceService : IWorkSpaceService
 
             var workSpaceDtos = workSpaces.Select(MapToDto).ToList();
 
-            return new PagedResponse<WorkSpaceDto>
-            {
-                Data = workSpaceDtos,
-                TotalCount = totalCount,
-                TotalPages = totalPages,
-                CurrentPage = searchDto.PageNumber,
-                PageSize = searchDto.PageSize
-            };
+            return PagedResponse<WorkSpaceDto>.SuccessResponse(
+                workSpaceDtos,
+                totalCount,
+                searchDto.PageSize,
+                searchDto.PageNumber,
+                "Workspaces retrieved successfully"
+            );
         }
         catch (Exception e)
         {

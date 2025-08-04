@@ -56,14 +56,13 @@ public class BoardService : IBoardService
                 .ToListAsync();
             var boardDtos = boards.Select(MapToDto).ToList();
         
-            return new PagedResponse<BoardDto>
-            {
-                Data = boardDtos,
-                TotalCount = totalCount,
-                PageSize = searchDto.PageSize,
-                CurrentPage = searchDto.PageNumber,
-                TotalPages = totalPages
-            };
+            return PagedResponse<BoardDto>.SuccessResponse(
+                boardDtos, 
+                totalCount, 
+                searchDto.PageSize, 
+                searchDto.PageNumber, 
+                "Boards retrieved successfully"
+            );
         }
         catch (Exception e)
         {

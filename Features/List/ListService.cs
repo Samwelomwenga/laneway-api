@@ -143,14 +143,13 @@ public class ListService : IListService
 
             var listDtos = lists.Select(MapToDto).ToList();
 
-            return new PagedResponse<ListDto>
-            {
-                Data = listDtos,
-                TotalCount = totalCount,
-                PageSize = searchDto.PageSize,
-                CurrentPage = searchDto.PageNumber,
-                TotalPages = totalPages
-            };
+            return PagedResponse<ListDto>.SuccessResponse(
+                listDtos,
+                totalCount,
+                searchDto.PageSize,
+                searchDto.PageNumber,
+                "Lists retrieved successfully"
+            );
         }
         catch (Exception e)
         {

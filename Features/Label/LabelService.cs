@@ -39,14 +39,13 @@ public class LabelService : ILabelService
                 .ToListAsync();
             var labelDtos = labels.Select(MapToDto).ToList();
             
-            return new PagedResponse<LabelDto>
-            {
-                Data = labelDtos,
-                TotalCount = totalCount,
-                PageSize = searchDto.PageSize,
-                CurrentPage = searchDto.PageNumber,
-                TotalPages = totalPages
-            };
+            return PagedResponse<LabelDto>.SuccessResponse(
+                labelDtos,
+                totalCount,
+                searchDto.PageSize,
+                searchDto.PageNumber,
+                "Labels retrieved successfully"
+            );
         }
         catch (Exception e)
         {
