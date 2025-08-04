@@ -5,12 +5,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace DefaultNamespace;
 
 [ApiController]
-[Route("api/[controller]")]
-public class WorkSpaceController: ControllerBase
+[Route("api/v1/[controller]")]
+public class WorkSpacesController: ControllerBase
 {
     private readonly IWorkSpaceService _workSpaceService;
 
-    public WorkSpaceController(IWorkSpaceService workSpaceService)
+    public WorkSpacesController(IWorkSpaceService workSpaceService)
     {
         _workSpaceService = workSpaceService;
     }

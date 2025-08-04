@@ -3,12 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace DefaultNamespace;
 
 [ApiController]
-[Route("api/[controller]")]
-public class ListController: ControllerBase
+[Route("api/v1/[controller]")]
+public class ListsController: ControllerBase
 {
     private readonly IListService _listService;
     
-    public ListController(IListService listService)
+    public ListsController(IListService listService)
     {
         _listService = listService;
     }

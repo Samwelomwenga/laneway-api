@@ -3,12 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace DefaultNamespace;
 
 [ApiController]
-[Route("api/[controller]")]
-public class CardController: ControllerBase
+[Route("api/v1/[controller]")]
+public class CardsController: ControllerBase
 {
     private readonly ICardService _cardService;
 
-    public CardController(ICardService cardService)
+    public CardsController(ICardService cardService)
     {
         _cardService = cardService;
     }

@@ -3,12 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace DefaultNamespace;
 
 [ApiController]
-[Route("api/[controller]")]
-public class BoardController: ControllerBase
+[Route("api/v1/[controller]")]
+public class BoardsController: ControllerBase
 {
     private readonly IBoardService _boardService;
 
-    public BoardController(IBoardService boardService)
+    public BoardsController(IBoardService boardService)
     {
         _boardService = boardService;
     }
