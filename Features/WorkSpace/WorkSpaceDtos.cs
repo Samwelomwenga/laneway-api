@@ -10,7 +10,8 @@ public record WorkSpaceDto
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     Guid CreatedBy,
-    Guid? UpdatedBy
+    Guid? UpdatedBy,
+    List<Guid> BoardIds
 );
 public record CreateWorkSpaceDto
 (

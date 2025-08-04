@@ -46,9 +46,14 @@ public class WorkSpaceService : IWorkSpaceService
                 .OrderBy(ws => ws.CreatedAt)
                 .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
                 .Take(searchDto.PageSize)
+                .Select(ws => new
+                {
+                   workSpace = ws,
+                   boardIds = ws.Boards.Select(b => b.Id).ToList()
+                })
                 .ToListAsync();
 
-            var workSpaceDtos = workSpaces.Select(MapToDto).ToList();
+            var workSpaceDtos = workSpaces.Select(ws => MapToDto(ws.workSpace, ws.boardIds)).ToList();
 
             return PagedResponse<WorkSpaceDto>.SuccessResponse(
                 workSpaceDtos,
@@ -70,12 +75,18 @@ public class WorkSpaceService : IWorkSpaceService
         try
         {
             var existingWorkSpace = await _context.WorkSpaces
-                .FirstOrDefaultAsync(ws => ws.Id == id);
+                .Where(ws => ws.Id == id)
+                .Select(ws => new
+                {
+                    workSpace = ws,
+                    boardIds = ws.Boards.Select(b => b.Id).ToList()
+                })
+                .FirstOrDefaultAsync();
             if (existingWorkSpace == null)
             {
                return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
             }
-            var workSpaceDto = MapToDto(existingWorkSpace);
+            var workSpaceDto = MapToDto(existingWorkSpace.workSpace, existingWorkSpace.boardIds);
             return ApiResponse<WorkSpaceDto>.SuccessResponse(workSpaceDto, "Workspace retrieved successfully", 200);
         }
         catch (Exception e)
@@ -149,7 +160,7 @@ public class WorkSpaceService : IWorkSpaceService
         }
     }
     
-    private static WorkSpaceDto MapToDto(WorkSpace workSpace)
+    private static WorkSpaceDto MapToDto(WorkSpace workSpace, List<Guid>? boardIds = null)
     {
         return new WorkSpaceDto
         (
@@ -161,7 +172,8 @@ public class WorkSpaceService : IWorkSpaceService
             workSpace.CreatedAt,
             workSpace.UpdatedAt,
             workSpace.CreatedBy,
-            workSpace.UpdatedBy
+            workSpace.UpdatedBy,
+            boardIds ?? new List<Guid>()
         );
     }
     
