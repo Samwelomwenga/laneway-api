@@ -2,9 +2,9 @@ namespace DefaultNamespace;
 
 public class Card: BaseEntity
 {
-    public string Title { get; set; }
+    public required string Title { get; set; }
     public string Description { get; set; } = string.Empty;
-    public dateTime DueDate { get; set; }
+    public DateTime DueDate { get; set; }
     public int Position { get; set; }
     public Guid ListId { get; set; }
     public bool Status { get; set; }

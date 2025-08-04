@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace DefaultNamespace;
 
 public interface ICardService
@@ -100,9 +102,9 @@ public class CardService: ICardService
         {
             var query = _context.Cards.AsQueryable();
 
-            if (!string.IsNullOrEmpty(searchDto.SearchTerm))
+            if (!string.IsNullOrEmpty(searchDto.searchTerm))
             {
-                query = query.Where(c => c.Title.Contains(searchDto.SearchTerm) || c.Description.Contains(searchDto.SearchTerm));
+                query = query.Where(c => c.Title.Contains(searchDto.searchTerm) || c.Description.Contains(searchDto.searchTerm));
             }
 
             if (searchDto.DueDate.HasValue)
@@ -222,6 +224,8 @@ public class CardService: ICardService
             EndDate = createCardDto.EndDate,
             ReminderDate = createCardDto.ReminderDate,
             IsArchived = createCardDto.IsArchived,
+            CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid() // Assuming the creator's ID is set here
         };
     }
+}

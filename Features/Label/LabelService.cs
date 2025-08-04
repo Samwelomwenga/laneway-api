@@ -1,12 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace DefaultNamespace;
 
 public interface ILabelService
 {
-    Task<List<Label>> GetAllAsync(LabelSearchDto searchDto);
-    Task<Label?> GetByIdAsync(Guid id);
-    Task<Label> CreateAsync(Label label);
-    Task<Label> UpdateAsync(Label label);
-    Task DeleteAsync(Guid id);
+    Task<PagedResponse<LabelDto>> GetAllAsync(LabelSearchDto searchDto);
+    Task<ApiResponse<LabelDto>> GetByIdAsync(Guid id);
+    Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelDto createLabelDto);
+    Task<ApiResponse<LabelDto>> UpdateAsync(Guid id, UpdateLabelDto updateLabelDto);
+    Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 
 public class LabelService : ILabelService
@@ -18,14 +20,14 @@ public class LabelService : ILabelService
         _context = context;
     }
 
-    public async Task<List<Label>> GetAllAsync(LabelSearchDto searchDto)
+    public async Task<PagedResponse<LabelDto>> GetAllAsync(LabelSearchDto searchDto)
     {
         try
         {
-            const query = _context.Label.AsQueryable();
-            if (!string.IsNullOrEmpty(searchDto.Name))
+            var query = _context.Labels.AsQueryable();
+            if (!string.IsNullOrEmpty(searchDto.SearchTerm))
             {
-                query = query.Where(l => l.Name.Contains(searchDto.Name, StringComparison.OrdinalIgnoreCase));
+                query = query.Where(l => l.Name.Contains(searchDto.SearchTerm, StringComparison.OrdinalIgnoreCase));
             }
             
             var totalCount = await query.CountAsync();
@@ -36,26 +38,24 @@ public class LabelService : ILabelService
                 .Take(searchDto.PageSize)
                 .ToListAsync();
             var labelDtos = labels.Select(MapToDto).ToList();
-            return new PagedResult<LabelDto>
+            
+            return new PagedResponse<LabelDto>
             {
                 Data = labelDtos,
                 TotalCount = totalCount,
                 PageSize = searchDto.PageSize,
                 CurrentPage = searchDto.PageNumber,
-                TotalPages = totalPages,
+                TotalPages = totalPages
             };
-            
-            
-
         }
         catch (Exception e)
         {
-            return <ApiResponse<List<LabelDto>>>.ErrorResponse("An error occurred while retrieving labels", 500,
+            return PagedResponse<LabelDto>.ErrorResponse("An error occurred while retrieving labels", 500,
                 new List<string> { e.Message });
         }
     }
 
-    public async Task<Label?> GetByIdAsync(Guid id)
+    public async Task<ApiResponse<LabelDto>> GetByIdAsync(Guid id)
     {
         try
         {
@@ -66,52 +66,50 @@ public class LabelService : ILabelService
             }
             var labelDto = MapToDto(label);
             return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label retrieved successfully", 200);
-
         }
         catch (Exception e)
         {
-           return <ApiResponse<LabelDto>>.ErrorResponse("An error occurred while retrieving the label", 500,
+           return ApiResponse<LabelDto>.ErrorResponse("An error occurred while retrieving the label", 500,
                 new List<string> { e.Message });
         }
     }
 
-    public async Task<Label> CreateAsync(Label label)
+    public async Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelDto createLabelDto)
     {
         try
         {
             var existingLabel = await _context.Labels
-                .FirstOrDefaultAsync(l => l.Name.Equals(label.Name, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefaultAsync(l => l.Name.Equals(createLabelDto.Name, StringComparison.OrdinalIgnoreCase));
             if (existingLabel != null)
             {
-                return <ApiResponse<LabelDto>>.ErrorResponse("Label with the same name already exists", 400,
+                return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 400,
                     new List<string> { "A label with this name already exists." });
             }
-           var newLabel = MapToEntity(label);
+           var newLabel = MapToEntity(createLabelDto);
             _context.Labels.Add(newLabel);
             await _context.SaveChangesAsync();
-           var LabelDto = MapToDto(newLabel);
+           var labelDto = MapToDto(newLabel);
             return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label created successfully", 201);
-
         }
         catch (Exception e)
         {
-           return <ApiResponse<LabelDto>>.ErrorResponse("An error occurred while creating the label", 500,
+           return ApiResponse<LabelDto>.ErrorResponse("An error occurred while creating the label", 500,
                 new List<string> { e.Message });
         }
     }
 
-    public async Task<Label> UpdateAsync(Label label)
+    public async Task<ApiResponse<LabelDto>> UpdateAsync(Guid id, UpdateLabelDto updateLabelDto)
     {
         try
         {
-            var existingLabel = await _context.Labels.FindAsync(label.Id);
+            var existingLabel = await _context.Labels.FindAsync(id);
             if (existingLabel == null)
             {
-                return <ApiResponse<LabelDto>>.ErrorResponse("Label not found", 404);
+                return ApiResponse<LabelDto>.ErrorResponse("Label not found", 404);
             }
 
-            existingLabel.Name = label.Name;
-            existingLabel.Color = label.Color;
+            existingLabel.Name = updateLabelDto.Name;
+            existingLabel.Color = updateLabelDto.Color;
             existingLabel.UpdatedAt = DateTime.UtcNow;
             existingLabel.UpdatedBy = Guid.NewGuid(); // Replace with actual user ID
 
@@ -120,58 +118,58 @@ public class LabelService : ILabelService
             
             var labelDto = MapToDto(existingLabel);
             return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label updated successfully", 200);
-
         }
         catch (Exception e)
         {
-            return <ApiResponse<LabelDto>>.ErrorResponse("An error occurred while updating the label", 500,
+            return ApiResponse<LabelDto>.ErrorResponse("An error occurred while updating the label", 500,
                 new List<string> { e.Message });
         }
     }
 
-    public async Task DeleteAsync(Guid id)
+    public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
        var existingLabel = await _context.Labels.FindAsync(id);
         if (existingLabel == null)
         {
-            return <ApiResponse<LabelDto>>.ErrorResponse("Label not found", 404);
+            return ApiResponse<bool>.ErrorResponse("Label not found", 404);
         }
 
         try
         {
             _context.Labels.Remove(existingLabel);
             await _context.SaveChangesAsync();
-            return ApiResponse<LabelDto>.SuccessResponse(null, "Label deleted successfully", 204);
+            return ApiResponse<bool>.SuccessResponse(true, "Label deleted successfully", 204);
         }
         catch (Exception e)
         {
-            return <ApiResponse<LabelDto>>.ErrorResponse("An error occurred while deleting the label", 500,
+            return ApiResponse<bool>.ErrorResponse("An error occurred while deleting the label", 500,
                 new List<string> { e.Message });
         }
     }
-}
 
-private static LabelDto MapToDto(Label label)
-{
-    return new LabelDto
-    (
-        label.Id,
-        label.Name,
-        label.Color,
-        label.CreatedAt,
-        label.UpdatedAt,
-        label.CreatedBy,
-        label.UpdatedBy
-    );
-}
-private static Label MapToEntity(CreateLabelDto createDto)
-{
-    return new Label
+    private static LabelDto MapToDto(Label label)
     {
-        Id = Guid.NewGuid(),
-        Name = createDto.Name,
-        Color = createDto.Color,
-        CreatedAt = DateTime.UtcNow,
-        CreatedBy = Guid.NewGuid() // Replace with actual user ID
-    };
+        return new LabelDto
+        (
+            label.Id,
+            label.Name,
+            label.Color,
+            label.CreatedAt,
+            label.UpdatedAt,
+            label.CreatedBy,
+            label.UpdatedBy
+        );
+    }
+    
+    private static Label MapToEntity(CreateLabelDto createDto)
+    {
+        return new Label
+        {
+            Id = Guid.NewGuid(),
+            Name = createDto.Name,
+            Color = createDto.Color,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Guid.NewGuid() // Replace with actual user ID
+        };
+    }
 }

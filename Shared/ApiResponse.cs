@@ -18,26 +18,43 @@ public class ApiResponse<T>
             StatusCode = statusCode
         };
     }
-}
-public static ApiResponse<T> ErrorResponse(string message, int statusCode = 400, List<string>? errors = null)
-{
-    return new ApiResponse<T>
+
+    public static ApiResponse<T> ErrorResponse(string message, int statusCode = 400, List<string>? errors = null)
     {
-        Success = false,
-        Message = message,
-        StatusCode = statusCode,
-        Errors = errors ?? new List<string>()
-    };
-}
+        return new ApiResponse<T>
+        {
+            Success = false,
+            Message = message,
+            StatusCode = statusCode,
+            Errors = errors ?? new List<string>()
+        };
+    }
 }
 
 public  class PagedResponse<T> : ApiResponse<List<T>>
 {
-    public List<T> Data { get; set; } = new();
+    public new List<T> Data { get; set; } = new();
     public int TotalCount { get; set; }
     public int PageSize { get; set; }
     public int CurrentPage { get; set; }
     public int TotalPages { get; set; }
+    
+    public static new PagedResponse<T> ErrorResponse(string message, int statusCode = 400, List<string>? errors = null)
+    {
+        return new PagedResponse<T>
+        {
+            Success = false,
+            Message = message,
+            StatusCode = statusCode,
+            Errors = errors ?? new List<string>(),
+            Data = new List<T>(),
+            TotalCount = 0,
+            PageSize = 0,
+            CurrentPage = 0,
+            TotalPages = 0
+        };
+    }
+    
     public bool HasNextPage => CurrentPage < TotalPages;
     public bool HasPreviousPage => CurrentPage > 1;
 }

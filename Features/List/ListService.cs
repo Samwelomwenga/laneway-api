@@ -1,12 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace DefaultNamespace;
 
 public interface IListService
 {
-    Task<ListDto> CreateAsync(CreateListDto createListDto);
-    Task<ListDto> UpdateAsync(Guid id, UpdateListDto updateListDto);
-    Task DeleteAsync(Guid id);
-    Task<ListDto> GetByIdAsync(Guid id);
-    Task<PagedResult<ListDto>> GetAllAsync(ListSearchDto searchDto);
+    Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto);
+    Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListDto updateListDto);
+    Task<ApiResponse<bool>> DeleteAsync(Guid id);
+    Task<ApiResponse<ListDto>> GetByIdAsync(Guid id);
+    Task<PagedResponse<ListDto>> GetAllAsync(ListSearchDto searchDto);
 }
 
 public class ListService : IListService
@@ -18,7 +20,7 @@ public class ListService : IListService
         _context = context;
     }
 
-    public async Task<ListDto> CreateAsync(CreateListDto createListDto)
+    public async Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto)
     {
         try
         {
@@ -26,18 +28,18 @@ public class ListService : IListService
 
             _context.Lists.Add(list);
             await _context.SaveChangesAsync();
-            var ListDto = MapToDto(list);
+            var listDto = MapToDto(list);
 
-            return ApiResponse<ListDto>.SuccessResponse(ListDto, "List created successfully", 201);
-
+            return ApiResponse<ListDto>.SuccessResponse(listDto, "List created successfully", 201);
         }
         catch (Exception e)
         {
             return ApiResponse<ListDto>.ErrorResponse("An error occurred while creating the list", 500,
                 new List<string> { e.Message });
         }
+    }
 
-    public async Task<ListDto> UpdateAsync(Guid id, UpdateListDto updateListDto)
+    public async Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListDto updateListDto)
     {
         try
         {
@@ -53,14 +55,13 @@ public class ListService : IListService
             list.Color = updateListDto.Color;
             list.IsArchived = updateListDto.IsArchived;
             list.UpdatedAt = DateTime.UtcNow;
-            list.UpdatedBy = Guid.NewGuid(); // Assuming the updater's ID is set here
+            list.UpdatedBy = Guid.NewGuid(); // This should be set to the current user's ID
 
             _context.Lists.Update(list);
             await _context.SaveChangesAsync();
-            var ListDto = MapToDto(list);
+            var listDto = MapToDto(list);
 
-            return ApiResponse<ListDto>.SuccessResponse(ListDto, "List updated successfully", 200);
-
+            return ApiResponse<ListDto>.SuccessResponse(listDto, "List updated successfully", 200);
         }
         catch (Exception e)
         {
@@ -69,32 +70,29 @@ public class ListService : IListService
         }
     }
 
-    public async Task DeleteAsync(Guid id)
+    public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
         try
         {
             var list = await _context.Lists.FindAsync(id);
             if (list == null)
             {
-                return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
+                return ApiResponse<bool>.ErrorResponse("List not found", 404);
             }
 
             _context.Lists.Remove(list);
-            await _context.SaveChangesAsync()
+            await _context.SaveChangesAsync();
                 
-            return <ApiResponse<bool>>.SuccessResponse(true, "List deleted successfully", 204);
-                
-
+            return ApiResponse<bool>.SuccessResponse(true, "List deleted successfully", 204);
         }
         catch (Exception e)
         {
-            return <ApiResponse<bool>>.ErrorResponse("An error occurred while deleting the list", 500,
+            return ApiResponse<bool>.ErrorResponse("An error occurred while deleting the list", 500,
                 new List<string> { e.Message });
         }
-        ;
     }
 
-    public async Task<ListDto> GetByIdAsync(Guid id)
+    public async Task<ApiResponse<ListDto>> GetByIdAsync(Guid id)
     {
         try
         {
@@ -106,16 +104,15 @@ public class ListService : IListService
 
             var listDto = MapToDto(list);
             return ApiResponse<ListDto>.SuccessResponse(listDto, "List retrieved successfully", 200);
-
         }
         catch (Exception e)
         {
-           return <ApiResponse<ListDto>>.ErrorResponse("An error occurred while retrieving the list", 500,
+           return ApiResponse<ListDto>.ErrorResponse("An error occurred while retrieving the list", 500,
                 new List<string> { e.Message });
         }
     }
     
-    public async Task<PagedResult<ListDto>> GetAllAsync(ListSearchDto searchDto)
+    public async Task<PagedResponse<ListDto>> GetAllAsync(ListSearchDto searchDto)
     {
         try
         {
@@ -146,19 +143,18 @@ public class ListService : IListService
 
             var listDtos = lists.Select(MapToDto).ToList();
 
-            return new PagedResult<ListDto>
+            return new PagedResponse<ListDto>
             {
                 Data = listDtos,
                 TotalCount = totalCount,
                 PageSize = searchDto.PageSize,
                 CurrentPage = searchDto.PageNumber,
-                TotalPages = totalPages,
+                TotalPages = totalPages
             };
-
         }
         catch (Exception e)
         {
-            return ApiResponse<PagedResult<ListDto>>.ErrorResponse("An error occurred while retrieving lists", 500,
+            return PagedResponse<ListDto>.ErrorResponse("An error occurred while retrieving lists", 500,
                 new List<string> { e.Message });
         }
     }
@@ -178,6 +174,7 @@ public class ListService : IListService
             list.UpdatedBy
         );
     }
+    
     private static List MapToEntity(CreateListDto createListDto)
     {
         return new List
@@ -189,6 +186,7 @@ public class ListService : IListService
             Color = createListDto.Color,
             IsArchived = createListDto.IsArchived,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = Guid.NewGuid() // Assuming the creator's ID is set here
+            CreatedBy = Guid.NewGuid() // This should be set to the current user's ID
         };
     }
+}

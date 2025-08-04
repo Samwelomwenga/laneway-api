@@ -1,13 +1,10 @@
 namespace DefaultNamespace;
 
-public record BoardDto
+public record WorkSpaceDto
 (
     Guid Id,
     string Name,
-    string Description,
-    string? Title,
-    Guid WorkspaceId,
-    Guid OwnerId,
+    string? Description,
     string Visibility,
     bool IsArchived,
     DateTime CreatedAt,
@@ -15,35 +12,25 @@ public record BoardDto
     Guid CreatedBy,
     Guid? UpdatedBy
 );
-
-public record CreateBoardDto
+public record CreateWorkSpaceDto
 (
     string Name,
-    string Description,
-    string? Title,
-    Guid WorkspaceId,
-    Guid OwnerId,
+    string? Description,
     string Visibility,
     bool IsArchived
 );
-
-public record UpdateBoardDto
+public record UpdateWorkSpaceDto
 (
     string Name,
-    string Description,
-    string? Title,
-    Guid WorkspaceId,
-    Guid OwnerId,
+    string? Description,
     string Visibility,
     bool IsArchived
 );
-
-public record BoardSearchDto
+public record WorkSpaceSearchDto
 (
     int PageNumber = 1,
     int PageSize = 10,
     string? SearchTerm = null,
-    Guid? WorkspaceId = null,
     bool? IsArchived = null,
     string? Visibility = null
 );

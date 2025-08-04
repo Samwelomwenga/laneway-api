@@ -1,5 +1,9 @@
+using Microsoft.AspNetCore.Mvc;
+
 namespace DefaultNamespace;
 
+[ApiController]
+[Route("api/[controller]")]
 public class ListController: ControllerBase
 {
     private readonly IListService _listService;
@@ -10,17 +14,17 @@ public class ListController: ControllerBase
     }
     
     [HttpGet]
-    public async Task<IActionResult<ApiResponse<PagedResponse<ListDto>>>> GetLists([FromQuery] ListSearchDto searchDto)
+    public async Task<ActionResult<PagedResponse<ListDto>>> GetLists([FromQuery] ListSearchDto searchDto)
     {
-        var response = await _listService.GetListsAsync(searchDto);
+        var response = await _listService.GetAllAsync(searchDto);
         return Ok(response);
     }
     
     [HttpGet("{id}")]
-    public async Task<IActionResult<ApiResponse<ListDto>>> GetList(Guid id)
+    public async Task<ActionResult<ApiResponse<ListDto>>> GetList(Guid id)
     {
-        var response = await _listService.GetListByIdAsync(id);
-        if (!response.success)
+        var response = await _listService.GetByIdAsync(id);
+        if (!response.Success)
         {
             return NotFound(response);
         }
@@ -28,7 +32,7 @@ public class ListController: ControllerBase
     }
     
     [HttpPost]
-    public async Task<IActionResult<ApiResponse<ListDto>>> CreateList([FromBody] CreateListDto createListDto)
+    public async Task<ActionResult<ApiResponse<ListDto>>> CreateList([FromBody] CreateListDto createListDto)
     {
         if (!ModelState.IsValid)
         {
@@ -39,16 +43,16 @@ public class ListController: ControllerBase
             var errorResponse = ApiResponse<ListDto>.ErrorResponse("Invalid data", 400, errors);
             return BadRequest(errorResponse);
         }
-        var response = await _listService.CreateListAsync(createListDto);
-        if (!response.success)
+        var response = await _listService.CreateAsync(createListDto);
+        if (!response.Success)
         {
             return BadRequest(response);
         }
-        return CreatedAtAction(nameof(GetList), new { id = response.Data.Id }, response);
+        return CreatedAtAction(nameof(GetList), new { id = response.Data!.Id }, response);
     }
     
     [HttpPut("{id}")]
-    public async Task<IActionResult<ApiResponse<ListDto>>> UpdateList(Guid id, [FromBody] UpdateListDto updateListDto)
+    public async Task<ActionResult<ApiResponse<ListDto>>> UpdateList(Guid id, [FromBody] UpdateListDto updateListDto)
     {
         if (!ModelState.IsValid)
         {
@@ -59,19 +63,19 @@ public class ListController: ControllerBase
             var errorResponse = ApiResponse<ListDto>.ErrorResponse("Invalid data", 400, errors);
             return BadRequest(errorResponse);
         }
-        var response = await _listService.UpdateListAsync(id, updateListDto);
-        if (!response.success)
+        var response = await _listService.UpdateAsync(id, updateListDto);
+        if (!response.Success)
         {
-            return BadRequest(response);
+            return NotFound(response);
         }
         return Ok(response);
     }
     
     [HttpDelete("{id}")]
-    public async Task<IActionResult<ApiResponse<bool>>> DeleteList(Guid id)
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteList(Guid id)
     {
-        var response = await _listService.DeleteListAsync(id);
-        if (!response.success)
+        var response = await _listService.DeleteAsync(id);
+        if (!response.Success)
         {
             return NotFound(response);
         }

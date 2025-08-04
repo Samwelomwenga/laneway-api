@@ -1,12 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace DefaultNamespace;
 
 public interface IBoardService
 {
-    Task<List<Board>> GetAllAsync(BoardSearchDto searchDto);
-    Task<Board?> GetByIdAsync(Guid id);
-    Task<Board> CreateAsync(Board board);
-    Task<Board?> UpdateAsync(Guid id, Board board);
-    Task<bool> DeleteAsync(Guid id);
+    Task<PagedResponse<BoardDto>> GetAllAsync(BoardSearchDto searchDto);
+    Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id);
+    Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto);
+    Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardDto updateBoardDto);
+    Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 
 public class BoardService : IBoardService
@@ -18,7 +20,7 @@ public class BoardService : IBoardService
         _context = context;
     }
 
-    public async Task<List<Board>> GetAllAsync(BoardSearchDto searchDto)
+    public async Task<PagedResponse<BoardDto>> GetAllAsync(BoardSearchDto searchDto)
     {
         try
         {
@@ -27,8 +29,8 @@ public class BoardService : IBoardService
             if (!string.IsNullOrEmpty(searchDto.SearchTerm))
             {
                 query = query.Where(b => b.Name.Contains(searchDto.SearchTerm) || 
-                                         b.Title.Contains(searchDto.SearchTerm) || 
-                                         b.Description.Contains(searchDto.SearchTerm));
+                                         (b.Title != null && b.Title.Contains(searchDto.SearchTerm)) || 
+                                         (b.Description != null && b.Description.Contains(searchDto.SearchTerm)));
             }
             if (searchDto.IsArchived.HasValue)
             {
@@ -40,124 +42,116 @@ public class BoardService : IBoardService
                 query = query.Where(b => b.WorkspaceId == searchDto.WorkspaceId.Value);
             }
 
-            if (searchDto.Visibility.HasValue)
+            if (!string.IsNullOrEmpty(searchDto.Visibility))
             {
-                query = query.Where(b => b.Visibility == searchDto.Visibility.Value);
+                query = query.Where(b => b.Visibility == searchDto.Visibility);
             }
         
             var totalCount = await query.CountAsync();
             var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
-            boards = query
+            var boards = await query
                 .OrderBy(b => b.CreatedAt)
                 .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
                 .Take(searchDto.PageSize)
                 .ToListAsync();
-            var boardDto = boards.Select(MapToDto).ToList();
+            var boardDtos = boards.Select(MapToDto).ToList();
         
-            var response = new PagedResult<BoardDto>
+            return new PagedResponse<BoardDto>
             {
-                Data = boardDto,
+                Data = boardDtos,
                 TotalCount = totalCount,
                 PageSize = searchDto.PageSize,
                 CurrentPage = searchDto.PageNumber,
                 TotalPages = totalPages
             };
-            
-            return <ApiResponse<PagedResult<BoardDto>>>.SuccessResponse(response, "Boards retrieved successfully", 200);
-
         }
         catch (Exception e)
         {
-            return <ApiResponse<List<BoardDto>>>.ErrorResponse("An error occurred while retrieving boards", 500,
+            return PagedResponse<BoardDto>.ErrorResponse("An error occurred while retrieving boards", 500,
                 new List<string> { e.Message });
         }
-       
     }
 
-    public async Task<Board?> GetByIdAsync(Guid id)
+    public async Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id)
     {
         try
         {
             var existingBoard = await _context.Boards.FindAsync(id);
             if (existingBoard == null)
             {
-                return <ApiResponse<BoardDto>>.ErrorResponse("Board not found", 404);
+                return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
             }
             var boardDto = MapToDto(existingBoard);
-            return <ApiResponse<BoardDto>>.SuccessResponse(boardDto, "Board retrieved successfully", 200);
-
+            return ApiResponse<BoardDto>.SuccessResponse(boardDto, "Board retrieved successfully", 200);
         }
         catch (Exception e)
         {
-            return <ApiResponse<BoardDto>>.ErrorResponse("An error occurred while retrieving the board", 500,
+            return ApiResponse<BoardDto>.ErrorResponse("An error occurred while retrieving the board", 500,
                 new List<string> { e.Message });
         }
     }
 
-    public async Task<Board> CreateAsync(Board board)
+    public async Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto)
     {
         try
         {
-            var boardEntity = MapToEntity(board);
+            var boardEntity = MapToEntity(createBoardDto);
             _context.Boards.Add(boardEntity);
             await _context.SaveChangesAsync();
             var boardDto = MapToDto(boardEntity);
-            return <ApiResponse<BoardDto>>.SuccessResponse(boardDto, "Board created successfully", 201);
-
+            return ApiResponse<BoardDto>.SuccessResponse(boardDto, "Board created successfully", 201);
         }
         catch (Exception e)
         {
-           return <ApiResponse<BoardDto>>.ErrorResponse("An error occurred while creating the board", 500,
+           return ApiResponse<BoardDto>.ErrorResponse("An error occurred while creating the board", 500,
                 new List<string> { e.Message });
         }
     }
 
-    public async Task<Board?> UpdateAsync(Guid id, Board board)
+    public async Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardDto updateBoardDto)
     {
         try
         {
             var existingBoard = await _context.Boards.FindAsync(id);
             if (existingBoard == null)
             {
-                return <ApiResponse<BoardDto>>.ErrorResponse("Board not found", 404);
+                return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
             }
 
-            existingBoard.Name = board.Name;
-            existingBoard.Description = board.Description;
-            existingBoard.Title = board.Title;
-            existingBoard.WorkspaceId = board.WorkspaceId;
-            existingBoard.OwnerId = board.OwnerId;
-            existingBoard.Visibility = board.Visibility;
-            existingBoard.IsArchived = board.IsArchived;
+            existingBoard.Name = updateBoardDto.Name;
+            existingBoard.Description = updateBoardDto.Description;
+            existingBoard.Title = updateBoardDto.Title;
+            existingBoard.WorkspaceId = updateBoardDto.WorkspaceId;
+            existingBoard.OwnerId = updateBoardDto.OwnerId;
+            existingBoard.Visibility = updateBoardDto.Visibility;
+            existingBoard.IsArchived = updateBoardDto.IsArchived;
             existingBoard.UpdatedAt = DateTime.UtcNow;
-            existingBoard.UpdatedBy = Guid.NewGuid(); // Assuming the updater's ID is set here
+            existingBoard.UpdatedBy = Guid.NewGuid(); // This should be set to the current user's ID
 
             await _context.SaveChangesAsync();
             var updatedBoardDto = MapToDto(existingBoard);
-            return <ApiResponse<BoardDto>>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
-
+            return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
         }
         catch (Exception e)
         {
-            return <ApiResponse<BoardDto>>.ErrorResponse("An error occurred while updating the board", 500,
+            return ApiResponse<BoardDto>.ErrorResponse("An error occurred while updating the board", 500,
                 new List<string> { e.Message });
         }
     }
 
-    public async Task<bool> DeleteAsync(Guid id)
+    public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
         try
         {
             var existingBoard = await _context.Boards.FindAsync(id);
             if (existingBoard == null)
             {
-                return <ApiResponse<bool>>.ErrorResponse("Board not found", 404);
+                return ApiResponse<bool>.ErrorResponse("Board not found", 404);
             }
 
             _context.Boards.Remove(existingBoard);
             await _context.SaveChangesAsync();
-            return <ApiResponse<bool>>.SuccessResponse(true, "Board deleted successfully", 204);
-
+            return ApiResponse<bool>.SuccessResponse(true, "Board deleted successfully", 204);
         }
         catch (Exception e)
         {
@@ -165,41 +159,40 @@ public class BoardService : IBoardService
                 new List<string> { e.Message });
         }
     }
-}
-private static BoardDto MapToDto(Board board)
-{
-    return new BoardDto
-    (
-        board.Id,
-        board.Name,
-        board.Description,
-        board.Title,
-        board.WorkspaceId,
-        board.OwnerId,
-        board.Visibility,
-        board.IsArchived,
-        board.CreatedAt,
-        board.UpdatedAt,
-        board.CreatedBy,
-        board.UpdatedBy
-    );
-}
 
-private static Board MapToEntity(CreateBoardDto createBoardDto)
-{
-    return new Board
+    private static BoardDto MapToDto(Board board)
     {
-        Id = Guid.NewGuid(),
-        Name = createBoardDto.Name,
-        Description = createBoardDto.Description,
-        Title = createBoardDto.Title,
-        WorkspaceId = createBoardDto.WorkspaceId,
-        OwnerId = createBoardDto.OwnerId,
-        Visibility = createBoardDto.Visibility,
-        IsArchived = createBoardDto.IsArchived,
-        CreatedAt = DateTime.UtcNow,
-        CreatedBy = Guid.NewGuid() // Assuming the creator's ID is set here
-    };
+        return new BoardDto
+        (
+            board.Id,
+            board.Name,
+            board.Description ?? string.Empty,
+            board.Title,
+            board.WorkspaceId,
+            board.OwnerId,
+            board.Visibility,
+            board.IsArchived,
+            board.CreatedAt,
+            board.UpdatedAt,
+            board.CreatedBy,
+            board.UpdatedBy
+        );
+    }
+
+    private static Board MapToEntity(CreateBoardDto createBoardDto)
+    {
+        return new Board
+        {
+            Id = Guid.NewGuid(),
+            Name = createBoardDto.Name,
+            Description = createBoardDto.Description,
+            Title = createBoardDto.Title,
+            WorkspaceId = createBoardDto.WorkspaceId,
+            OwnerId = createBoardDto.OwnerId,
+            Visibility = createBoardDto.Visibility,
+            IsArchived = createBoardDto.IsArchived,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Guid.NewGuid() // This should be set to the current user's ID
+        };
+    }
 }
-
-

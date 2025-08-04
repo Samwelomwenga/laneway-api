@@ -8,8 +8,12 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
-   .AddNegotiate();
+// Register application services
+builder.Services.AddScoped<IBoardService, BoardService>();
+builder.Services.AddScoped<ICardService, CardService>();
+builder.Services.AddScoped<ILabelService, LabelService>();
+builder.Services.AddScoped<IListService, ListService>();
+builder.Services.AddScoped<IWorkSpaceService, WorkSpaceService>();
 
 builder.Services.AddAuthorization(options =>
 {

@@ -19,7 +19,7 @@ public record CardDto
      DateTime? UpdatedAt , 
      Guid CreatedBy ,
      Guid? UpdatedBy
-): 
+);
 
 public record CreateCardDto
 (
