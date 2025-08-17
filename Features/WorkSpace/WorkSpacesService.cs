@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace DefaultNamespace;
 
@@ -46,14 +47,10 @@ public class WorkSpaceService : IWorkSpaceService
                 .OrderBy(ws => ws.CreatedAt)
                 .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
                 .Take(searchDto.PageSize)
-                .Select(ws => new
-                {
-                   workSpace = ws,
-                   boardIds = ws.Boards.Select(b => b.Id).ToList()
-                })
+                .Include(ws => ws.Boards)
                 .ToListAsync();
 
-            var workSpaceDtos = workSpaces.Select(ws => MapToDto(ws.workSpace, ws.boardIds)).ToList();
+            var workSpaceDtos = workSpaces.Select(ws => MapToDto(ws, ws.Boards.Select(b => b.Id).ToList())).ToList();
 
             return PagedResponse<WorkSpaceDto>.SuccessResponse(
                 workSpaceDtos,
@@ -76,17 +73,13 @@ public class WorkSpaceService : IWorkSpaceService
         {
             var existingWorkSpace = await _context.WorkSpaces
                 .Where(ws => ws.Id == id)
-                .Select(ws => new
-                {
-                    workSpace = ws,
-                    boardIds = ws.Boards.Select(b => b.Id).ToList()
-                })
+                .Include(ws => ws.Boards)
                 .FirstOrDefaultAsync();
             if (existingWorkSpace == null)
             {
                return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
             }
-            var workSpaceDto = MapToDto(existingWorkSpace.workSpace, existingWorkSpace.boardIds);
+            var workSpaceDto = MapToDto(existingWorkSpace,  existingWorkSpace.Boards.Select(b => b.Id).ToList());
             return ApiResponse<WorkSpaceDto>.SuccessResponse(workSpaceDto, "Workspace retrieved successfully", 200);
         }
         catch (Exception e)
