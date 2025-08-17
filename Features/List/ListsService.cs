@@ -102,7 +102,7 @@ public class ListService : IListService
                 return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
             }
 
-            var listDto = MapToDto(list);
+            var listDto = MapToDto(list, list.Cards.Select(c => c.Id).ToList());
             return ApiResponse<ListDto>.SuccessResponse(listDto, "List retrieved successfully", 200);
         }
         catch (Exception e)
@@ -139,9 +139,10 @@ public class ListService : IListService
                 .OrderBy(l => l.Position)
                 .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
                 .Take(searchDto.PageSize)
+                .Include(l => l.Cards)
                 .ToListAsync();
 
-            var listDtos = lists.Select(MapToDto).ToList();
+            var listDtos = lists.Select(l => MapToDto(l, l.Cards.Select(c => c.Id).ToList())).ToList();
 
             return PagedResponse<ListDto>.SuccessResponse(
                 listDtos,
@@ -158,7 +159,7 @@ public class ListService : IListService
         }
     }
     
-    private static ListDto MapToDto(List list)
+    private static ListDto MapToDto(List list, List<Guid>? cardIds = null)
     {
         return new ListDto(
             list.Id,
@@ -167,6 +168,7 @@ public class ListService : IListService
             list.BoardId,
             list.Color,
             list.IsArchived,
+            cardIds ?? new List<Guid>(),
             list.CreatedAt,
             list.UpdatedAt,
             list.CreatedBy,

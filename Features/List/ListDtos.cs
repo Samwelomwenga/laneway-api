@@ -8,6 +8,7 @@ public record ListDto
     Guid BoardId,
     string Color,
     bool IsArchived,
+    List<Guid> CardIds,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     Guid CreatedBy,
