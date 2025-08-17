@@ -53,8 +53,9 @@ public class BoardService : IBoardService
                 .OrderBy(b => b.CreatedAt)
                 .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
                 .Take(searchDto.PageSize)
+                .Include(b => b.Lists)
                 .ToListAsync();
-            var boardDtos = boards.Select(MapToDto).ToList();
+            var boardDtos = boards.Select(b => MapToDto(b, b.Lists.Select(l => l.Id).ToList())).ToList();
         
             return PagedResponse<BoardDto>.SuccessResponse(
                 boardDtos, 
@@ -80,7 +81,7 @@ public class BoardService : IBoardService
             {
                 return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
             }
-            var boardDto = MapToDto(existingBoard);
+            var boardDto = MapToDto(existingBoard, existingBoard.Lists.Select(l => l.Id).ToList());
             return ApiResponse<BoardDto>.SuccessResponse(boardDto, "Board retrieved successfully", 200);
         }
         catch (Exception e)
@@ -159,7 +160,7 @@ public class BoardService : IBoardService
         }
     }
 
-    private static BoardDto MapToDto(Board board)
+    private static BoardDto MapToDto(Board board, List<Guid>? listIds = null)
     {
         return new BoardDto
         (
@@ -171,6 +172,7 @@ public class BoardService : IBoardService
             board.OwnerId,
             board.Visibility,
             board.IsArchived,
+            listIds ?? new List<Guid>(),
             board.CreatedAt,
             board.UpdatedAt,
             board.CreatedBy,

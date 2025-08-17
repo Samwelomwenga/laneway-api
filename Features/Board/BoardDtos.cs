@@ -10,6 +10,7 @@ public record BoardDto
     Guid OwnerId,
     string Visibility,
     bool IsArchived,
+    List<Guid> ListIds,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     Guid CreatedBy,
