@@ -60,3 +60,10 @@ riderModule.iml
 
 # JetBrains Rider
 .idea/
+*.user
+
+managed_context/
+
+qodana.yaml
+
+test_suite_analysis/
