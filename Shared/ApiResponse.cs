@@ -39,23 +39,6 @@ public  class PagedResponse<T> : ApiResponse<List<T>>
     public int CurrentPage { get; set; }
     public int TotalPages { get; set; }
     
-    public static PagedResponse<T> SuccessResponse(List<T> data, int totalCount, int pageSize, int currentPage, string message = "Data retrieved successfully")
-    {
-        var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
-        
-        return new PagedResponse<T>
-        {
-            Success = true,
-            Message = totalCount > 0 ? message : "No data found",
-            StatusCode = 200,
-            Data = data,
-            TotalCount = totalCount,
-            PageSize = pageSize,
-            CurrentPage = currentPage,
-            TotalPages = totalPages
-        };
-    }
-    
     public static new PagedResponse<T> ErrorResponse(string message, int statusCode = 400, List<string>? errors = null)
     {
         return new PagedResponse<T>
