@@ -8,8 +8,5 @@
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
         <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
-        
-        <!-- Suppress specific code analysis rules that are not critical for functionality -->
-        <NoWarn>$(NoWarn);CA1515;CA2227;CA1002;CA2007;CA1031;CA1062;CA1000;CA1014</NoWarn>
     </PropertyGroup>
 </Project>
