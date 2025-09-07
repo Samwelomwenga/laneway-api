@@ -29,6 +29,33 @@ namespace prodigy_board_API.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Users",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    FirstName = table.Column<string>(type: "varchar(50)", nullable: false),
+                    LastName = table.Column<string>(type: "varchar(50)", nullable: false),
+                    Username = table.Column<string>(type: "varchar(50)", nullable: false),
+                    Email = table.Column<string>(type: "varchar(255)", nullable: false),
+                    PasswordHash = table.Column<string>(type: "varchar(500)", nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
+                    PhoneNumber = table.Column<string>(type: "varchar(20)", nullable: true, defaultValue: ""),
+                    ProfilePictureUrl = table.Column<string>(type: "text", nullable: true),
+                    Bio = table.Column<string>(type: "varchar(500)", nullable: true, defaultValue: ""),
+                    Language = table.Column<string>(type: "varchar(10)", nullable: false, defaultValue: "en-US"),
+                    TimeZone = table.Column<string>(type: "varchar(50)", nullable: false, defaultValue: "UTC"),
+                    Location = table.Column<string>(type: "varchar(300)", nullable: false, defaultValue: ""),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP AT TIME ZONE 'UTC'"),
+                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Users", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "WorkSpaces",
                 columns: table => new
                 {
@@ -45,6 +72,30 @@ namespace prodigy_board_API.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_WorkSpaces", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Accounts",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "varchar(100)", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP AT TIME ZONE 'UTC'"),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
+                    UpdatedBy = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Accounts", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Accounts_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -140,6 +191,11 @@ namespace prodigy_board_API.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Accounts_UserId",
+                table: "Accounts",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Boards_WorkspaceId",
                 table: "Boards",
                 column: "WorkspaceId");
@@ -158,13 +214,25 @@ namespace prodigy_board_API.Migrations
                 name: "IX_Lists_BoardId",
                 table: "Lists",
                 column: "BoardId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_Email",
+                table: "Users",
+                column: "Email",
+                unique: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "Accounts");
+
+            migrationBuilder.DropTable(
                 name: "Cards");
+
+            migrationBuilder.DropTable(
+                name: "Users");
 
             migrationBuilder.DropTable(
                 name: "Labels");
