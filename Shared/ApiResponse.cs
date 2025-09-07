@@ -1,3 +1,4 @@
+
 namespace DefaultNamespace;
 
 public class ApiResponse<T>
@@ -38,6 +39,22 @@ public  class PagedResponse<T> : ApiResponse<List<T>>
     public int PageSize { get; set; }
     public int CurrentPage { get; set; }
     public int TotalPages { get; set; }
+    
+    public static PagedResponse<T> SuccessResponse(List<T> data, int totalCount, int pageSize, int currentPage, string message = "Request was successful", int statusCode = 200)
+    {
+        var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+        return new PagedResponse<T>
+        {
+            Success = true,
+            Message = message,
+            Data = data,
+            StatusCode = statusCode,
+            TotalCount = totalCount,
+            PageSize = pageSize,
+            CurrentPage = currentPage,
+            TotalPages = totalPages
+        };
+    }
     
     public static new PagedResponse<T> ErrorResponse(string message, int statusCode = 400, List<string>? errors = null)
     {
