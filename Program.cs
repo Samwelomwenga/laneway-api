@@ -16,6 +16,8 @@ builder.Services.AddScoped<ICardService, CardService>();
 builder.Services.AddScoped<ILabelService, LabelService>();
 builder.Services.AddScoped<IListService, ListService>();
 builder.Services.AddScoped<IWorkSpaceService, WorkSpaceService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
 
 // Add Entity Framework with in-memory database for development
 builder.Services.AddDbContext<ApplicationDbContext>(options =>

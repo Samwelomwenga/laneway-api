@@ -1,0 +1,211 @@
+using Microsoft.EntityFrameworkCore;
+
+namespace DefaultNamespace;
+
+public interface IUserService
+{
+    Task<PagedResponse<UserDto>> GetAllAsync(UserSearchDto searchDto);
+    Task<ApiResponse<UserDto>> GetByIdAsync(Guid id);
+    Task<ApiResponse<UserDto>> CreateAsync(CreateUserDto createUserDto);
+    Task<ApiResponse<UserDto>> UpdateAsync(Guid id, UpdateUserDto updateUserDto);
+    Task<ApiResponse<bool>> DeleteAsync(Guid id);
+}
+
+public class UserService : IUserService
+{
+    private readonly ApplicationDbContext _context;
+
+    public UserService(ApplicationDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<PagedResponse<UserDto>> GetAllAsync(UserSearchDto searchDto)
+    {
+        try
+        {
+            var query = _context.Users.AsQueryable();
+
+            if (!string.IsNullOrEmpty(searchDto.SearchTerm))
+            {
+                query = query.Where(u => u.Username.Contains(searchDto.SearchTerm) || 
+                                        u.Email.Contains(searchDto.SearchTerm) ||
+                                        u.FirstName.Contains(searchDto.SearchTerm) ||
+                                        u.LastName.Contains(searchDto.SearchTerm));
+
+            }
+            
+
+            if (searchDto.IsActive.HasValue)
+            {
+                query = query.Where(u => u.IsActive == searchDto.IsActive.Value);
+            }
+
+            var totalCount = await query.CountAsync();
+            var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
+            var users = await query
+                .OrderBy(u => u.CreatedAt)
+                .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
+                .Take(searchDto.PageSize)
+                .Include(u => u.Accounts)
+                .ToListAsync();
+
+            var userDtos = users.Select(MapToDto).ToList();
+
+            return PagedResponse<UserDto>.SuccessResponse(
+                userDtos,
+                totalCount,
+                searchDto.PageSize,
+                searchDto.PageNumber,
+                "Users retrieved successfully"
+            );
+        }
+        catch (Exception e)
+        {
+            return PagedResponse<UserDto>.ErrorResponse("An error occurred while retrieving users", 500,
+                new List<string> { e.Message });
+        }
+    }
+
+    public async Task<ApiResponse<UserDto>> GetByIdAsync(Guid id)
+    {
+        try
+        {
+            var existingUser = await _context.Users
+                .Include(u => u.Accounts)
+                .Where(u => u.Id == id)
+                .FirstOrDefaultAsync();
+            if (existingUser == null)
+            {
+               return ApiResponse<UserDto>.ErrorResponse("User not found", 404);
+            }
+            var userDto = MapToDto(existingUser);
+            return ApiResponse<UserDto>.SuccessResponse(userDto, "User retrieved successfully", 200);
+        }
+        catch (Exception e)
+        {
+            return ApiResponse<UserDto>.ErrorResponse("An error occurred while retrieving the user", 500,
+                new List<string> { e.Message });
+        }
+    }
+
+    public async Task<ApiResponse<UserDto>> CreateAsync(CreateUserDto createUserDto)
+    {
+        try
+        {
+            var newUser = MapToEntity(createUserDto);
+            _context.Users.Add(newUser);
+            await _context.SaveChangesAsync();
+            return ApiResponse<UserDto>.SuccessResponse(MapToDto(newUser), "User created successfully", 201);
+        }
+        catch (Exception e)
+        {
+           return ApiResponse<UserDto>.ErrorResponse("An error occurred while creating the user", 500,
+                new List<string> { e.Message });
+        }
+    }
+
+    public async Task<ApiResponse<UserDto>> UpdateAsync(Guid id, UpdateUserDto updateUserDto)
+    {
+        try
+        {
+            var existingUser = await _context.Users.FindAsync(id);
+            if (existingUser == null)
+            {
+                return ApiResponse<UserDto>.ErrorResponse("User not found", 404);
+            }
+
+            existingUser.Username = updateUserDto.Username;
+            existingUser.Email = updateUserDto.Email;
+            existingUser.FirstName = updateUserDto.FirstName;
+            existingUser.LastName = updateUserDto.LastName;
+            existingUser.PhoneNumber = updateUserDto.PhoneNumber;
+            existingUser.Bio = updateUserDto.Bio;
+            existingUser.Language = updateUserDto.Language;
+            existingUser.TimeZone = updateUserDto.TimeZone;
+            existingUser.Location = updateUserDto.Location;
+            existingUser.ProfilePictureUrl = updateUserDto.ProfilePictureUrl;
+            existingUser.IsActive = updateUserDto.IsActive;
+            existingUser.UpdatedAt = DateTime.UtcNow;
+            existingUser.UpdatedBy = Guid.NewGuid(); // This should be set to the current user's ID
+
+            _context.Users.Update(existingUser);
+            await _context.SaveChangesAsync();
+
+            return ApiResponse<UserDto>.SuccessResponse(MapToDto(existingUser), "User updated successfully", 200);
+        }
+        catch (Exception e)
+        {
+            return ApiResponse<UserDto>.ErrorResponse("An error occurred while updating the user", 500,
+                new List<string> { e.Message });
+        }
+    }
+    
+    public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
+    {
+        try
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+            {
+                return ApiResponse<bool>.ErrorResponse("User not found", 404);
+            }
+
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+            return ApiResponse<bool>.SuccessResponse(true, "User deleted successfully", 200);
+        }
+        catch (Exception e)
+        {
+            return ApiResponse<bool>.ErrorResponse("An error occurred while deleting the user", 500,
+                new List<string> { e.Message });
+        }
+    }
+    
+    private static UserDto MapToDto(User user)
+    {
+        var accounts = user.Accounts?.Select(a => new AccountDto(a.Id, a.Name, a.CreatedBy, a.CreatedAt, a.UpdatedAt, a.UpdatedBy, null!)).ToList() ?? new List<AccountDto>();
+        return new UserDto
+        (
+            user.Id,
+            user.Username,
+            user.Email,
+            user.FirstName,
+            user.LastName,
+            user.PhoneNumber,
+            user.Bio,
+            user.Language,
+            user.TimeZone,
+            user.Location,
+            user.ProfilePictureUrl,
+            user.IsActive,
+            accounts,
+            user.CreatedAt,
+            user.UpdatedAt,
+            user.CreatedBy,
+            user.UpdatedBy
+        );
+    }
+    
+    private static User MapToEntity(CreateUserDto createUserDto)
+    {
+        return new User
+        {
+            Id = Guid.NewGuid(),
+            Username = createUserDto.Username,
+            Email = createUserDto.Email,
+            FirstName = createUserDto.FirstName,
+            LastName = createUserDto.LastName,
+            PhoneNumber = createUserDto.PhoneNumber,
+            Bio = createUserDto.Bio,
+            Language = createUserDto.Language,
+            TimeZone = createUserDto.TimeZone,
+            Location = createUserDto.Location,
+            ProfilePictureUrl = createUserDto.ProfilePictureUrl,
+            PasswordHash = "temp_hash", // This should be properly hashed
+            IsActive = createUserDto.IsActive,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Guid.NewGuid() // This should be set to the current user's ID
+        };
+    }
+}
