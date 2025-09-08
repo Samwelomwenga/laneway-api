@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace DefaultNamespace;
 
@@ -28,6 +29,22 @@ public class UsersController : ControllerBase
         {
             return NotFound(response);
         }
+        return Ok(response);
+    }
+
+    [HttpGet("username-exists")]
+    public async Task<ActionResult<ApiResponse<bool>>> CheckUserNameExists([FromQuery][Required] string username)
+    {
+        if(!ModelState.IsValid)
+        {
+            var errors = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .ToList();
+            var errorResponse = ApiResponse<bool>.ErrorResponse("Invalid data", 400, errors);
+            return BadRequest(errorResponse);
+        }
+        var response = await _userService.UserNameExistsAsync(username);
         return Ok(response);
     }
 
