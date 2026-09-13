@@ -81,6 +81,14 @@ public class LabelService : ILabelService
             return ApiResponse<LabelDto>.ErrorResponse("Label not found", 404);
         }
 
+        var nameTaken = await _context.Labels
+            .AnyAsync(l => l.Id != id && l.Name.ToLower() == updateLabelDto.Name.ToLower());
+        if (nameTaken)
+        {
+            return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
+                new List<string> { "A label with this name already exists." });
+        }
+
         existingLabel.Name = updateLabelDto.Name;
         existingLabel.Color = updateLabelDto.Color;
         existingLabel.UpdatedAt = DateTime.UtcNow;
