@@ -23,136 +23,96 @@ public class WorkSpaceService : IWorkSpaceService
 
     public async Task<PagedResponse<WorkSpaceDto>> GetAllAsync(WorkSpaceSearchDto searchDto)
     {
-        try
+        var query = _context.WorkSpaces.AsQueryable();
+
+        if (!string.IsNullOrEmpty(searchDto.SearchTerm))
         {
-            var query = _context.WorkSpaces.AsQueryable();
-
-            if (!string.IsNullOrEmpty(searchDto.SearchTerm))
-            {
-                query = query.Where(ws => ws.Name.Contains(searchDto.SearchTerm) || 
-                                          (ws.Description != null && ws.Description.Contains(searchDto.SearchTerm)));
-            }
-            if (searchDto.IsArchived.HasValue)
-            {
-                query = query.Where(ws => ws.IsArchived == searchDto.IsArchived.Value);
-            }
-            if (!string.IsNullOrEmpty(searchDto.Visibility))
-            {
-                query = query.Where(ws => ws.Visibility == searchDto.Visibility);
-            }
-
-            var totalCount = await query.CountAsync();
-            var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
-            var workSpaces = await query
-                .OrderBy(ws => ws.CreatedAt)
-                .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-                .Take(searchDto.PageSize)
-                .Include(ws => ws.Boards)
-                .ToListAsync();
-
-            var workSpaceDtos = workSpaces.Select(ws => MapToDto(ws, ws.Boards.Select(b => b.Id).ToList())).ToList();
-
-            return PagedResponse<WorkSpaceDto>.SuccessResponse(
-                workSpaceDtos,
-                totalCount,
-                searchDto.PageSize,
-                searchDto.PageNumber,
-                "Workspaces retrieved successfully"
-            );
+            query = query.Where(ws => ws.Name.Contains(searchDto.SearchTerm) ||
+                                      (ws.Description != null && ws.Description.Contains(searchDto.SearchTerm)));
         }
-        catch (Exception e)
+        if (searchDto.IsArchived.HasValue)
         {
-            return PagedResponse<WorkSpaceDto>.ErrorResponse("An error occurred while retrieving workspaces", 500,
-                new List<string> { e.Message });
+            query = query.Where(ws => ws.IsArchived == searchDto.IsArchived.Value);
         }
+        if (!string.IsNullOrEmpty(searchDto.Visibility))
+        {
+            query = query.Where(ws => ws.Visibility == searchDto.Visibility);
+        }
+
+        var totalCount = await query.CountAsync();
+        var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
+        var workSpaces = await query
+            .OrderBy(ws => ws.CreatedAt)
+            .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
+            .Take(searchDto.PageSize)
+            .Include(ws => ws.Boards)
+            .ToListAsync();
+
+        var workSpaceDtos = workSpaces.Select(ws => MapToDto(ws, ws.Boards.Select(b => b.Id).ToList())).ToList();
+
+        return PagedResponse<WorkSpaceDto>.SuccessResponse(
+            workSpaceDtos,
+            totalCount,
+            searchDto.PageSize,
+            searchDto.PageNumber,
+            "Workspaces retrieved successfully"
+        );
     }
 
     public async Task<ApiResponse<WorkSpaceDto>> GetByIdAsync(Guid id)
     {
-        try
+        var existingWorkSpace = await _context.WorkSpaces
+            .Where(ws => ws.Id == id)
+            .Include(ws => ws.Boards)
+            .FirstOrDefaultAsync();
+        if (existingWorkSpace == null)
         {
-            var existingWorkSpace = await _context.WorkSpaces
-                .Where(ws => ws.Id == id)
-                .Include(ws => ws.Boards)
-                .FirstOrDefaultAsync();
-            if (existingWorkSpace == null)
-            {
-               return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
-            }
-            var workSpaceDto = MapToDto(existingWorkSpace,  existingWorkSpace.Boards.Select(b => b.Id).ToList());
-            return ApiResponse<WorkSpaceDto>.SuccessResponse(workSpaceDto, "Workspace retrieved successfully", 200);
+           return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
         }
-        catch (Exception e)
-        {
-            return ApiResponse<WorkSpaceDto>.ErrorResponse("An error occurred while retrieving the workspace", 500,
-                new List<string> { e.Message });
-        }
+        var workSpaceDto = MapToDto(existingWorkSpace,  existingWorkSpace.Boards.Select(b => b.Id).ToList());
+        return ApiResponse<WorkSpaceDto>.SuccessResponse(workSpaceDto, "Workspace retrieved successfully", 200);
     }
 
     public async Task<ApiResponse<WorkSpaceDto>> CreateAsync(CreateWorkSpaceDto createWorkSpaceDto)
     {
-        try
-        {
-            var newWorkSpace = MapToEntity(createWorkSpaceDto);
-            _context.WorkSpaces.Add(newWorkSpace);
-            await _context.SaveChangesAsync();
-            return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(newWorkSpace), "Workspace created successfully", 201);
-
-        }
-        catch (Exception e)
-        {
-           return ApiResponse<WorkSpaceDto>.ErrorResponse("An error occurred while creating the workspace", 500,
-                new List<string> { e.Message });
-        }
+        var newWorkSpace = MapToEntity(createWorkSpaceDto);
+        _context.WorkSpaces.Add(newWorkSpace);
+        await _context.SaveChangesAsync();
+        return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(newWorkSpace), "Workspace created successfully", 201);
     }
+
     public async Task<ApiResponse<WorkSpaceDto>> UpdateAsync(Guid id, UpdateWorkSpaceDto updateWorkSpaceDto)
     {
-        try
+        var existingWorkSpace = await _context.WorkSpaces.FindAsync(id);
+        if (existingWorkSpace == null)
         {
-            var existingWorkSpace = await _context.WorkSpaces.FindAsync(id);
-            if (existingWorkSpace == null)
-            {
-                return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
-            }
-
-            existingWorkSpace.Name = updateWorkSpaceDto.Name;
-            existingWorkSpace.Description = updateWorkSpaceDto.Description;
-            existingWorkSpace.Visibility = updateWorkSpaceDto.Visibility;
-            existingWorkSpace.IsArchived = updateWorkSpaceDto.IsArchived;
-
-            _context.WorkSpaces.Update(existingWorkSpace);
-            await _context.SaveChangesAsync();
-
-            return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(existingWorkSpace), "Workspace updated successfully", 200);
+            return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
         }
-        catch (Exception e)
-        {
-            return ApiResponse<WorkSpaceDto>.ErrorResponse("An error occurred while updating the workspace", 500,
-                new List<string> { e.Message });
-        }
+
+        existingWorkSpace.Name = updateWorkSpaceDto.Name;
+        existingWorkSpace.Description = updateWorkSpaceDto.Description;
+        existingWorkSpace.Visibility = updateWorkSpaceDto.Visibility;
+        existingWorkSpace.IsArchived = updateWorkSpaceDto.IsArchived;
+
+        _context.WorkSpaces.Update(existingWorkSpace);
+        await _context.SaveChangesAsync();
+
+        return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(existingWorkSpace), "Workspace updated successfully", 200);
     }
-    
+
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        try
+        var workSpace = await _context.WorkSpaces.FindAsync(id);
+        if (workSpace == null)
         {
-            var workSpace = await _context.WorkSpaces.FindAsync(id);
-            if (workSpace == null)
-            {
-                return ApiResponse<bool>.ErrorResponse("Workspace not found", 404);
-            }
+            return ApiResponse<bool>.ErrorResponse("Workspace not found", 404);
+        }
 
-            _context.WorkSpaces.Remove(workSpace);
-            await _context.SaveChangesAsync();
-            return ApiResponse<bool>.SuccessResponse(true, "Workspace deleted successfully", 200);
-        }
-        catch (Exception e)
-        {
-            return ApiResponse<bool>.ErrorResponse("An error occurred while deleting the workspace", 500,
-                new List<string> { e.Message });
-        }
+        _context.WorkSpaces.Remove(workSpace);
+        await _context.SaveChangesAsync();
+        return ApiResponse<bool>.SuccessResponse(true, "Workspace deleted successfully", 200);
     }
-    
+
     private static WorkSpaceDto MapToDto(WorkSpace workSpace, List<Guid>? boardIds = null)
     {
         return new WorkSpaceDto
@@ -169,7 +129,7 @@ public class WorkSpaceService : IWorkSpaceService
             boardIds ?? new List<Guid>()
         );
     }
-    
+
     private static WorkSpace MapToEntity(CreateWorkSpaceDto createWorkSpaceDto)
     {
         return new WorkSpace

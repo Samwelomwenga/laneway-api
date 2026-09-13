@@ -22,143 +22,103 @@ public class ListService : IListService
 
     public async Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto)
     {
-        try
-        {
-            var list = MapToEntity(createListDto);
+        var list = MapToEntity(createListDto);
 
-            _context.Lists.Add(list);
-            await _context.SaveChangesAsync();
-            var listDto = MapToDto(list);
+        _context.Lists.Add(list);
+        await _context.SaveChangesAsync();
+        var listDto = MapToDto(list);
 
-            return ApiResponse<ListDto>.SuccessResponse(listDto, "List created successfully", 201);
-        }
-        catch (Exception e)
-        {
-            return ApiResponse<ListDto>.ErrorResponse("An error occurred while creating the list", 500,
-                new List<string> { e.Message });
-        }
+        return ApiResponse<ListDto>.SuccessResponse(listDto, "List created successfully", 201);
     }
 
     public async Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListDto updateListDto)
     {
-        try
+        var list = await _context.Lists.FindAsync(id);
+        if (list == null)
         {
-            var list = await _context.Lists.FindAsync(id);
-            if (list == null)
-            {
-                return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
-            }
-
-            list.Name = updateListDto.Name;
-            list.Position = updateListDto.Position;
-            list.BoardId = updateListDto.BoardId;
-            list.Color = updateListDto.Color;
-            list.IsArchived = updateListDto.IsArchived;
-            list.UpdatedAt = DateTime.UtcNow;
-            list.UpdatedBy = Guid.NewGuid(); // This should be set to the current user's ID
-
-            _context.Lists.Update(list);
-            await _context.SaveChangesAsync();
-            var listDto = MapToDto(list);
-
-            return ApiResponse<ListDto>.SuccessResponse(listDto, "List updated successfully", 200);
+            return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
         }
-        catch (Exception e)
-        {
-            return ApiResponse<ListDto>.ErrorResponse("An error occurred while updating the list", 500,
-                new List<string> { e.Message });
-        }
+
+        list.Name = updateListDto.Name;
+        list.Position = updateListDto.Position;
+        list.BoardId = updateListDto.BoardId;
+        list.Color = updateListDto.Color;
+        list.IsArchived = updateListDto.IsArchived;
+        list.UpdatedAt = DateTime.UtcNow;
+        list.UpdatedBy = Guid.NewGuid(); // This should be set to the current user's ID
+
+        _context.Lists.Update(list);
+        await _context.SaveChangesAsync();
+        var listDto = MapToDto(list);
+
+        return ApiResponse<ListDto>.SuccessResponse(listDto, "List updated successfully", 200);
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        try
+        var list = await _context.Lists.FindAsync(id);
+        if (list == null)
         {
-            var list = await _context.Lists.FindAsync(id);
-            if (list == null)
-            {
-                return ApiResponse<bool>.ErrorResponse("List not found", 404);
-            }
+            return ApiResponse<bool>.ErrorResponse("List not found", 404);
+        }
 
-            _context.Lists.Remove(list);
-            await _context.SaveChangesAsync();
-                
-            return ApiResponse<bool>.SuccessResponse(true, "List deleted successfully", 204);
-        }
-        catch (Exception e)
-        {
-            return ApiResponse<bool>.ErrorResponse("An error occurred while deleting the list", 500,
-                new List<string> { e.Message });
-        }
+        _context.Lists.Remove(list);
+        await _context.SaveChangesAsync();
+
+        return ApiResponse<bool>.SuccessResponse(true, "List deleted successfully", 204);
     }
 
     public async Task<ApiResponse<ListDto>> GetByIdAsync(Guid id)
     {
-        try
+        var list = await _context.Lists.FindAsync(id);
+        if (list == null)
         {
-            var list = await _context.Lists.FindAsync(id);
-            if (list == null)
-            {
-                return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
-            }
+            return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
+        }
 
-            var listDto = MapToDto(list, list.Cards.Select(c => c.Id).ToList());
-            return ApiResponse<ListDto>.SuccessResponse(listDto, "List retrieved successfully", 200);
-        }
-        catch (Exception e)
-        {
-           return ApiResponse<ListDto>.ErrorResponse("An error occurred while retrieving the list", 500,
-                new List<string> { e.Message });
-        }
+        var listDto = MapToDto(list, list.Cards.Select(c => c.Id).ToList());
+        return ApiResponse<ListDto>.SuccessResponse(listDto, "List retrieved successfully", 200);
     }
-    
+
     public async Task<PagedResponse<ListDto>> GetAllAsync(ListSearchDto searchDto)
     {
-        try
+        var query = _context.Lists.AsQueryable();
+
+        if (searchDto.BoardId.HasValue)
         {
-            var query = _context.Lists.AsQueryable();
-
-            if (searchDto.BoardId.HasValue)
-            {
-                query = query.Where(l => l.BoardId == searchDto.BoardId.Value);
-            }
-
-            if (searchDto.IsArchived.HasValue)
-            {
-                query = query.Where(l => l.IsArchived == searchDto.IsArchived.Value);
-            }
-
-            if (!string.IsNullOrEmpty(searchDto.SearchTerm))
-            {
-                query = query.Where(l => l.Name.Contains(searchDto.SearchTerm));
-            }
-
-            var totalCount = await query.CountAsync();
-            var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
-            var lists = await query
-                .OrderBy(l => l.Position)
-                .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-                .Take(searchDto.PageSize)
-                .Include(l => l.Cards)
-                .ToListAsync();
-
-            var listDtos = lists.Select(l => MapToDto(l, l.Cards.Select(c => c.Id).ToList())).ToList();
-
-            return PagedResponse<ListDto>.SuccessResponse(
-                listDtos,
-                totalCount,
-                searchDto.PageSize,
-                searchDto.PageNumber,
-                "Lists retrieved successfully"
-            );
+            query = query.Where(l => l.BoardId == searchDto.BoardId.Value);
         }
-        catch (Exception e)
+
+        if (searchDto.IsArchived.HasValue)
         {
-            return PagedResponse<ListDto>.ErrorResponse("An error occurred while retrieving lists", 500,
-                new List<string> { e.Message });
+            query = query.Where(l => l.IsArchived == searchDto.IsArchived.Value);
         }
+
+        if (!string.IsNullOrEmpty(searchDto.SearchTerm))
+        {
+            query = query.Where(l => l.Name.Contains(searchDto.SearchTerm));
+        }
+
+        var totalCount = await query.CountAsync();
+        var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
+        var lists = await query
+            .OrderBy(l => l.Position)
+            .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
+            .Take(searchDto.PageSize)
+            .Include(l => l.Cards)
+            .ToListAsync();
+
+        var listDtos = lists.Select(l => MapToDto(l, l.Cards.Select(c => c.Id).ToList())).ToList();
+
+        return PagedResponse<ListDto>.SuccessResponse(
+            listDtos,
+            totalCount,
+            searchDto.PageSize,
+            searchDto.PageNumber,
+            "Lists retrieved successfully"
+        );
     }
-    
+
     private static ListDto MapToDto(List list, List<Guid>? cardIds = null)
     {
         return new ListDto(
@@ -175,7 +135,7 @@ public class ListService : IListService
             list.UpdatedBy
         );
     }
-    
+
     private static List MapToEntity(CreateListDto createListDto)
     {
         return new List
