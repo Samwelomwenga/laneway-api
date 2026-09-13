@@ -95,6 +95,7 @@ public class WorkSpaceService : IWorkSpaceService
         existingWorkSpace.Description = updateWorkSpaceDto.Description;
         existingWorkSpace.Visibility = updateWorkSpaceDto.Visibility;
         existingWorkSpace.IsArchived = updateWorkSpaceDto.IsArchived;
+        existingWorkSpace.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
