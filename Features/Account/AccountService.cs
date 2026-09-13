@@ -92,7 +92,7 @@ namespace DefaultNamespace
                 return ApiResponse<bool>.ErrorResponse("Account not found", 404);
             _context.Accounts.Remove(account);
             await _context.SaveChangesAsync();
-            return ApiResponse<bool>.SuccessResponse(true, "Account deleted successfully", 200);
+            return ApiResponse<bool>.SuccessResponse(true, "Account deleted successfully", 204);
         }
 
         private static AccountDto MapToDto(Account account)

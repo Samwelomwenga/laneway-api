@@ -112,7 +112,7 @@ public class WorkSpaceService : IWorkSpaceService
 
         _context.WorkSpaces.Remove(workSpace);
         await _context.SaveChangesAsync();
-        return ApiResponse<bool>.SuccessResponse(true, "Workspace deleted successfully", 200);
+        return ApiResponse<bool>.SuccessResponse(true, "Workspace deleted successfully", 204);
     }
 
     private static WorkSpaceDto MapToDto(WorkSpace workSpace, List<Guid>? boardIds = null)

@@ -135,7 +135,7 @@ namespace DefaultNamespace
 
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
-            return ApiResponse<bool>.SuccessResponse(true, "User deleted successfully", 200);
+            return ApiResponse<bool>.SuccessResponse(true, "User deleted successfully", 204);
         }
         public async Task<ApiResponse<bool>> UserNameExistsAsync(string username)
         {
