@@ -63,7 +63,7 @@ public class LabelService : ILabelService
             .FirstOrDefaultAsync(l => l.Name.ToLower() == createLabelDto.Name.ToLower());
         if (existingLabel != null)
         {
-            return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 400,
+            return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
                 new List<string> { "A label with this name already exists." });
         }
         var newLabel = MapToEntity(createLabelDto);
