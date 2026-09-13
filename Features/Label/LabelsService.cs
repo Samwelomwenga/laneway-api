@@ -25,7 +25,7 @@ public class LabelService : ILabelService
         var query = _context.Labels.AsQueryable();
         if (!string.IsNullOrEmpty(searchDto.SearchTerm))
         {
-            query = query.Where(l => l.Name.Contains(searchDto.SearchTerm, StringComparison.OrdinalIgnoreCase));
+            query = query.Where(l => l.Name.ToLower().Contains(searchDto.SearchTerm.ToLower()));
         }
 
         var totalCount = await query.CountAsync();
@@ -60,7 +60,7 @@ public class LabelService : ILabelService
     public async Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelDto createLabelDto)
     {
         var existingLabel = await _context.Labels
-            .FirstOrDefaultAsync(l => l.Name.Equals(createLabelDto.Name, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefaultAsync(l => l.Name.ToLower() == createLabelDto.Name.ToLower());
         if (existingLabel != null)
         {
             return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 400,
