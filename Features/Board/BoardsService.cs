@@ -66,7 +66,9 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id)
     {
-        var existingBoard = await _context.Boards.FindAsync(id);
+        var existingBoard = await _context.Boards
+            .Include(b => b.Lists)
+            .FirstOrDefaultAsync(b => b.Id == id);
         if (existingBoard == null)
         {
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
@@ -86,7 +88,9 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardDto updateBoardDto)
     {
-        var existingBoard = await _context.Boards.FindAsync(id);
+        var existingBoard = await _context.Boards
+            .Include(b => b.Lists)
+            .FirstOrDefaultAsync(b => b.Id == id);
         if (existingBoard == null)
         {
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
@@ -103,7 +107,7 @@ public class BoardService : IBoardService
         existingBoard.UpdatedBy = Guid.NewGuid(); // This should be set to the current user's ID
 
         await _context.SaveChangesAsync();
-        var updatedBoardDto = MapToDto(existingBoard);
+        var updatedBoardDto = MapToDto(existingBoard, existingBoard.Lists.Select(l => l.Id).ToList());
         return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
     }
 

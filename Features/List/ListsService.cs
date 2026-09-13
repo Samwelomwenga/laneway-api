@@ -33,7 +33,9 @@ public class ListService : IListService
 
     public async Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListDto updateListDto)
     {
-        var list = await _context.Lists.FindAsync(id);
+        var list = await _context.Lists
+            .Include(l => l.Cards)
+            .FirstOrDefaultAsync(l => l.Id == id);
         if (list == null)
         {
             return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
@@ -47,9 +49,8 @@ public class ListService : IListService
         list.UpdatedAt = DateTime.UtcNow;
         list.UpdatedBy = Guid.NewGuid(); // This should be set to the current user's ID
 
-        _context.Lists.Update(list);
         await _context.SaveChangesAsync();
-        var listDto = MapToDto(list);
+        var listDto = MapToDto(list, list.Cards.Select(c => c.Id).ToList());
 
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List updated successfully", 200);
     }
@@ -70,7 +71,9 @@ public class ListService : IListService
 
     public async Task<ApiResponse<ListDto>> GetByIdAsync(Guid id)
     {
-        var list = await _context.Lists.FindAsync(id);
+        var list = await _context.Lists
+            .Include(l => l.Cards)
+            .FirstOrDefaultAsync(l => l.Id == id);
         if (list == null)
         {
             return ApiResponse<ListDto>.ErrorResponse("List not found", 404);

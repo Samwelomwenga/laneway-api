@@ -83,7 +83,9 @@ public class WorkSpaceService : IWorkSpaceService
 
     public async Task<ApiResponse<WorkSpaceDto>> UpdateAsync(Guid id, UpdateWorkSpaceDto updateWorkSpaceDto)
     {
-        var existingWorkSpace = await _context.WorkSpaces.FindAsync(id);
+        var existingWorkSpace = await _context.WorkSpaces
+            .Include(ws => ws.Boards)
+            .FirstOrDefaultAsync(ws => ws.Id == id);
         if (existingWorkSpace == null)
         {
             return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
@@ -94,10 +96,9 @@ public class WorkSpaceService : IWorkSpaceService
         existingWorkSpace.Visibility = updateWorkSpaceDto.Visibility;
         existingWorkSpace.IsArchived = updateWorkSpaceDto.IsArchived;
 
-        _context.WorkSpaces.Update(existingWorkSpace);
         await _context.SaveChangesAsync();
 
-        return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(existingWorkSpace), "Workspace updated successfully", 200);
+        return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(existingWorkSpace, existingWorkSpace.Boards.Select(b => b.Id).ToList()), "Workspace updated successfully", 200);
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
