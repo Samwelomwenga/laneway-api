@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class CardsController: ControllerBase
+public class CardsController: ApiControllerBase
 {
     private readonly ICardService _cardService;
 
@@ -24,11 +24,7 @@ public class CardsController: ControllerBase
     public async Task<ActionResult<ApiResponse<CardDto>>> GetCard(Guid id)
     {
         var response = await _cardService.GetByIdAsync(id);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpPost]
@@ -46,7 +42,7 @@ public class CardsController: ControllerBase
         var response = await _cardService.CreateAsync(createCardDto);
         if (!response.Success)
         {
-            return BadRequest(response);
+            return ToActionResult(response);
         }
         return CreatedAtAction(nameof(GetCard), new { id = response.Data!.Id }, response);
     }
@@ -64,23 +60,14 @@ public class CardsController: ControllerBase
               return BadRequest(errorResponse);
         }
         var response = await _cardService.UpdateAsync(id, updateCardDto);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteCard(Guid id)
     {
         var response = await _cardService.DeleteAsync(id);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
-    
+
 }

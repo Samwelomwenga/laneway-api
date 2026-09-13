@@ -5,7 +5,7 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/users")]
-public class UsersController : ControllerBase
+public class UsersController : ApiControllerBase
 {
     private readonly IUserService _userService;
 
@@ -25,11 +25,7 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<ApiResponse<UserDto>>> GetUser(Guid id)
     {
         var response = await _userService.GetByIdAsync(id);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpGet("username-exists")]
@@ -63,7 +59,7 @@ public class UsersController : ControllerBase
         var response = await _userService.CreateAsync(createUserDto);
         if (!response.Success)
         {
-            return BadRequest(response);
+            return ToActionResult(response);
         }
         return CreatedAtAction(nameof(GetUser), new { id = response.Data!.Id }, response);
     }
@@ -81,21 +77,13 @@ public class UsersController : ControllerBase
             return BadRequest(errorResponse);
         }
         var response = await _userService.UpdateAsync(id, updateUserDto);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteUser(Guid id)
     {
         var response = await _userService.DeleteAsync(id);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
 }

@@ -4,14 +4,14 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class LabelsController: ControllerBase
+public class LabelsController: ApiControllerBase
 {
     private readonly ILabelService _labelService;
     public LabelsController(ILabelService labelService)
     {
         _labelService = labelService;
     }
-    
+
     [HttpGet]
     public async Task<ActionResult<PagedResponse<LabelDto>>> GetLabels([FromQuery] LabelSearchDto searchDto)
     {
@@ -23,11 +23,7 @@ public class LabelsController: ControllerBase
     public async Task<ActionResult<ApiResponse<LabelDto>>> GetLabel(Guid id)
     {
         var response = await _labelService.GetByIdAsync(id);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpPost]
@@ -45,11 +41,11 @@ public class LabelsController: ControllerBase
         var response = await _labelService.CreateAsync(createLabelDto);
         if (!response.Success)
         {
-            return BadRequest(response);
+            return ToActionResult(response);
         }
         return CreatedAtAction(nameof(GetLabel), new { id = response.Data!.Id }, response);
     }
-    
+
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<LabelDto>>> UpdateLabel(Guid id, [FromBody] UpdateLabelDto updateLabelDto)
     {
@@ -63,21 +59,13 @@ public class LabelsController: ControllerBase
             return BadRequest(errorResponse);
         }
         var response = await _labelService.UpdateAsync(id, updateLabelDto);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteLabel(Guid id)
     {
         var response = await _labelService.DeleteAsync(id);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
 }

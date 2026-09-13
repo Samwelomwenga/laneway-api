@@ -6,7 +6,7 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class WorkSpacesController: ControllerBase
+public class WorkSpacesController: ApiControllerBase
 {
     private readonly IWorkSpaceService _workSpaceService;
 
@@ -21,18 +21,14 @@ public class WorkSpacesController: ControllerBase
         var response = await _workSpaceService.GetAllAsync(searchDto);
         return Ok(response);
     }
-    
+
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<WorkSpaceDto>>> GetWorkSpace(Guid id)
     {
         var response = await _workSpaceService.GetByIdAsync(id);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
-    
+
     [HttpPost]
     public async Task<ActionResult<ApiResponse<WorkSpaceDto>>> CreateWorkSpace([FromBody] CreateWorkSpaceDto createWorkSpaceDto)
     {
@@ -48,11 +44,11 @@ public class WorkSpacesController: ControllerBase
         var response = await _workSpaceService.CreateAsync(createWorkSpaceDto);
         if (!response.Success)
         {
-            return BadRequest(response);
+            return ToActionResult(response);
         }
         return CreatedAtAction(nameof(GetWorkSpace), new { id = response.Data!.Id }, response);
     }
-    
+
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<WorkSpaceDto>>> UpdateWorkSpace(Guid id, [FromBody] UpdateWorkSpaceDto updateWorkSpaceDto)
     {
@@ -66,21 +62,13 @@ public class WorkSpacesController: ControllerBase
             return BadRequest(errorResponse);
         }
         var response = await _workSpaceService.UpdateAsync(id, updateWorkSpaceDto);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
-    
+
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteWorkSpace(Guid id)
     {
         var response = await _workSpaceService.DeleteAsync(id);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
 }

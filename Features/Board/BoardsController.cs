@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class BoardsController: ControllerBase
+public class BoardsController: ApiControllerBase
 {
     private readonly IBoardService _boardService;
 
@@ -24,12 +24,7 @@ public class BoardsController: ControllerBase
     public async Task<ActionResult<ApiResponse<BoardDto>>> GetBoard(Guid id)
     {
         var response = await _boardService.GetByIdAsync(id);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpPost]
@@ -47,10 +42,10 @@ public class BoardsController: ControllerBase
         var response = await _boardService.CreateAsync(createBoardDto);
         if(!response.Success)
         {
-            return BadRequest(response);
+            return ToActionResult(response);
         }
         return CreatedAtAction(nameof(GetBoard), new { id = response.Data!.Id }, response);
-        
+
     }
 
     [HttpPut("{id}")]
@@ -66,22 +61,14 @@ public class BoardsController: ControllerBase
             return BadRequest(errorResponse);
         }
         var response = await _boardService.UpdateAsync(id, updateBoardDto);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteBoard(Guid id)
     {
         var response = await _boardService.DeleteAsync(id);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
-    
+
 }

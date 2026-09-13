@@ -5,7 +5,7 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/accounts")]
-public class AccountsController : ControllerBase
+public class AccountsController : ApiControllerBase
 {
     private readonly IAccountService _accountService;
 
@@ -25,9 +25,7 @@ public class AccountsController : ControllerBase
     public async Task<ActionResult<ApiResponse<AccountDto>>> GetAccount(Guid id)
     {
         var result = await _accountService.GetByIdAsync(id);
-        if (!result.Success)
-            return NotFound(result);
-        return Ok(result);
+        return ToActionResult(result);
     }
 
     [HttpPost]
@@ -45,7 +43,7 @@ public class AccountsController : ControllerBase
         var response = await _accountService.CreateAsync(createAccountDto);
         if (!response.Success)
         {
-            return BadRequest(response);
+            return ToActionResult(response);
         }
         return CreatedAtAction(nameof(GetAccount), new { id = response.Data!.Id }, response);
     }
@@ -63,19 +61,13 @@ public class AccountsController : ControllerBase
             return BadRequest(errorResponse);
         }
         var response = await _accountService.UpdateAsync(id, updateAccountDto);
-        if (!response.Success)
-        {
-            return NotFound(response);
-        }
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAccount(Guid id)
     {
         var result = await _accountService.DeleteAsync(id);
-        if (!result.Success)
-            return NotFound(result);
-        return Ok(result);
+        return ToActionResult(result);
     }
 }
