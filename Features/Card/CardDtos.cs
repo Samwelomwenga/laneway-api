@@ -15,8 +15,9 @@ public record CardDto
      DateTime? EndDate,
      DateTime? ReminderDate ,
      bool IsArchived ,
+     List<Guid> LabelIds,
       DateTime CreatedAt ,
-     DateTime? UpdatedAt , 
+     DateTime? UpdatedAt ,
      Guid CreatedBy ,
      Guid? UpdatedBy
 );
@@ -33,7 +34,8 @@ public record CreateCardDto
     DateTime? StartDate,
     DateTime? EndDate,
     DateTime? ReminderDate,
-    bool IsArchived
+    bool IsArchived,
+    List<Guid>? LabelIds
 );
 
 public record UpdateCardDto
@@ -48,7 +50,8 @@ public record UpdateCardDto
     DateTime? StartDate,
     DateTime? EndDate,
     DateTime? ReminderDate,
-    bool IsArchived
+    bool IsArchived,
+    List<Guid>? LabelIds
 );
 public record CardSearchDto
 (

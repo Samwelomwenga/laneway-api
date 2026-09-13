@@ -13,4 +13,5 @@ public class Card: BaseEntity
     public DateTime? EndDate { get; set; }
     public DateTime? ReminderDate { get; set; }
     public bool IsArchived { get; set; }
+    public List<Label> Labels { get; set; } = new List<Label>();
 }

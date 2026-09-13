@@ -93,5 +93,10 @@ public class ApplicationDbContext : DbContext
             entity.Property(u => u.UpdatedBy)
                 .IsRequired(false);
         });
+
+        modelBuilder.Entity<Card>()
+            .HasMany(c => c.Labels)
+            .WithMany(l => l.Cards)
+            .UsingEntity(j => j.ToTable("CardLabels"));
     }
 }

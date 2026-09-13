@@ -21,7 +21,14 @@ public class CardService: ICardService
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
     {
+        var (labels, missingLabelIds) = await FindLabelsAsync(createCardDto.LabelIds);
+        if (missingLabelIds.Count > 0)
+        {
+            return ApiResponse<CardDto>.ErrorResponse("Label not found", 400, missingLabelIds);
+        }
+
         var card = MapToEntity(createCardDto);
+        card.Labels.AddRange(labels);
 
         _context.Cards.Add(card);
         await _context.SaveChangesAsync();
@@ -33,10 +40,18 @@ public class CardService: ICardService
 
     public async Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardDto updateCardDto)
     {
-        var card = await _context.Cards.FindAsync(id);
+        var card = await _context.Cards
+            .Include(c => c.Labels)
+            .FirstOrDefaultAsync(c => c.Id == id);
         if (card == null)
         {
             return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
+        }
+
+        var (labels, missingLabelIds) = await FindLabelsAsync(updateCardDto.LabelIds);
+        if (missingLabelIds.Count > 0)
+        {
+            return ApiResponse<CardDto>.ErrorResponse("Label not found", 400, missingLabelIds);
         }
 
         card.Title = updateCardDto.Title;
@@ -51,8 +66,9 @@ public class CardService: ICardService
         card.ReminderDate = updateCardDto.ReminderDate;
         card.IsArchived = updateCardDto.IsArchived;
         card.UpdatedAt = DateTime.UtcNow;
+        card.Labels.Clear();
+        card.Labels.AddRange(labels);
 
-        _context.Cards.Update(card);
         await _context.SaveChangesAsync();
 
         var cardDto = MapToDto(card);
@@ -61,7 +77,9 @@ public class CardService: ICardService
     }
     public async Task<ApiResponse<CardDto>> GetByIdAsync(Guid id)
     {
-        var card = await _context.Cards.FindAsync(id);
+        var card = await _context.Cards
+            .Include(c => c.Labels)
+            .FirstOrDefaultAsync(c => c.Id == id);
         if (card == null)
         {
             return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
@@ -117,6 +135,7 @@ public class CardService: ICardService
             .OrderBy(c => c.Position)
             .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
             .Take(searchDto.PageSize)
+            .Include(c => c.Labels)
             .ToListAsync();
 
         var cardDtos = cards.Select(MapToDto).ToList();
@@ -144,6 +163,13 @@ public class CardService: ICardService
 
         return ApiResponse<bool>.SuccessResponse(true, "Card deleted successfully", 204);
     }
+    private async Task<(List<Label> Labels, List<string> MissingIds)> FindLabelsAsync(List<Guid>? labelIds)
+    {
+        var ids = labelIds?.Distinct().ToList() ?? [];
+        var labels = await _context.Labels.Where(l => ids.Contains(l.Id)).ToListAsync();
+        var missingIds = ids.Except(labels.Select(l => l.Id)).Select(id => id.ToString()).ToList();
+        return (labels, missingIds);
+    }
     private static CardDto MapToDto(Card card)
     {
         return new CardDto
@@ -160,6 +186,7 @@ public class CardService: ICardService
             card.EndDate,
             card.ReminderDate,
             card.IsArchived,
+            card.Labels.Select(l => l.Id).ToList(),
             card.CreatedAt,
             card.UpdatedAt,
             card.CreatedBy,
