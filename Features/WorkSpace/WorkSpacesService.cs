@@ -28,15 +28,15 @@ public class WorkSpaceService : IWorkSpaceService
         if (!string.IsNullOrEmpty(searchDto.SearchTerm))
         {
             query = query.Where(ws => ws.Name.Contains(searchDto.SearchTerm) ||
-                                      (ws.Description != null && ws.Description.Contains(searchDto.SearchTerm)));
+                                      ws.Description.Contains(searchDto.SearchTerm));
         }
         if (searchDto.IsArchived.HasValue)
         {
             query = query.Where(ws => ws.IsArchived == searchDto.IsArchived.Value);
         }
-        if (!string.IsNullOrEmpty(searchDto.Visibility))
+        if (searchDto.Visibility.HasValue)
         {
-            query = query.Where(ws => ws.Visibility == searchDto.Visibility);
+            query = query.Where(ws => ws.Visibility == searchDto.Visibility.Value);
         }
 
         var totalCount = await query.CountAsync();
@@ -92,7 +92,7 @@ public class WorkSpaceService : IWorkSpaceService
         }
 
         existingWorkSpace.Name = updateWorkSpaceDto.Name;
-        existingWorkSpace.Description = updateWorkSpaceDto.Description;
+        existingWorkSpace.Description = updateWorkSpaceDto.Description ?? string.Empty;
         existingWorkSpace.Visibility = updateWorkSpaceDto.Visibility;
         existingWorkSpace.IsArchived = updateWorkSpaceDto.IsArchived;
         existingWorkSpace.UpdatedAt = DateTime.UtcNow;
@@ -138,7 +138,7 @@ public class WorkSpaceService : IWorkSpaceService
         {
             Id = Guid.NewGuid(),
             Name = createWorkSpaceDto.Name,
-            Description = createWorkSpaceDto.Description,
+            Description = createWorkSpaceDto.Description ?? string.Empty,
             Visibility = createWorkSpaceDto.Visibility,
             IsArchived = createWorkSpaceDto.IsArchived,
             CreatedAt = DateTime.UtcNow,

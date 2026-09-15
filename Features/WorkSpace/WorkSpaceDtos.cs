@@ -4,8 +4,8 @@ public record WorkSpaceDto
 (
     Guid Id,
     string Name,
-    string? Description,
-    string Visibility,
+    string Description,
+    WorkspaceVisibility Visibility,
     bool IsArchived,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
@@ -17,14 +17,14 @@ public record CreateWorkSpaceDto
 (
     string Name,
     string? Description,
-    string Visibility,
+    WorkspaceVisibility Visibility,
     bool IsArchived
 );
 public record UpdateWorkSpaceDto
 (
     string Name,
     string? Description,
-    string Visibility,
+    WorkspaceVisibility Visibility,
     bool IsArchived
 );
 public record WorkSpaceSearchDto
@@ -33,5 +33,5 @@ public record WorkSpaceSearchDto
     int PageSize = 10,
     string? SearchTerm = null,
     bool? IsArchived = null,
-    string? Visibility = null
+    WorkspaceVisibility? Visibility = null
 );

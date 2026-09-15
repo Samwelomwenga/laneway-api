@@ -55,15 +55,14 @@ public class CardService: ICardService
         }
 
         card.Title = updateCardDto.Title;
-        card.Description = updateCardDto.Description;
+        card.Description = updateCardDto.Description ?? string.Empty;
         card.DueDate = updateCardDto.DueDate;
         card.Position = updateCardDto.Position;
         card.ListId = updateCardDto.ListId;
-        card.Status = updateCardDto.Status;
+        card.IsDueComplete = updateCardDto.IsDueComplete;
         card.Cover = updateCardDto.Cover;
         card.StartDate = updateCardDto.StartDate;
-        card.EndDate = updateCardDto.EndDate;
-        card.ReminderDate = updateCardDto.ReminderDate;
+        card.DueReminderMinutes = updateCardDto.DueReminderMinutes;
         card.IsArchived = updateCardDto.IsArchived;
         card.UpdatedAt = DateTime.UtcNow;
         card.Labels.Clear();
@@ -100,7 +99,7 @@ public class CardService: ICardService
 
         if (searchDto.DueDate.HasValue)
         {
-            query = query.Where(c => c.DueDate.Date == searchDto.DueDate.Value.Date);
+            query = query.Where(c => c.DueDate.HasValue && c.DueDate.Value.Date == searchDto.DueDate.Value.Date);
         }
 
         if (searchDto.Position.HasValue)
@@ -113,9 +112,9 @@ public class CardService: ICardService
             query = query.Where(c => c.ListId == searchDto.ListId.Value);
         }
 
-        if (searchDto.Status.HasValue)
+        if (searchDto.IsDueComplete.HasValue)
         {
-            query = query.Where(c => c.Status == searchDto.Status.Value);
+            query = query.Where(c => c.IsDueComplete == searchDto.IsDueComplete.Value);
         }
 
         if (searchDto.StartDate.HasValue)
@@ -125,7 +124,7 @@ public class CardService: ICardService
 
         if (searchDto.EndDate.HasValue)
         {
-            query = query.Where(c => c.EndDate <= searchDto.EndDate.Value);
+            query = query.Where(c => c.DueDate <= searchDto.EndDate.Value);
         }
 
         var totalCount = await query.CountAsync();
@@ -180,11 +179,10 @@ public class CardService: ICardService
             card.DueDate,
             card.Position,
             card.ListId,
-            card.Status,
+            card.IsDueComplete,
             card.Cover,
             card.StartDate,
-            card.EndDate,
-            card.ReminderDate,
+            card.DueReminderMinutes,
             card.IsArchived,
             card.Labels.Select(l => l.Id).ToList(),
             card.CreatedAt,
@@ -199,15 +197,14 @@ public class CardService: ICardService
         {
             Id = Guid.NewGuid(),
             Title = createCardDto.Title,
-            Description = createCardDto.Description,
+            Description = createCardDto.Description ?? string.Empty,
             DueDate = createCardDto.DueDate,
             Position = createCardDto.Position,
             ListId = createCardDto.ListId,
-            Status = createCardDto.Status,
+            IsDueComplete = createCardDto.IsDueComplete,
             Cover = createCardDto.Cover,
             StartDate = createCardDto.StartDate,
-            EndDate = createCardDto.EndDate,
-            ReminderDate = createCardDto.ReminderDate,
+            DueReminderMinutes = createCardDto.DueReminderMinutes,
             IsArchived = createCardDto.IsArchived,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()

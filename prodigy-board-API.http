@@ -1,3 +1,136 @@
 @prodigy_board_API_HostAddress = http://localhost:5062
 
-###
+### Create a workspace with no description. It comes back with "description": "" and "visibility": "Public".
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: application/json
+
+{
+  "name": "Field shapes",
+  "visibility": "Public",
+  "isArchived": false
+}
+
+> {% client.global.set("workspaceId", response.body.data.id); %}
+
+### Update the workspace with a null description. It still comes back as "".
+PUT {{prodigy_board_API_HostAddress}}/api/v1/workspaces/{{workspaceId}}
+Content-Type: application/json
+
+{
+  "name": "Field shapes",
+  "description": null,
+  "visibility": "Private",
+  "isArchived": false
+}
+
+### Search workspaces by visibility name.
+GET {{prodigy_board_API_HostAddress}}/api/v1/workspaces?visibility=Private
+
+### Create a board with "Workspace" visibility. The response has no title or ownerId.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+Content-Type: application/json
+
+{
+  "name": "Sprint 1",
+  "workspaceId": "{{workspaceId}}",
+  "visibility": "Workspace",
+  "isArchived": false
+}
+
+> {% client.global.set("boardId", response.body.data.id); %}
+
+### Update the board with a null description. It comes back as "".
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{boardId}}
+Content-Type: application/json
+
+{
+  "name": "Sprint 1",
+  "description": null,
+  "workspaceId": "{{workspaceId}}",
+  "visibility": "Public",
+  "isArchived": false
+}
+
+### Search boards by visibility name.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?visibility=Public
+
+### Create a list with the "Sky" color.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+Content-Type: application/json
+
+{
+  "name": "To do",
+  "position": 1,
+  "boardId": "{{boardId}}",
+  "color": "Sky",
+  "isArchived": false
+}
+
+> {% client.global.set("listId", response.body.data.id); %}
+
+### Create a list with no color. It comes back with "color": null.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+Content-Type: application/json
+
+{
+  "name": "Doing",
+  "position": 2,
+  "boardId": "{{boardId}}",
+  "isArchived": false
+}
+
+### Create a label with the "Lime" color. Label names are unique across all boards for now, so the name gets a random suffix.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+Content-Type: application/json
+
+{
+  "name": "Bug {{$uuid}}",
+  "color": "Lime"
+}
+
+> {% client.global.set("labelId", response.body.data.id); %}
+
+### Create a label with no color. It comes back with "color": null.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+Content-Type: application/json
+
+{
+  "name": "Idea {{$uuid}}"
+}
+
+### Create a card with no due date and no description. It comes back with "dueDate": null, "isDueComplete": false, "dueReminderMinutes": null, and "description": "".
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "Write the spec",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isArchived": false
+}
+
+> {% client.global.set("cardId", response.body.data.id); %}
+
+### Give the card a due date, mark it complete, and set a reminder 60 minutes before the due date.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{cardId}}
+Content-Type: application/json
+
+{
+  "title": "Write the spec",
+  "dueDate": "2026-10-01T17:00:00Z",
+  "isDueComplete": true,
+  "dueReminderMinutes": 60,
+  "position": 1,
+  "listId": "{{listId}}",
+  "isArchived": false,
+  "labelIds": ["{{labelId}}"]
+}
+
+### Search complete cards.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?isDueComplete=true
+
+### Search cards due on or before a time. The endDate key filters on the due date.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?endDate=2026-10-02T00:00:00Z
+
+### Search cards due on a given day. A card with no due date never matches.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueDate=2026-10-01T00:00:00Z

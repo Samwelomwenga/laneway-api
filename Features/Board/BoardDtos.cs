@@ -5,10 +5,8 @@ public record BoardDto
     Guid Id,
     string Name,
     string Description,
-    string? Title,
     Guid WorkspaceId,
-    Guid OwnerId,
-    string Visibility,
+    BoardVisibility Visibility,
     bool IsArchived,
     List<Guid> ListIds,
     DateTime CreatedAt,
@@ -20,22 +18,18 @@ public record BoardDto
 public record CreateBoardDto
 (
     string Name,
-    string Description,
-    string? Title,
+    string? Description,
     Guid WorkspaceId,
-    Guid OwnerId,
-    string Visibility,
+    BoardVisibility Visibility,
     bool IsArchived
 );
 
 public record UpdateBoardDto
 (
     string Name,
-    string Description,
-    string? Title,
+    string? Description,
     Guid WorkspaceId,
-    Guid OwnerId,
-    string Visibility,
+    BoardVisibility Visibility,
     bool IsArchived
 );
 
@@ -46,5 +40,5 @@ public record BoardSearchDto
     string? SearchTerm = null,
     Guid? WorkspaceId = null,
     bool? IsArchived = null,
-    string? Visibility = null
+    BoardVisibility? Visibility = null
 );

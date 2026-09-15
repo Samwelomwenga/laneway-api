@@ -27,8 +27,7 @@ public class BoardService : IBoardService
         if (!string.IsNullOrEmpty(searchDto.SearchTerm))
         {
             query = query.Where(b => b.Name.Contains(searchDto.SearchTerm) ||
-                                     (b.Title != null && b.Title.Contains(searchDto.SearchTerm)) ||
-                                     (b.Description != null && b.Description.Contains(searchDto.SearchTerm)));
+                                     b.Description.Contains(searchDto.SearchTerm));
         }
         if (searchDto.IsArchived.HasValue)
         {
@@ -40,9 +39,9 @@ public class BoardService : IBoardService
             query = query.Where(b => b.WorkspaceId == searchDto.WorkspaceId.Value);
         }
 
-        if (!string.IsNullOrEmpty(searchDto.Visibility))
+        if (searchDto.Visibility.HasValue)
         {
-            query = query.Where(b => b.Visibility == searchDto.Visibility);
+            query = query.Where(b => b.Visibility == searchDto.Visibility.Value);
         }
 
         var totalCount = await query.CountAsync();
@@ -97,10 +96,8 @@ public class BoardService : IBoardService
         }
 
         existingBoard.Name = updateBoardDto.Name;
-        existingBoard.Description = updateBoardDto.Description;
-        existingBoard.Title = updateBoardDto.Title;
+        existingBoard.Description = updateBoardDto.Description ?? string.Empty;
         existingBoard.WorkspaceId = updateBoardDto.WorkspaceId;
-        existingBoard.OwnerId = updateBoardDto.OwnerId;
         existingBoard.Visibility = updateBoardDto.Visibility;
         existingBoard.IsArchived = updateBoardDto.IsArchived;
         existingBoard.UpdatedAt = DateTime.UtcNow;
@@ -130,10 +127,8 @@ public class BoardService : IBoardService
         (
             board.Id,
             board.Name,
-            board.Description ?? string.Empty,
-            board.Title,
+            board.Description,
             board.WorkspaceId,
-            board.OwnerId,
             board.Visibility,
             board.IsArchived,
             listIds ?? new List<Guid>(),
@@ -150,10 +145,8 @@ public class BoardService : IBoardService
         {
             Id = Guid.NewGuid(),
             Name = createBoardDto.Name,
-            Description = createBoardDto.Description,
-            Title = createBoardDto.Title,
+            Description = createBoardDto.Description ?? string.Empty,
             WorkspaceId = createBoardDto.WorkspaceId,
-            OwnerId = createBoardDto.OwnerId,
             Visibility = createBoardDto.Visibility,
             IsArchived = createBoardDto.IsArchived,
             CreatedAt = DateTime.UtcNow,

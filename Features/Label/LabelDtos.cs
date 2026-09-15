@@ -4,7 +4,7 @@ public record LabelDto
 (
     Guid Id,
     string Name,
-    string Color,
+    Color? Color,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     Guid CreatedBy,
@@ -14,13 +14,13 @@ public record LabelDto
 public record CreateLabelDto
 (
     string Name,
-    string Color
+    Color? Color
 );
 
 public record UpdateLabelDto
 (
     string Name,
-    string Color
+    Color? Color
 );
 
 public record LabelSearchDto

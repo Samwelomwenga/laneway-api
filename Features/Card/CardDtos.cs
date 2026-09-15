@@ -5,14 +5,13 @@ public record CardDto
      Guid Id,
      string Title,
      string Description ,
-     DateTime DueDate ,
+     DateTime? DueDate ,
      int Position ,
      Guid ListId ,
-     bool Status ,
+     bool IsDueComplete ,
      string? Cover,
      DateTime? StartDate,
-     DateTime? EndDate,
-     DateTime? ReminderDate ,
+     int? DueReminderMinutes ,
      bool IsArchived ,
      List<Guid> LabelIds,
       DateTime CreatedAt ,
@@ -24,15 +23,14 @@ public record CardDto
 public record CreateCardDto
 (
     string Title,
-    string Description,
-    DateTime DueDate,
+    string? Description,
+    DateTime? DueDate,
     int Position,
     Guid ListId,
-    bool Status,
+    bool IsDueComplete,
     string? Cover,
     DateTime? StartDate,
-    DateTime? EndDate,
-    DateTime? ReminderDate,
+    int? DueReminderMinutes,
     bool IsArchived,
     List<Guid>? LabelIds
 );
@@ -40,15 +38,14 @@ public record CreateCardDto
 public record UpdateCardDto
 (
     string Title,
-    string Description,
-    DateTime DueDate,
+    string? Description,
+    DateTime? DueDate,
     int Position,
     Guid ListId,
-    bool Status,
+    bool IsDueComplete,
     string? Cover,
     DateTime? StartDate,
-    DateTime? EndDate,
-    DateTime? ReminderDate,
+    int? DueReminderMinutes,
     bool IsArchived,
     List<Guid>? LabelIds
 );
@@ -60,9 +57,8 @@ public record CardSearchDto
     DateTime? DueDate = null,
     int? Position = null,
     Guid? ListId = null,
-    bool? Status = null,
+    bool? IsDueComplete = null,
     DateTime? StartDate = null,
     DateTime? EndDate = null,
-    DateTime? ReminderDate = null,
     bool? IsArchived = null
 );

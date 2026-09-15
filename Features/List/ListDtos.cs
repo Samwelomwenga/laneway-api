@@ -6,7 +6,7 @@ public record ListDto
     string Name,
     int Position,
     Guid BoardId,
-    string Color,
+    Color? Color,
     bool IsArchived,
     List<Guid> CardIds,
     DateTime CreatedAt,
@@ -20,7 +20,7 @@ public record CreateListDto
     string Name,
     int Position,
     Guid BoardId,
-    string Color,
+    Color? Color,
     bool IsArchived
 );
 
@@ -29,7 +29,7 @@ public record UpdateListDto
     string Name,
     int Position,
     Guid BoardId,
-    string Color,
+    Color? Color,
     bool IsArchived
 );
 public record ListSearchDto
