@@ -17,21 +17,27 @@ public record ListDto
 
 public record CreateListDto
 (
-    string Name,
-    int Position,
-    Guid BoardId,
+    string? Name,
+    int? Position,
+    Guid? BoardId,
     Color? Color,
-    bool IsArchived
-);
+    bool? IsArchived
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 
 public record UpdateListDto
 (
-    string Name,
-    int Position,
-    Guid BoardId,
+    string? Name,
+    int? Position,
+    Guid? BoardId,
     Color? Color,
-    bool IsArchived
-);
+    bool? IsArchived
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 public record ListSearchDto
 (
     int PageNumber = 1,

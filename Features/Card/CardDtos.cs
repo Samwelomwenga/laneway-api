@@ -22,33 +22,39 @@ public record CardDto
 
 public record CreateCardDto
 (
-    string Title,
+    string? Title,
     string? Description,
     DateTime? DueDate,
-    int Position,
-    Guid ListId,
-    bool IsDueComplete,
+    int? Position,
+    Guid? ListId,
+    bool? IsDueComplete,
     string? Cover,
     DateTime? StartDate,
     int? DueReminderMinutes,
-    bool IsArchived,
-    List<Guid>? LabelIds
-);
+    bool? IsArchived,
+    List<Guid?>? LabelIds
+)
+{
+    public string? Title { get; init; } = Title?.Trim();
+}
 
 public record UpdateCardDto
 (
-    string Title,
+    string? Title,
     string? Description,
     DateTime? DueDate,
-    int Position,
-    Guid ListId,
-    bool IsDueComplete,
+    int? Position,
+    Guid? ListId,
+    bool? IsDueComplete,
     string? Cover,
     DateTime? StartDate,
     int? DueReminderMinutes,
-    bool IsArchived,
-    List<Guid>? LabelIds
-);
+    bool? IsArchived,
+    List<Guid?>? LabelIds
+)
+{
+    public string? Title { get; init; } = Title?.Trim();
+}
 public record CardSearchDto
 (
     int PageNumber = 1,

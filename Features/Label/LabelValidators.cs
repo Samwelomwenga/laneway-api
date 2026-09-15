@@ -6,7 +6,7 @@ public sealed class CreateLabelDtoValidator : AbstractValidator<CreateLabelDto>
 {
     public CreateLabelDtoValidator()
     {
-        RuleFor(x => x.Name).Required();
+        RuleFor(x => x.Name).Required().MaxLength(FieldLimits.LabelName);
     }
 }
 
@@ -14,6 +14,6 @@ public sealed class UpdateLabelDtoValidator : AbstractValidator<UpdateLabelDto>
 {
     public UpdateLabelDtoValidator()
     {
-        RuleFor(x => x.Name).Required();
+        RuleFor(x => x.Name).Required().MaxLength(FieldLimits.LabelName);
     }
 }

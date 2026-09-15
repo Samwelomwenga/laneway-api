@@ -22,6 +22,12 @@ public class ListService : IListService
 
     public async Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto)
     {
+        var boardId = createListDto.BoardId!.Value;
+        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
+        {
+            return BoardNotFound(boardId);
+        }
+
         var list = MapToEntity(createListDto);
 
         _context.Lists.Add(list);
@@ -41,11 +47,17 @@ public class ListService : IListService
             return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
         }
 
-        list.Name = updateListDto.Name;
-        list.Position = updateListDto.Position;
-        list.BoardId = updateListDto.BoardId;
+        var boardId = updateListDto.BoardId!.Value;
+        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
+        {
+            return BoardNotFound(boardId);
+        }
+
+        list.Name = updateListDto.Name!;
+        list.Position = updateListDto.Position!.Value;
+        list.BoardId = boardId;
         list.Color = updateListDto.Color;
-        list.IsArchived = updateListDto.IsArchived;
+        list.IsArchived = updateListDto.IsArchived!.Value;
         list.UpdatedAt = DateTime.UtcNow;
         list.UpdatedBy = Guid.NewGuid();
 
@@ -139,16 +151,20 @@ public class ListService : IListService
         );
     }
 
+    private static ApiResponse<ListDto> BoardNotFound(Guid boardId) =>
+        ApiResponse<ListDto>.ErrorResponse("A referenced resource does not exist", 400,
+            [new ApiError("boardId", ErrorCodes.NotFound, $"Board {boardId} does not exist.")]);
+
     private static List MapToEntity(CreateListDto createListDto)
     {
         return new List
         {
             Id = Guid.NewGuid(),
-            Name = createListDto.Name,
-            Position = createListDto.Position,
-            BoardId = createListDto.BoardId,
+            Name = createListDto.Name!,
+            Position = createListDto.Position!.Value,
+            BoardId = createListDto.BoardId!.Value,
             Color = createListDto.Color,
-            IsArchived = createListDto.IsArchived,
+            IsArchived = createListDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()
         };

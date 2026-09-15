@@ -98,7 +98,7 @@ Content-Type: application/json
   "name": "Idea {{$uuid}}"
 }
 
-### Create a card with no due date and no description. It comes back with "dueDate": null, "isDueComplete": false, "dueReminderMinutes": null, and "description": "".
+### Create a card with no due date and no description. It comes back with "dueDate": null, "dueReminderMinutes": null, and "description": "".
 POST {{prodigy_board_API_HostAddress}}/api/v1/cards
 Content-Type: application/json
 
@@ -106,6 +106,7 @@ Content-Type: application/json
   "title": "Write the spec",
   "position": 1,
   "listId": "{{listId}}",
+  "isDueComplete": false,
   "isArchived": false
 }
 
@@ -261,6 +262,7 @@ Content-Type: application/json
   "dueDate": "2026-10-01T17:00:00+03:00",
   "position": 1,
   "listId": "{{listId}}",
+  "isDueComplete": false,
   "isArchived": false
 }
 
@@ -272,9 +274,374 @@ Content-Type: application/json
   "title": "Missing label",
   "position": 1,
   "listId": "{{listId}}",
+  "isDueComplete": false,
   "isArchived": false,
   "labelIds": ["{{labelId}}", "{{$uuid}}"]
 }
+
+### Create a board with a padded name. The name comes back trimmed.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+Content-Type: application/json
+
+{
+  "name": "  Validation board  ",
+  "workspaceId": "{{workspaceId}}",
+  "visibility": "Private",
+  "isArchived": false
+}
+
+> {% client.global.set("validationBoardId", response.body.data.id); %}
+
+### Create a board from an empty object. 400 required on name, workspaceId, visibility, and isArchived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+Content-Type: application/json
+
+{}
+
+### Create a board with a blank name. 400 required on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+Content-Type: application/json
+
+{
+  "name": "   ",
+  "workspaceId": "{{workspaceId}}",
+  "visibility": "Private",
+  "isArchived": false
+}
+
+### Create a board with a name of 101 characters and a description of 1,001. One 400 holds tooLong on both.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+Content-Type: application/json
+
+{
+  "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+  "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "workspaceId": "{{workspaceId}}",
+  "visibility": "Private",
+  "isArchived": false
+}
+
+### Create a board whose workspaceId is the empty GUID. 400 notFound on workspaceId.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+Content-Type: application/json
+
+{
+  "name": "Empty workspace id",
+  "workspaceId": "00000000-0000-0000-0000-000000000000",
+  "visibility": "Private",
+  "isArchived": false
+}
+
+### Replace the board with an empty object. 400 required on name, workspaceId, visibility, and isArchived.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{validationBoardId}}
+Content-Type: application/json
+
+{}
+
+### Move the board to a workspace that doesn't exist. 400 notFound on workspaceId.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{validationBoardId}}
+Content-Type: application/json
+
+{
+  "name": "Validation board",
+  "workspaceId": "{{$uuid}}",
+  "visibility": "Private",
+  "isArchived": false
+}
+
+### Create a list with a padded name and a color. The name comes back trimmed.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+Content-Type: application/json
+
+{
+  "name": "  Validation list  ",
+  "position": 3,
+  "boardId": "{{boardId}}",
+  "color": "Pink",
+  "isArchived": false
+}
+
+> {% client.global.set("validationListId", response.body.data.id); %}
+
+### Create a list with a blank name and nothing else. 400 required on name, position, boardId, and isArchived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+Content-Type: application/json
+
+{
+  "name": "   "
+}
+
+### Create a list with a name of 101 characters. 400 tooLong on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+Content-Type: application/json
+
+{
+  "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+  "position": 4,
+  "boardId": "{{boardId}}",
+  "isArchived": false
+}
+
+### Create a list on a board that doesn't exist. 400 notFound on boardId.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+Content-Type: application/json
+
+{
+  "name": "Orphan list",
+  "position": 4,
+  "boardId": "{{$uuid}}",
+  "isArchived": false
+}
+
+### Replace the list with an empty object. 400 required on name, position, boardId, and isArchived.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{validationListId}}
+Content-Type: application/json
+
+{}
+
+### Replace the list with position 0 and no color. 0 and false count as present, so it's 200. The name comes back trimmed and the color comes back null.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{validationListId}}
+Content-Type: application/json
+
+{
+  "name": "  Validation list renamed  ",
+  "position": 0,
+  "boardId": "{{boardId}}",
+  "isArchived": false
+}
+
+### Create a card with no title that is marked complete without a due date. One 400 holds required on title and requiresDueDate on isDueComplete.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": true,
+  "isArchived": false
+}
+
+### Create a card from an empty object. 400 required on title, position, listId, isDueComplete, and isArchived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{}
+
+### Create a card with a reminder and no due date. 400 requiresDueDate on dueReminderMinutes.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "Reminder without due date",
+  "dueReminderMinutes": 30,
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card with a due date and a negative reminder. 400 outOfRange on dueReminderMinutes.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "Negative reminder",
+  "dueDate": "2026-10-01T17:00:00Z",
+  "dueReminderMinutes": -1,
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card that starts after its due date. 400 startAfterDue on startDate.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "Starts too late",
+  "startDate": "2026-10-02T09:00:00Z",
+  "dueDate": "2026-10-01T17:00:00Z",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card with a start date and no due date. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "Start date only",
+  "startDate": "2026-10-02T09:00:00Z",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a complete card that starts at its due time, with a reminder of 0. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "Same start and due",
+  "startDate": "2026-10-01T20:00:00+03:00",
+  "dueDate": "2026-10-01T17:00:00Z",
+  "dueReminderMinutes": 0,
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": true,
+  "isArchived": false
+}
+
+### Create a card with a title of 501 characters and a description of 10,001. One 400 holds tooLong on both.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+  "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card with a padded title of 500 characters and a description of 10,000. 201, so the columns take the full limits. The title comes back trimmed.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "  tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt  ",
+  "description": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card with a blank title and a null second label id. One 400 holds required on title and invalidFormat on labelIds[1].
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "  ",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": false,
+  "isArchived": false,
+  "labelIds": ["{{labelId}}", null]
+}
+
+### Create a card in a list that doesn't exist, with the empty GUID as a label. One 400 holds notFound on listId and labelIds[0].
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "Nothing exists",
+  "position": 1,
+  "listId": "{{$uuid}}",
+  "isDueComplete": false,
+  "isArchived": false,
+  "labelIds": ["00000000-0000-0000-0000-000000000000"]
+}
+
+### Create a card with the same label twice. 201 with one entry in labelIds.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "Repeated label",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": false,
+  "isArchived": false,
+  "labelIds": ["{{labelId}}", "{{labelId}}"]
+}
+
+### Replace the card with only a title. 400 required on position, listId, isDueComplete, and isArchived.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{cardId}}
+Content-Type: application/json
+
+{
+  "title": "Write the spec"
+}
+
+### Replace the card without its due date but still complete. 400 requiresDueDate on isDueComplete.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{cardId}}
+Content-Type: application/json
+
+{
+  "title": "Write the spec",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": true,
+  "isArchived": false
+}
+
+### Replace the card with only its required fields. 200. The due date, start date and reminder come back null, the description comes back "", and the labels are cleared.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{cardId}}
+Content-Type: application/json
+
+{
+  "title": "Write the spec",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a label with a padded name. The name comes back trimmed.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+Content-Type: application/json
+
+{
+  "name": "  Trim {{$uuid}}  "
+}
+
+> {% client.global.set("trimmedLabelName", response.body.data.name); %}
+
+### Create a label with that name padded again. The check compares trimmed names, so it's 409 duplicate on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+Content-Type: application/json
+
+{
+  "name": "   {{trimmedLabelName}}   "
+}
+
+### Rename another label to the padded name. 409 duplicate on name.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/labels/{{labelId}}
+Content-Type: application/json
+
+{
+  "name": "   {{trimmedLabelName}}   ",
+  "color": "Lime"
+}
+
+### Create a label with a blank name. 400 required on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+Content-Type: application/json
+
+{
+  "name": "   ",
+  "color": "Red"
+}
+
+### Create a label with a name of 51 characters. 400 tooLong on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+Content-Type: application/json
+
+{
+  "name": "lllllllllllllllllllllllllllllllllllllllllllllllllll"
+}
+
+### Replace the label with an empty object. 400 required on name.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/labels/{{labelId}}
+Content-Type: application/json
+
+{}
 
 ### Create a label to test duplicate names against.
 POST {{prodigy_board_API_HostAddress}}/api/v1/labels
@@ -294,7 +661,7 @@ Content-Type: application/json
   "name": "{{duplicateLabelName}}"
 }
 
-### Create a board in a workspace that doesn't exist. The foreign key handler returns 400 notFound.
+### Create a board in a workspace that doesn't exist. 400 notFound on workspaceId.
 POST {{prodigy_board_API_HostAddress}}/api/v1/boards
 Content-Type: application/json
 

@@ -60,7 +60,7 @@ public class LabelService : ILabelService
     public async Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelDto createLabelDto)
     {
         var existingLabel = await _context.Labels
-            .FirstOrDefaultAsync(l => l.Name.ToLower() == createLabelDto.Name.ToLower());
+            .FirstOrDefaultAsync(l => l.Name.ToLower() == createLabelDto.Name!.ToLower());
         if (existingLabel != null)
         {
             return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
@@ -82,14 +82,14 @@ public class LabelService : ILabelService
         }
 
         var nameTaken = await _context.Labels
-            .AnyAsync(l => l.Id != id && l.Name.ToLower() == updateLabelDto.Name.ToLower());
+            .AnyAsync(l => l.Id != id && l.Name.ToLower() == updateLabelDto.Name!.ToLower());
         if (nameTaken)
         {
             return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
                 [new ApiError("name", ErrorCodes.Duplicate, "A label with this name already exists.")]);
         }
 
-        existingLabel.Name = updateLabelDto.Name;
+        existingLabel.Name = updateLabelDto.Name!;
         existingLabel.Color = updateLabelDto.Color;
         existingLabel.UpdatedAt = DateTime.UtcNow;
         existingLabel.UpdatedBy = Guid.NewGuid();
@@ -133,7 +133,7 @@ public class LabelService : ILabelService
         return new Label
         {
             Id = Guid.NewGuid(),
-            Name = createDto.Name,
+            Name = createDto.Name!,
             Color = createDto.Color,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()

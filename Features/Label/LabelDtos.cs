@@ -13,15 +13,21 @@ public record LabelDto
 
 public record CreateLabelDto
 (
-    string Name,
+    string? Name,
     Color? Color
-);
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 
 public record UpdateLabelDto
 (
-    string Name,
+    string? Name,
     Color? Color
-);
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 
 public record LabelSearchDto
 (

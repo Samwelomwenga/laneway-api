@@ -17,21 +17,27 @@ public record BoardDto
 
 public record CreateBoardDto
 (
-    string Name,
+    string? Name,
     string? Description,
-    Guid WorkspaceId,
-    BoardVisibility Visibility,
-    bool IsArchived
-);
+    Guid? WorkspaceId,
+    BoardVisibility? Visibility,
+    bool? IsArchived
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 
 public record UpdateBoardDto
 (
-    string Name,
+    string? Name,
     string? Description,
-    Guid WorkspaceId,
-    BoardVisibility Visibility,
-    bool IsArchived
-);
+    Guid? WorkspaceId,
+    BoardVisibility? Visibility,
+    bool? IsArchived
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 
 public record BoardSearchDto
 (

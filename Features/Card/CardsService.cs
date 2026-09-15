@@ -21,10 +21,10 @@ public class CardService: ICardService
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
     {
-        var (labels, labelErrors) = await FindLabelsAsync(createCardDto.LabelIds);
-        if (labelErrors.Count > 0)
+        var (labels, referenceErrors) = await ResolveReferencesAsync(createCardDto.ListId!.Value, createCardDto.LabelIds);
+        if (referenceErrors.Count > 0)
         {
-            return ApiResponse<CardDto>.ErrorResponse("Label not found", 400, labelErrors);
+            return ApiResponse<CardDto>.ErrorResponse("A referenced resource does not exist", 400, referenceErrors);
         }
 
         var card = MapToEntity(createCardDto);
@@ -48,22 +48,22 @@ public class CardService: ICardService
             return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
         }
 
-        var (labels, labelErrors) = await FindLabelsAsync(updateCardDto.LabelIds);
-        if (labelErrors.Count > 0)
+        var (labels, referenceErrors) = await ResolveReferencesAsync(updateCardDto.ListId!.Value, updateCardDto.LabelIds);
+        if (referenceErrors.Count > 0)
         {
-            return ApiResponse<CardDto>.ErrorResponse("Label not found", 400, labelErrors);
+            return ApiResponse<CardDto>.ErrorResponse("A referenced resource does not exist", 400, referenceErrors);
         }
 
-        card.Title = updateCardDto.Title;
+        card.Title = updateCardDto.Title!;
         card.Description = updateCardDto.Description ?? string.Empty;
         card.DueDate = updateCardDto.DueDate;
-        card.Position = updateCardDto.Position;
-        card.ListId = updateCardDto.ListId;
-        card.IsDueComplete = updateCardDto.IsDueComplete;
+        card.Position = updateCardDto.Position!.Value;
+        card.ListId = updateCardDto.ListId.Value;
+        card.IsDueComplete = updateCardDto.IsDueComplete!.Value;
         card.Cover = updateCardDto.Cover;
         card.StartDate = updateCardDto.StartDate;
         card.DueReminderMinutes = updateCardDto.DueReminderMinutes;
-        card.IsArchived = updateCardDto.IsArchived;
+        card.IsArchived = updateCardDto.IsArchived!.Value;
         card.UpdatedAt = DateTime.UtcNow;
         card.Labels.Clear();
         card.Labels.AddRange(labels);
@@ -162,17 +162,22 @@ public class CardService: ICardService
 
         return ApiResponse<bool>.SuccessResponse(true, "Card deleted successfully", 204);
     }
-    private async Task<(List<Label> Labels, List<ApiError> Errors)> FindLabelsAsync(List<Guid>? labelIds)
+    private async Task<(List<Label> Labels, List<ApiError> Errors)> ResolveReferencesAsync(Guid listId, List<Guid?>? labelIds)
     {
-        var ids = labelIds ?? [];
+        var errors = new List<ApiError>();
+        if (!await _context.Lists.AnyAsync(l => l.Id == listId))
+        {
+            errors.Add(new ApiError("listId", ErrorCodes.NotFound, $"List {listId} does not exist."));
+        }
+
+        var ids = labelIds?.Select(id => id!.Value).ToList() ?? [];
         var labels = await _context.Labels.Where(l => ids.Contains(l.Id)).ToListAsync();
         var foundIds = labels.Select(l => l.Id).ToHashSet();
-        var errors = ids
+        errors.AddRange(ids
             .Select((id, index) => (Id: id, Index: index))
             .Where(entry => !foundIds.Contains(entry.Id))
             .DistinctBy(entry => entry.Id)
-            .Select(entry => new ApiError($"labelIds[{entry.Index}]", ErrorCodes.NotFound, $"Label {entry.Id} does not exist."))
-            .ToList();
+            .Select(entry => new ApiError($"labelIds[{entry.Index}]", ErrorCodes.NotFound, $"Label {entry.Id} does not exist.")));
         return (labels, errors);
     }
     private static CardDto MapToDto(Card card)
@@ -202,16 +207,16 @@ public class CardService: ICardService
         return new Card
         {
             Id = Guid.NewGuid(),
-            Title = createCardDto.Title,
+            Title = createCardDto.Title!,
             Description = createCardDto.Description ?? string.Empty,
             DueDate = createCardDto.DueDate,
-            Position = createCardDto.Position,
-            ListId = createCardDto.ListId,
-            IsDueComplete = createCardDto.IsDueComplete,
+            Position = createCardDto.Position!.Value,
+            ListId = createCardDto.ListId!.Value,
+            IsDueComplete = createCardDto.IsDueComplete!.Value,
             Cover = createCardDto.Cover,
             StartDate = createCardDto.StartDate,
             DueReminderMinutes = createCardDto.DueReminderMinutes,
-            IsArchived = createCardDto.IsArchived,
+            IsArchived = createCardDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()
         };

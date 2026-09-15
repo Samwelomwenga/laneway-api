@@ -78,6 +78,12 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto)
     {
+        var workspaceId = createBoardDto.WorkspaceId!.Value;
+        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
+        {
+            return WorkspaceNotFound(workspaceId);
+        }
+
         var boardEntity = MapToEntity(createBoardDto);
         _context.Boards.Add(boardEntity);
         await _context.SaveChangesAsync();
@@ -95,11 +101,17 @@ public class BoardService : IBoardService
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
         }
 
-        existingBoard.Name = updateBoardDto.Name;
+        var workspaceId = updateBoardDto.WorkspaceId!.Value;
+        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
+        {
+            return WorkspaceNotFound(workspaceId);
+        }
+
+        existingBoard.Name = updateBoardDto.Name!;
         existingBoard.Description = updateBoardDto.Description ?? string.Empty;
-        existingBoard.WorkspaceId = updateBoardDto.WorkspaceId;
-        existingBoard.Visibility = updateBoardDto.Visibility;
-        existingBoard.IsArchived = updateBoardDto.IsArchived;
+        existingBoard.WorkspaceId = workspaceId;
+        existingBoard.Visibility = updateBoardDto.Visibility!.Value;
+        existingBoard.IsArchived = updateBoardDto.IsArchived!.Value;
         existingBoard.UpdatedAt = DateTime.UtcNow;
         existingBoard.UpdatedBy = Guid.NewGuid();
 
@@ -139,16 +151,20 @@ public class BoardService : IBoardService
         );
     }
 
+    private static ApiResponse<BoardDto> WorkspaceNotFound(Guid workspaceId) =>
+        ApiResponse<BoardDto>.ErrorResponse("A referenced resource does not exist", 400,
+            [new ApiError("workspaceId", ErrorCodes.NotFound, $"Workspace {workspaceId} does not exist.")]);
+
     private static Board MapToEntity(CreateBoardDto createBoardDto)
     {
         return new Board
         {
             Id = Guid.NewGuid(),
-            Name = createBoardDto.Name,
+            Name = createBoardDto.Name!,
             Description = createBoardDto.Description ?? string.Empty,
-            WorkspaceId = createBoardDto.WorkspaceId,
-            Visibility = createBoardDto.Visibility,
-            IsArchived = createBoardDto.IsArchived,
+            WorkspaceId = createBoardDto.WorkspaceId!.Value,
+            Visibility = createBoardDto.Visibility!.Value,
+            IsArchived = createBoardDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()
         };
