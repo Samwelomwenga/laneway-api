@@ -64,7 +64,7 @@ public class LabelService : ILabelService
         if (existingLabel != null)
         {
             return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
-                new List<string> { "A label with this name already exists." });
+                [new ApiError("name", ErrorCodes.Duplicate, "A label with this name already exists.")]);
         }
         var newLabel = MapToEntity(createLabelDto);
         _context.Labels.Add(newLabel);
@@ -86,7 +86,7 @@ public class LabelService : ILabelService
         if (nameTaken)
         {
             return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
-                new List<string> { "A label with this name already exists." });
+                [new ApiError("name", ErrorCodes.Duplicate, "A label with this name already exists.")]);
         }
 
         existingLabel.Name = updateLabelDto.Name;

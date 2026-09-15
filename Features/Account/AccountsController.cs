@@ -31,15 +31,6 @@ public class AccountsController : ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<AccountDto>>> CreateAccount([FromBody] CreateAccountDto createAccountDto)
     {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<AccountDto>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _accountService.CreateAsync(createAccountDto);
         if (!response.Success)
         {
@@ -51,15 +42,6 @@ public class AccountsController : ApiControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<AccountDto>>> UpdateAccount(Guid id, [FromBody] UpdateAccountDto updateAccountDto)
     {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<AccountDto>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _accountService.UpdateAsync(id, updateAccountDto);
         return ToActionResult(response);
     }

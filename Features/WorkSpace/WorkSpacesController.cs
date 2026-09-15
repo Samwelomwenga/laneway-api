@@ -32,15 +32,6 @@ public class WorkSpacesController: ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<WorkSpaceDto>>> CreateWorkSpace([FromBody] CreateWorkSpaceDto createWorkSpaceDto)
     {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<WorkSpaceDto>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _workSpaceService.CreateAsync(createWorkSpaceDto);
         if (!response.Success)
         {
@@ -52,15 +43,6 @@ public class WorkSpacesController: ApiControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<WorkSpaceDto>>> UpdateWorkSpace(Guid id, [FromBody] UpdateWorkSpaceDto updateWorkSpaceDto)
     {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<WorkSpaceDto>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _workSpaceService.UpdateAsync(id, updateWorkSpaceDto);
         return ToActionResult(response);
     }

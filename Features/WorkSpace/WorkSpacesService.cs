@@ -91,10 +91,10 @@ public class WorkSpaceService : IWorkSpaceService
             return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
         }
 
-        existingWorkSpace.Name = updateWorkSpaceDto.Name;
+        existingWorkSpace.Name = updateWorkSpaceDto.Name!;
         existingWorkSpace.Description = updateWorkSpaceDto.Description ?? string.Empty;
-        existingWorkSpace.Visibility = updateWorkSpaceDto.Visibility;
-        existingWorkSpace.IsArchived = updateWorkSpaceDto.IsArchived;
+        existingWorkSpace.Visibility = updateWorkSpaceDto.Visibility!.Value;
+        existingWorkSpace.IsArchived = updateWorkSpaceDto.IsArchived!.Value;
         existingWorkSpace.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -137,10 +137,10 @@ public class WorkSpaceService : IWorkSpaceService
         return new WorkSpace
         {
             Id = Guid.NewGuid(),
-            Name = createWorkSpaceDto.Name,
+            Name = createWorkSpaceDto.Name!,
             Description = createWorkSpaceDto.Description ?? string.Empty,
-            Visibility = createWorkSpaceDto.Visibility,
-            IsArchived = createWorkSpaceDto.IsArchived,
+            Visibility = createWorkSpaceDto.Visibility!.Value,
+            IsArchived = createWorkSpaceDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()
         };

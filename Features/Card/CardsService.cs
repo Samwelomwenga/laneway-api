@@ -21,10 +21,10 @@ public class CardService: ICardService
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
     {
-        var (labels, missingLabelIds) = await FindLabelsAsync(createCardDto.LabelIds);
-        if (missingLabelIds.Count > 0)
+        var (labels, labelErrors) = await FindLabelsAsync(createCardDto.LabelIds);
+        if (labelErrors.Count > 0)
         {
-            return ApiResponse<CardDto>.ErrorResponse("Label not found", 400, missingLabelIds);
+            return ApiResponse<CardDto>.ErrorResponse("Label not found", 400, labelErrors);
         }
 
         var card = MapToEntity(createCardDto);
@@ -48,10 +48,10 @@ public class CardService: ICardService
             return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
         }
 
-        var (labels, missingLabelIds) = await FindLabelsAsync(updateCardDto.LabelIds);
-        if (missingLabelIds.Count > 0)
+        var (labels, labelErrors) = await FindLabelsAsync(updateCardDto.LabelIds);
+        if (labelErrors.Count > 0)
         {
-            return ApiResponse<CardDto>.ErrorResponse("Label not found", 400, missingLabelIds);
+            return ApiResponse<CardDto>.ErrorResponse("Label not found", 400, labelErrors);
         }
 
         card.Title = updateCardDto.Title;
@@ -162,12 +162,18 @@ public class CardService: ICardService
 
         return ApiResponse<bool>.SuccessResponse(true, "Card deleted successfully", 204);
     }
-    private async Task<(List<Label> Labels, List<string> MissingIds)> FindLabelsAsync(List<Guid>? labelIds)
+    private async Task<(List<Label> Labels, List<ApiError> Errors)> FindLabelsAsync(List<Guid>? labelIds)
     {
-        var ids = labelIds?.Distinct().ToList() ?? [];
+        var ids = labelIds ?? [];
         var labels = await _context.Labels.Where(l => ids.Contains(l.Id)).ToListAsync();
-        var missingIds = ids.Except(labels.Select(l => l.Id)).Select(id => id.ToString()).ToList();
-        return (labels, missingIds);
+        var foundIds = labels.Select(l => l.Id).ToHashSet();
+        var errors = ids
+            .Select((id, index) => (Id: id, Index: index))
+            .Where(entry => !foundIds.Contains(entry.Id))
+            .DistinctBy(entry => entry.Id)
+            .Select(entry => new ApiError($"labelIds[{entry.Index}]", ErrorCodes.NotFound, $"Label {entry.Id} does not exist."))
+            .ToList();
+        return (labels, errors);
     }
     private static CardDto MapToDto(Card card)
     {

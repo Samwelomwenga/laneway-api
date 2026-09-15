@@ -134,3 +134,237 @@ GET {{prodigy_board_API_HostAddress}}/api/v1/cards?endDate=2026-10-02T00:00:00Z
 
 ### Search cards due on a given day. A card with no due date never matches.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueDate=2026-10-01T00:00:00Z
+
+### Create a workspace with a padded name, a padded description, and a lowercase visibility. The name comes back trimmed, the description comes back as sent, and visibility comes back as "Public".
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: application/json
+
+{
+  "name": "  Validation  ",
+  "description": "  kept as sent  ",
+  "visibility": "public",
+  "isArchived": false
+}
+
+> {% client.global.set("validationWorkspaceId", response.body.data.id); %}
+
+### Send malformed JSON. 400 invalidFormat with a null field.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: application/json
+
+{
+  "name": "Broken",
+
+### Send an id that isn't a GUID. 400 invalidFormat on id.
+GET {{prodigy_board_API_HostAddress}}/api/v1/workspaces/not-a-guid
+
+### Send a field the request doesn't take. 400 unknownField on status.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: application/json
+
+{
+  "name": "Unknown field",
+  "status": "open"
+}
+
+### Send visibility as an integer. 400 unknownValue on visibility, and the message lists Private and Public.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: application/json
+
+{
+  "name": "Integer visibility",
+  "visibility": 1
+}
+
+### Send a visibility name that doesn't exist. 400 unknownValue on visibility.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: application/json
+
+{
+  "name": "Unknown visibility",
+  "visibility": "Secret"
+}
+
+### Send two visibility names in one string. 400 unknownValue on visibility.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: application/json
+
+{
+  "name": "Two visibilities",
+  "visibility": "Private, Public"
+}
+
+### Send a blank name and a description of 1,001 characters. One 400 holds required on name and tooLong on description.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: application/json
+
+{
+  "name": "   ",
+  "visibility": "Private",
+  "isArchived": false,
+  "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+}
+
+### Create a workspace with a null visibility and no isArchived. 400 required on both.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: application/json
+
+{
+  "name": "Missing fields",
+  "visibility": null
+}
+
+### Send a name of 101 characters inside spaces. Trimming leaves 101, so it's 400 tooLong on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: application/json
+
+{
+  "visibility": "Private",
+  "isArchived": false,
+  "name": "  nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn  "
+}
+
+### Replace the workspace with an empty object. 400 required on name, visibility, and isArchived.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/workspaces/{{validationWorkspaceId}}
+Content-Type: application/json
+
+{}
+
+### Replace the workspace with every field. The name comes back trimmed.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/workspaces/{{validationWorkspaceId}}
+Content-Type: application/json
+
+{
+  "name": " Validation renamed ",
+  "visibility": "PRIVATE",
+  "isArchived": false
+}
+
+### Create a card with a due date that has no offset. 400 invalidFormat on dueDate.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "No offset",
+  "dueDate": "2026-10-01T17:00:00",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isArchived": false
+}
+
+### Create a card with a due date in +03:00. It comes back as "2026-10-01T14:00:00Z".
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "East Africa time",
+  "dueDate": "2026-10-01T17:00:00+03:00",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isArchived": false
+}
+
+### Create a card whose second label doesn't exist. 400 notFound on labelIds[1].
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "Missing label",
+  "position": 1,
+  "listId": "{{listId}}",
+  "isArchived": false,
+  "labelIds": ["{{labelId}}", "{{$uuid}}"]
+}
+
+### Create a label to test duplicate names against.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+Content-Type: application/json
+
+{
+  "name": "Duplicate {{$uuid}}"
+}
+
+> {% client.global.set("duplicateLabelName", response.body.data.name); %}
+
+### Create a second label with the same name. 409 duplicate on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+Content-Type: application/json
+
+{
+  "name": "{{duplicateLabelName}}"
+}
+
+### Create a board in a workspace that doesn't exist. The foreign key handler returns 400 notFound.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+Content-Type: application/json
+
+{
+  "name": "Orphan",
+  "workspaceId": "{{$uuid}}",
+  "visibility": "Private",
+  "isArchived": false
+}
+
+### Check a username without the username key. 400 required on username.
+GET {{prodigy_board_API_HostAddress}}/api/v1/users/username-exists
+
+### Call a route that doesn't exist. The framework's empty 404 stays.
+GET {{prodigy_board_API_HostAddress}}/api/v1/does-not-exist
+
+### Delete the workspaces collection. The framework's empty 405 stays.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+
+### Post a workspace as plain text. The framework's 415 stays.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: text/plain
+
+name=Plain text
+
+### Create a user whose email the next user will try to take.
+POST {{prodigy_board_API_HostAddress}}/api/v1/users
+Content-Type: application/json
+
+{
+  "username": "first-{{$uuid}}",
+  "email": "{{$uuid}}@example.com",
+  "firstName": "First",
+  "lastName": "User",
+  "language": "en-US",
+  "timeZone": "UTC",
+  "location": "Nairobi",
+  "isActive": true
+}
+
+> {% client.global.set("takenEmail", response.body.data.email); %}
+
+### Create a second user.
+POST {{prodigy_board_API_HostAddress}}/api/v1/users
+Content-Type: application/json
+
+{
+  "username": "second-{{$uuid}}",
+  "email": "{{$uuid}}@example.com",
+  "firstName": "Second",
+  "lastName": "User",
+  "language": "en-US",
+  "timeZone": "UTC",
+  "location": "Nairobi",
+  "isActive": true
+}
+
+> {% client.global.set("secondUserId", response.body.data.id); %}
+
+### Give the second user the first user's email. User update has no duplicate check, so the unique index on Email fails and the exception handler returns 409 duplicate with a null field.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/users/{{secondUserId}}
+Content-Type: application/json
+
+{
+  "username": "second-{{$uuid}}",
+  "email": "{{takenEmail}}",
+  "firstName": "Second",
+  "lastName": "User",
+  "language": "en-US",
+  "timeZone": "UTC",
+  "location": "Nairobi",
+  "isActive": true
+}

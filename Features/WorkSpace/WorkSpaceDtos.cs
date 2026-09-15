@@ -15,18 +15,24 @@ public record WorkSpaceDto
 );
 public record CreateWorkSpaceDto
 (
-    string Name,
+    string? Name,
     string? Description,
-    WorkspaceVisibility Visibility,
-    bool IsArchived
-);
+    WorkspaceVisibility? Visibility,
+    bool? IsArchived
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 public record UpdateWorkSpaceDto
 (
-    string Name,
+    string? Name,
     string? Description,
-    WorkspaceVisibility Visibility,
-    bool IsArchived
-);
+    WorkspaceVisibility? Visibility,
+    bool? IsArchived
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 public record WorkSpaceSearchDto
 (
     int PageNumber = 1,
