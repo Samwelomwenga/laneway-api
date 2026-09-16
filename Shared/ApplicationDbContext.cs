@@ -139,6 +139,10 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Label>(entity =>
         {
             entity.Property(l => l.Name).HasColumnType($"varchar({FieldLimits.LabelName})");
+            entity.HasOne<Board>()
+                .WithMany()
+                .HasForeignKey(l => l.BoardId)
+                .OnDelete(DeleteBehavior.Cascade);
             ActorKeys(entity);
         });
     }

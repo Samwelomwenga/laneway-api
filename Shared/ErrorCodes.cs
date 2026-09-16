@@ -15,4 +15,5 @@ public static class ErrorCodes
     public const string MutuallyExclusive = "mutuallyExclusive";
     public const string NotSibling = "notSibling";
     public const string NotAdjacent = "notAdjacent";
+    public const string NotOnBoard = "notOnBoard";
 }

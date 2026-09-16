@@ -8,6 +8,8 @@ public interface ICardService
     Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardDto updateCardDto);
     Task<ApiResponse<CardDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<List<CardDto>>> GetAllAsync(CardSearchDto searchDto);
+    Task<ApiResponse<bool>> AddLabelAsync(Guid cardId, Guid labelId);
+    Task<ApiResponse<bool>> RemoveLabelAsync(Guid cardId, Guid labelId);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 public class CardService: ICardService
@@ -169,6 +171,57 @@ public class CardService: ICardService
             message: "Cards retrieved successfully"
         );
     }
+    public Task<ApiResponse<bool>> AddLabelAsync(Guid cardId, Guid labelId) =>
+        ChangeLabelAsync(cardId, labelId, add: true);
+
+    public Task<ApiResponse<bool>> RemoveLabelAsync(Guid cardId, Guid labelId) =>
+        ChangeLabelAsync(cardId, labelId, add: false);
+
+    private async Task<ApiResponse<bool>> ChangeLabelAsync(Guid cardId, Guid labelId, bool add)
+    {
+        var card = await _context.Cards
+            .Include(c => c.Labels)
+            .FirstOrDefaultAsync(c => c.Id == cardId);
+        if (card == null)
+        {
+            return ApiResponse<bool>.ErrorResponse("Card not found", 404);
+        }
+
+        var label = await _context.Labels.FindAsync(labelId);
+        if (label == null)
+        {
+            return ApiResponse<bool>.ErrorResponse("Label not found", 404);
+        }
+
+        var boardId = await BoardOfListAsync(card.ListId);
+        if (boardId is { } board && label.BoardId != board)
+        {
+            return ReferenceErrors.Invalid<bool>([NotOnBoard("labelId", labelId, board)]);
+        }
+
+        var message = add ? "Label added to the card" : "Label removed from the card";
+        var onCard = card.Labels.Find(l => l.Id == labelId);
+        var changesTheSet = add ? onCard is null : onCard is not null;
+        if (!changesTheSet)
+        {
+            return ApiResponse<bool>.SuccessResponse(true, message, 204);
+        }
+
+        if (add)
+        {
+            card.Labels.Add(label);
+        }
+        else
+        {
+            card.Labels.Remove(onCard!);
+        }
+
+        _context.StampChange(card, _actor, relatedChanged: true);
+        await _context.SaveChangesAsync();
+
+        return ApiResponse<bool>.SuccessResponse(true, message, 204);
+    }
+
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
         var card = await _context.Cards.FindAsync(id);
@@ -186,22 +239,43 @@ public class CardService: ICardService
         Guid listId, List<Guid?>? labelIds)
     {
         var errors = new List<ApiError>();
-        var listExists = await _context.Lists.AnyAsync(l => l.Id == listId);
-        if (!listExists)
+        var boardId = await BoardOfListAsync(listId);
+        if (boardId is null)
         {
             errors.Add(new ApiError("listId", ErrorCodes.NotFound, $"List {listId} does not exist."));
         }
 
         var ids = labelIds?.Select(id => id!.Value).ToList() ?? [];
         var labels = await _context.Labels.Where(l => ids.Contains(l.Id)).ToListAsync();
-        var foundIds = labels.Select(l => l.Id).ToHashSet();
-        errors.AddRange(ids
-            .Select((id, index) => (Id: id, Index: index))
-            .Where(entry => !foundIds.Contains(entry.Id))
-            .DistinctBy(entry => entry.Id)
-            .Select(entry => new ApiError($"labelIds[{entry.Index}]", ErrorCodes.NotFound, $"Label {entry.Id} does not exist.")));
-        return (labels, listExists, errors);
+        var seen = new HashSet<Guid>();
+        for (var index = 0; index < ids.Count; index++)
+        {
+            var id = ids[index];
+            if (!seen.Add(id))
+            {
+                continue;
+            }
+
+            var field = $"labelIds[{index}]";
+            var label = labels.Find(l => l.Id == id);
+            if (label is null)
+            {
+                errors.Add(new ApiError(field, ErrorCodes.NotFound, $"Label {id} does not exist."));
+            }
+            else if (boardId is { } board && label.BoardId != board)
+            {
+                errors.Add(NotOnBoard(field, id, board));
+            }
+        }
+
+        return (labels, boardId is not null, errors);
     }
+
+    private async Task<Guid?> BoardOfListAsync(Guid listId) =>
+        await _context.Lists.Where(l => l.Id == listId).Select(l => (Guid?)l.BoardId).FirstOrDefaultAsync();
+
+    private static ApiError NotOnBoard(string field, Guid labelId, Guid boardId) =>
+        new(field, ErrorCodes.NotOnBoard, $"Label {labelId} isn't on board {boardId}.");
     private static CardDto MapToDto(Card card)
     {
         return new CardDto
