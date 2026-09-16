@@ -2441,3 +2441,466 @@ X-User-Id: {{actorId}}
 ### Delete the now-empty workspace. 204.
 DELETE {{prodigy_board_API_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}
 X-User-Id: {{actorId}}
+
+### Create the workspace the read-only checks work in.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Read only",
+  "visibility": "Private"
+}
+
+> {% client.global.set("readOnlyWorkspaceId", response.body.data.id); %}
+
+### Create the board the read-only checks archive.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Read only board",
+  "workspaceId": "{{readOnlyWorkspaceId}}",
+  "visibility": "Private"
+}
+
+> {% client.global.set("readOnlyBoardId", response.body.data.id); %}
+
+### Create a second board, which nothing below archives. Its writes keep working throughout.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Untouched board",
+  "workspaceId": "{{readOnlyWorkspaceId}}",
+  "visibility": "Private"
+}
+
+> {% client.global.set("untouchedBoardId", response.body.data.id); %}
+
+### Create the list the read-only checks archive.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Doing",
+  "boardId": "{{readOnlyBoardId}}"
+}
+
+> {% client.global.set("readOnlyListId", response.body.data.id); %}
+
+### Create a list on the untouched board.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Untouched list",
+  "boardId": "{{untouchedBoardId}}"
+}
+
+> {% client.global.set("untouchedListId", response.body.data.id); %}
+
+### Create the card the read-only checks block. Its own flag stays off the whole way.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Card A",
+  "listId": "{{readOnlyListId}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("readOnlyCardId", response.body.data.id); %}
+
+### Create a card on the untouched board.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Untouched card",
+  "listId": "{{untouchedListId}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("untouchedCardId", response.body.data.id); %}
+
+### Create the label the read-only checks block.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Read only label",
+  "boardId": "{{readOnlyBoardId}}",
+  "color": "Red"
+}
+
+> {% client.global.set("readOnlyLabelId", response.body.data.id); %}
+
+### Replace the card while nothing is archived. 200.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Card A",
+  "listId": "{{readOnlyListId}}",
+  "position": 65536,
+  "isDueComplete": false
+}
+
+### Add the label to the card while nothing is archived. 204.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/labels/{{readOnlyLabelId}}
+X-User-Id: {{actorId}}
+
+### Remove it again. 204.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/labels/{{readOnlyLabelId}}
+X-User-Id: {{actorId}}
+
+### Archive the list. The board above it stays open. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{readOnlyListId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Replace a card in the archived list. 409 archived with a null field, naming the list.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Renamed under an archived list",
+  "listId": "{{readOnlyListId}}",
+  "position": 65536,
+  "isDueComplete": false
+}
+
+### Replace the archived list itself. 409 archived, "This list is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{readOnlyListId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed while archived",
+  "position": 65536,
+  "boardId": "{{readOnlyBoardId}}"
+}
+
+### Create a card in the archived list. 409 archived on listId.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Born hidden",
+  "listId": "{{readOnlyListId}}",
+  "isDueComplete": false
+}
+
+### Add a label to a card in the archived list. 409 archived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/labels/{{readOnlyLabelId}}
+X-User-Id: {{actorId}}
+
+### Remove a label from a card in the archived list. 409 archived.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/labels/{{readOnlyLabelId}}
+X-User-Id: {{actorId}}
+
+### Archive a card in the archived list. 409 archived, and the message says to restore the list first.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Send that card its current archived value. Still 409, because the parent blocks the call either way.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Replace a card in the archived list with no title. 400 required on title, because the body runs first.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "listId": "{{readOnlyListId}}",
+  "position": 65536,
+  "isDueComplete": false
+}
+
+### Create a card in a list that doesn't exist. 400 notFound on listId, which runs before the archive check.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Nowhere",
+  "listId": "11111111-1111-1111-1111-111111111111",
+  "isDueComplete": false
+}
+
+### Create a card in the archived list naming a label that doesn't exist. 400 notFound, for the same reason.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Born hidden",
+  "listId": "{{readOnlyListId}}",
+  "isDueComplete": false,
+  "labelIds": ["11111111-1111-1111-1111-111111111111"]
+}
+
+### Create a list on the board holding the archived list. 201, because only the list is archived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Second list",
+  "boardId": "{{readOnlyBoardId}}"
+}
+
+### Create a label on that board. 201, for the same reason.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Second label",
+  "boardId": "{{readOnlyBoardId}}",
+  "color": "Blue"
+}
+
+### Restore the list. 204, because a list's own flag never blocks its own archived call.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{readOnlyListId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Archive the board. The list and card below it keep their own flags off. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Replace a card on the archived board. 409 archived, naming the board.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Renamed under an archived board",
+  "listId": "{{readOnlyListId}}",
+  "position": 65536,
+  "isDueComplete": false
+}
+
+### Replace a list on the archived board. 409 archived, "The board this list is on is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{readOnlyListId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed under an archived board",
+  "position": 65536,
+  "boardId": "{{readOnlyBoardId}}"
+}
+
+### Replace the archived board itself. 409 archived, "This board is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed while archived",
+  "workspaceId": "{{readOnlyWorkspaceId}}",
+  "visibility": "Private"
+}
+
+### Create a card on the archived board. 409 archived on listId, naming the board.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Born hidden",
+  "listId": "{{readOnlyListId}}",
+  "isDueComplete": false
+}
+
+### Create a list on the archived board. 409 archived on boardId.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Born hidden",
+  "boardId": "{{readOnlyBoardId}}"
+}
+
+### Create a label on the archived board. 409 archived on boardId, naming the label's board.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Born hidden",
+  "boardId": "{{readOnlyBoardId}}",
+  "color": "Green"
+}
+
+### Replace a label on the archived board. 409 archived with a null field.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/labels/{{readOnlyLabelId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed under an archived board",
+  "color": "Red"
+}
+
+### Delete a label on the archived board. 409 archived, because labels follow the board's state.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/labels/{{readOnlyLabelId}}
+X-User-Id: {{actorId}}
+
+### Add a label to a card on the archived board. 409 archived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/labels/{{readOnlyLabelId}}
+X-User-Id: {{actorId}}
+
+### Remove a label from a card on the archived board. 409 archived.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/labels/{{readOnlyLabelId}}
+X-User-Id: {{actorId}}
+
+### Archive a card on the archived board. 409 archived, and the message says to restore the board first.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Archive a list on the archived board. 409 archived, and the message says to restore the board first.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{readOnlyListId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Archive the already archived board. 204, because a board is never blocked.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Replace the card on the untouched board. 200, because another board's archive means nothing here.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{untouchedCardId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Untouched card",
+  "listId": "{{untouchedListId}}",
+  "position": 65536,
+  "isDueComplete": false
+}
+
+### Archive the card while its board is archived. 409, so a card has to be archived before its parents are.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Restore the board, so the card can be archived from the bottom up. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Archive the card. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Replace the archived card. 409 archived, "This card is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Renamed while archived",
+  "listId": "{{readOnlyListId}}",
+  "position": 65536,
+  "isDueComplete": false
+}
+
+### Add a label to the archived card. 409 archived, naming the card itself.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/labels/{{readOnlyLabelId}}
+X-User-Id: {{actorId}}
+
+### Remove a label from the archived card. 409 archived, for the same reason.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}/labels/{{readOnlyLabelId}}
+X-User-Id: {{actorId}}
+
+### Archive the list above it. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{readOnlyListId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Archive the board above that. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Delete the archived card inside the archived list. 204, because delete reads only its own flag.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{readOnlyCardId}}
+X-User-Id: {{actorId}}
+
+### Delete the archived list on the archived board. 204, for the same reason.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/lists/{{readOnlyListId}}
+X-User-Id: {{actorId}}

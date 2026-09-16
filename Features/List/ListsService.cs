@@ -17,12 +17,14 @@ public class ListService : IListService
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
     private readonly Placements _placements;
+    private readonly ArchiveGuard _archive;
 
-    public ListService(ApplicationDbContext context, Actor actor, Placements placements)
+    public ListService(ApplicationDbContext context, Actor actor, Placements placements, ArchiveGuard archive)
     {
         _context = context;
         _actor = actor;
         _placements = placements;
+        _archive = archive;
     }
 
     public async Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto)
@@ -40,6 +42,11 @@ public class ListService : IListService
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<ListDto>(placed.Errors);
+        }
+
+        if (await _archive.OnBoardAsync(boardId) is { } archived)
+        {
+            return ArchiveErrors.NoCreate<ListDto>(archived, "boardId", TreeItem.List);
         }
 
         var list = MapToEntity(createListDto, _actor.Id, placed.Position);
@@ -62,6 +69,11 @@ public class ListService : IListService
             return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
         }
 
+        if (await _archive.OnListAsync(id) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<ListDto>(archived, TreeItem.List);
+        }
+
         var boardId = updateListDto.BoardId!.Value;
         if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
         {
@@ -80,8 +92,21 @@ public class ListService : IListService
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List updated successfully", 200);
     }
 
-    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto) =>
-        await _context.SetArchivedAsync(await _context.Lists.FindAsync(id), _actor, archivedDto, "List");
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)
+    {
+        var list = await _context.Lists.FindAsync(id);
+        if (list == null)
+        {
+            return ApiResponse<bool>.ErrorResponse("List not found", 404);
+        }
+
+        if (await _archive.OnBoardAsync(list.BoardId) is { } archived)
+        {
+            return ArchiveErrors.RestoreFirst<bool>(archived, TreeItem.List);
+        }
+
+        return await _context.SetArchivedAsync(list, _actor, archivedDto, "List");
+    }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
@@ -93,7 +118,7 @@ public class ListService : IListService
 
         if (!list.IsArchived)
         {
-            return ArchiveErrors.NotArchived<bool>("List");
+            return ArchiveErrors.NotArchived<bool>(TreeItem.List);
         }
 
         _context.Lists.Remove(list);

@@ -27,6 +27,7 @@ builder.Services.AddOpenApi(options => options.AddSchemaTransformer<EnumSchemaTr
 
 builder.Services.AddScoped<Actor>();
 builder.Services.AddScoped<Placements>();
+builder.Services.AddScoped<ArchiveGuard>();
 builder.Services.AddScoped<IBoardService, BoardService>();
 builder.Services.AddScoped<ICardService, CardService>();
 builder.Services.AddScoped<ILabelService, LabelService>();

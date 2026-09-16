@@ -15,11 +15,13 @@ public class LabelService : ILabelService
 {
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
+    private readonly ArchiveGuard _archive;
 
-    public LabelService(ApplicationDbContext context, Actor actor)
+    public LabelService(ApplicationDbContext context, Actor actor, ArchiveGuard archive)
     {
         _context = context;
         _actor = actor;
+        _archive = archive;
     }
 
     public async Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto)
@@ -78,6 +80,11 @@ public class LabelService : ILabelService
             return ReferenceErrors.NotFound<LabelDto>("boardId", "Board", boardId);
         }
 
+        if (await _archive.OnBoardAsync(boardId) is { } archived)
+        {
+            return ArchiveErrors.NoCreate<LabelDto>(archived, "boardId", TreeItem.Label);
+        }
+
         if (await FindDuplicateAsync(boardId, name, createLabelDto.Color, self: null) is { } duplicate)
         {
             return duplicate;
@@ -102,7 +109,13 @@ public class LabelService : ILabelService
 
         var name = updateLabelDto.Name ?? string.Empty;
         await using var transaction = await _context.Database.BeginTransactionAsync();
+
         await TryLockBoardAsync(existingLabel.BoardId);
+
+        if (await _archive.OnBoardAsync(existingLabel.BoardId) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<LabelDto>(archived, TreeItem.Label);
+        }
 
         if (await FindDuplicateAsync(existingLabel.BoardId, name, updateLabelDto.Color, id) is { } duplicate)
         {
@@ -129,7 +142,13 @@ public class LabelService : ILabelService
         }
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
+
         await TryLockBoardAsync(existingLabel.BoardId);
+
+        if (await _archive.OnBoardAsync(existingLabel.BoardId) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.Label);
+        }
 
         _context.Labels.Remove(existingLabel);
         await _context.SaveChangesAsync();

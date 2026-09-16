@@ -16,11 +16,13 @@ public class BoardService : IBoardService
 {
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
+    private readonly ArchiveGuard _archive;
 
-    public BoardService(ApplicationDbContext context, Actor actor)
+    public BoardService(ApplicationDbContext context, Actor actor, ArchiveGuard archive)
     {
         _context = context;
         _actor = actor;
+        _archive = archive;
     }
 
     public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(BoardSearchDto searchDto)
@@ -105,6 +107,11 @@ public class BoardService : IBoardService
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
         }
 
+        if (await _archive.OnBoardAsync(id) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<BoardDto>(archived, TreeItem.Board);
+        }
+
         var workspaceId = updateBoardDto.WorkspaceId!.Value;
         if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
         {
@@ -122,8 +129,16 @@ public class BoardService : IBoardService
         return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
     }
 
-    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto) =>
-        await _context.SetArchivedAsync(await _context.Boards.FindAsync(id), _actor, archivedDto, "Board");
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)
+    {
+        var board = await _context.Boards.FindAsync(id);
+        if (board == null)
+        {
+            return ApiResponse<bool>.ErrorResponse("Board not found", 404);
+        }
+
+        return await _context.SetArchivedAsync(board, _actor, archivedDto, "Board");
+    }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
@@ -135,7 +150,7 @@ public class BoardService : IBoardService
 
         if (!existingBoard.IsArchived)
         {
-            return ArchiveErrors.NotArchived<bool>("Board");
+            return ArchiveErrors.NotArchived<bool>(TreeItem.Board);
         }
 
         _context.Boards.Remove(existingBoard);

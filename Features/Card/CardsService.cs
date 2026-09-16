@@ -18,12 +18,14 @@ public class CardService: ICardService
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
     private readonly Placements _placements;
+    private readonly ArchiveGuard _archive;
 
-    public CardService(ApplicationDbContext context, Actor actor, Placements placements)
+    public CardService(ApplicationDbContext context, Actor actor, Placements placements, ArchiveGuard archive)
     {
         _context = context;
         _actor = actor;
         _placements = placements;
+        _archive = archive;
     }
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
@@ -46,6 +48,11 @@ public class CardService: ICardService
             return ReferenceErrors.Invalid<CardDto>(errors);
         }
 
+        if (await _archive.OnListAsync(listId) is { } archived)
+        {
+            return ArchiveErrors.NoCreate<CardDto>(archived, "listId", TreeItem.Card);
+        }
+
         var card = MapToEntity(createCardDto, _actor.Id, position);
         card.Labels.AddRange(labels);
 
@@ -66,6 +73,11 @@ public class CardService: ICardService
         if (card == null)
         {
             return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
+        }
+
+        if (await _archive.OnCardAsync(id) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<CardDto>(archived, TreeItem.Card);
         }
 
         var (labels, _, referenceErrors) = await ResolveReferencesAsync(updateCardDto.ListId!.Value, updateCardDto.LabelIds);
@@ -190,6 +202,11 @@ public class CardService: ICardService
             return ApiResponse<bool>.ErrorResponse("Label not found", 404);
         }
 
+        if (await _archive.OnCardAsync(cardId) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.Card);
+        }
+
         var boardId = await BoardOfListAsync(card.ListId);
         if (boardId is { } board && label.BoardId != board)
         {
@@ -219,8 +236,21 @@ public class CardService: ICardService
         return ApiResponse<bool>.SuccessResponse(true, message, 204);
     }
 
-    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto) =>
-        await _context.SetArchivedAsync(await _context.Cards.FindAsync(id), _actor, archivedDto, "Card");
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)
+    {
+        var card = await _context.Cards.FindAsync(id);
+        if (card == null)
+        {
+            return ApiResponse<bool>.ErrorResponse("Card not found", 404);
+        }
+
+        if (await _archive.OnListAsync(card.ListId) is { } archived)
+        {
+            return ArchiveErrors.RestoreFirst<bool>(archived, TreeItem.Card);
+        }
+
+        return await _context.SetArchivedAsync(card, _actor, archivedDto, "Card");
+    }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
@@ -232,7 +262,7 @@ public class CardService: ICardService
 
         if (!card.IsArchived)
         {
-            return ArchiveErrors.NotArchived<bool>("Card");
+            return ArchiveErrors.NotArchived<bool>(TreeItem.Card);
         }
 
         _context.Cards.Remove(card);
