@@ -58,7 +58,7 @@ public class BoardService : IBoardService
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var boardDtos = boards.Select(b => MapToDto(b, b.Lists.Select(l => l.Id).ToList())).ToList();
+        var boardDtos = boards.Select(b => MapToDto(b, b.Lists.InSortOrder().Select(l => l.Id).ToList())).ToList();
 
         return PagedResponse<BoardDto>.SuccessResponse(
             boardDtos,
@@ -78,7 +78,7 @@ public class BoardService : IBoardService
         {
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
         }
-        var boardDto = MapToDto(existingBoard, existingBoard.Lists.Select(l => l.Id).ToList());
+        var boardDto = MapToDto(existingBoard, existingBoard.Lists.InSortOrder().Select(l => l.Id).ToList());
         return ApiResponse<BoardDto>.SuccessResponse(boardDto, "Board retrieved successfully", 200);
     }
 
@@ -121,7 +121,7 @@ public class BoardService : IBoardService
         _context.StampChange(existingBoard, _actor);
 
         await _context.SaveChangesAsync();
-        var updatedBoardDto = MapToDto(existingBoard, existingBoard.Lists.Select(l => l.Id).ToList());
+        var updatedBoardDto = MapToDto(existingBoard, existingBoard.Lists.InSortOrder().Select(l => l.Id).ToList());
         return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
     }
 

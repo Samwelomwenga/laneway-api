@@ -1,11 +1,10 @@
 namespace DefaultNamespace;
 
-public class Card: BaseEntity
+public class Card: PlacedEntity
 {
     public required string Title { get; set; }
     public string Description { get; set; } = string.Empty;
     public DateTime? DueDate { get; set; }
-    public int Position { get; set; }
     public Guid ListId { get; set; }
     public bool IsDueComplete { get; set; }
     public string? Cover { get; set; } = string.Empty;

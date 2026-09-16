@@ -14,26 +14,41 @@ public class CardService: ICardService
 {
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
+    private readonly Placements _placements;
 
-    public CardService(ApplicationDbContext context, Actor actor)
+    public CardService(ApplicationDbContext context, Actor actor, Placements placements)
     {
         _context = context;
         _actor = actor;
+        _placements = placements;
     }
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
     {
-        var (labels, referenceErrors) = await ResolveReferencesAsync(createCardDto.ListId!.Value, createCardDto.LabelIds);
-        if (referenceErrors.Count > 0)
+        var listId = createCardDto.ListId!.Value;
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var (labels, listExists, errors) = await ResolveReferencesAsync(listId, createCardDto.LabelIds);
+        var position = 0d;
+        if (listExists)
         {
-            return ApiResponse<CardDto>.ErrorResponse("A referenced resource does not exist", 400, referenceErrors);
+            var placed = await _placements.ResolveInListAsync(
+                listId, new Placement(createCardDto.Position, createCardDto.Before, createCardDto.After));
+            errors.AddRange(placed.Errors);
+            position = placed.Position;
         }
 
-        var card = MapToEntity(createCardDto, _actor.Id);
+        if (errors.Count > 0)
+        {
+            return ReferenceErrors.Invalid<CardDto>(errors);
+        }
+
+        var card = MapToEntity(createCardDto, _actor.Id, position);
         card.Labels.AddRange(labels);
 
         _context.Cards.Add(card);
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         var cardDto = MapToDto(card);
 
@@ -50,10 +65,10 @@ public class CardService: ICardService
             return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
         }
 
-        var (labels, referenceErrors) = await ResolveReferencesAsync(updateCardDto.ListId!.Value, updateCardDto.LabelIds);
+        var (labels, _, referenceErrors) = await ResolveReferencesAsync(updateCardDto.ListId!.Value, updateCardDto.LabelIds);
         if (referenceErrors.Count > 0)
         {
-            return ApiResponse<CardDto>.ErrorResponse("A referenced resource does not exist", 400, referenceErrors);
+            return ReferenceErrors.Invalid<CardDto>(referenceErrors);
         }
 
         card.Title = updateCardDto.Title!;
@@ -142,7 +157,7 @@ public class CardService: ICardService
         }
 
         var (cards, totalCount) = await PagedQuery.ReadAsync(
-            query.OrderBy(c => c.Position).Include(c => c.Labels),
+            query.InSortOrder().Include(c => c.Labels),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
@@ -167,10 +182,12 @@ public class CardService: ICardService
 
         return ApiResponse<bool>.SuccessResponse(true, "Card deleted successfully", 204);
     }
-    private async Task<(List<Label> Labels, List<ApiError> Errors)> ResolveReferencesAsync(Guid listId, List<Guid?>? labelIds)
+    private async Task<(List<Label> Labels, bool ListExists, List<ApiError> Errors)> ResolveReferencesAsync(
+        Guid listId, List<Guid?>? labelIds)
     {
         var errors = new List<ApiError>();
-        if (!await _context.Lists.AnyAsync(l => l.Id == listId))
+        var listExists = await _context.Lists.AnyAsync(l => l.Id == listId);
+        if (!listExists)
         {
             errors.Add(new ApiError("listId", ErrorCodes.NotFound, $"List {listId} does not exist."));
         }
@@ -183,7 +200,7 @@ public class CardService: ICardService
             .Where(entry => !foundIds.Contains(entry.Id))
             .DistinctBy(entry => entry.Id)
             .Select(entry => new ApiError($"labelIds[{entry.Index}]", ErrorCodes.NotFound, $"Label {entry.Id} does not exist.")));
-        return (labels, errors);
+        return (labels, listExists, errors);
     }
     private static CardDto MapToDto(Card card)
     {
@@ -207,7 +224,7 @@ public class CardService: ICardService
             card.UpdatedBy
         );
     }
-    private static Card MapToEntity(CreateCardDto createCardDto, Guid actorId)
+    private static Card MapToEntity(CreateCardDto createCardDto, Guid actorId, double position)
     {
         return new Card
         {
@@ -215,7 +232,7 @@ public class CardService: ICardService
             Title = createCardDto.Title!,
             Description = createCardDto.Description ?? string.Empty,
             DueDate = createCardDto.DueDate,
-            Position = createCardDto.Position!.Value,
+            Position = position,
             ListId = createCardDto.ListId!.Value,
             IsDueComplete = createCardDto.IsDueComplete!.Value,
             Cover = createCardDto.Cover,

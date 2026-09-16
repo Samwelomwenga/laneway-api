@@ -8,7 +8,8 @@ public sealed class CreateCardDtoValidator : AbstractValidator<CreateCardDto>
     {
         RuleFor(x => x.Title).Required().MaxLength(FieldLimits.CardTitle);
         RuleFor(x => x.Description).MaxLength(FieldLimits.CardDescription);
-        RuleFor(x => x.Position).Required();
+        RuleFor(x => x.Position).ValidPosition();
+        RuleFor(x => x).OnePlacement(x => new Placement(x.Position, x.Before, x.After));
         RuleFor(x => x.ListId).Required();
         RuleFor(x => x.IsDueComplete).Required().CompleteNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.DueReminderMinutes).NotNegative().ReminderNeedsDueDate(x => x.DueDate);

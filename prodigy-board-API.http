@@ -411,7 +411,7 @@ Content-Type: application/json
 
 > {% client.global.set("validationListId", response.body.data.id); %}
 
-### Create a list with a blank name and nothing else. 400 required on name, position, boardId, and isArchived.
+### Create a list with a blank name and nothing else. 400 required on name, boardId, and isArchived. Position is optional now.
 POST {{prodigy_board_API_HostAddress}}/api/v1/lists
 X-User-Id: {{actorId}}
 Content-Type: application/json
@@ -475,7 +475,7 @@ Content-Type: application/json
   "isArchived": false
 }
 
-### Create a card from an empty object. 400 required on title, position, listId, isDueComplete, and isArchived.
+### Create a card from an empty object. 400 required on title, listId, isDueComplete, and isArchived. Position is optional now.
 POST {{prodigy_board_API_HostAddress}}/api/v1/cards
 X-User-Id: {{actorId}}
 Content-Type: application/json
@@ -1313,3 +1313,441 @@ Content-Type: application/json
 
 ### Delete a board with no header. 400 required on X-User-Id.
 DELETE {{prodigy_board_API_HostAddress}}/api/v1/boards/{{actorBoardId}}
+
+### Create the board the placement requests below use.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Placement board",
+  "workspaceId": "{{workspaceId}}",
+  "visibility": "Private",
+  "isArchived": false
+}
+
+> {% client.global.set("placementBoardId", response.body.data.id); %}
+
+### Create a list with no placement. An empty board gives 65536.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "First",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+> {% client.global.set("firstListId", response.body.data.id); %}
+
+### Create a second list with no placement. A create with no placement lands at the bottom, so 131072.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Second",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+> {% client.global.set("secondListId", response.body.data.id); %}
+
+### Create a list at the top. Top is the smallest sibling halved, so 32768.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Top",
+  "position": "top",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+### Create a list at the bottom by name. Bottom is the largest sibling plus 65536, so 196608.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Bottom",
+  "position": "bottom",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+### Create a list at a number. A client number is stored as sent, so 1.5.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Numbered",
+  "position": 1.5,
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+### Create a list at a number sent as a string. The field takes either, so it comes back as 2.5.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Numbered as a string",
+  "position": "2.5",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+### Create a list between two named siblings. First and Second are neighbours, so it's their midpoint, 98304.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Between",
+  "after": "{{firstListId}}",
+  "before": "{{secondListId}}",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+### Create a list at position 0. 400 outOfRange on position.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Zero",
+  "position": 0,
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+### Create a list at a name that isn't top or bottom. 400 unknownValue on position.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Middle",
+  "position": "middle",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+### Send position together with before. 400 mutuallyExclusive with a null field, and the message names both fields sent.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Two meanings",
+  "position": "top",
+  "before": "{{firstListId}}",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+### Name an anchor that doesn't exist. 400 notFound on before.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Ghost anchor",
+  "before": "{{$uuid}}",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+### Name an anchor that sits on another board. 400 notSibling on before.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Stranger anchor",
+  "before": "{{listId}}",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+### Name anchors that aren't neighbours in that order. 400 notAdjacent on before.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Wrong order",
+  "after": "{{secondListId}}",
+  "before": "{{firstListId}}",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+### Create the list the card placement requests below use.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Card placement",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+> {% client.global.set("placementListId", response.body.data.id); %}
+
+### Create a card with no placement in an empty list. 65536.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "First card",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+> {% client.global.set("firstCardId", response.body.data.id); %}
+
+### Create a card at the bottom. 131072.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Bottom card",
+  "position": "bottom",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+> {% client.global.set("bottomCardId", response.body.data.id); %}
+
+### Create a card at the top. 32768.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Top card",
+  "position": "top",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card after a named sibling. The first card and the bottom card are neighbours, so it's their midpoint, 98304.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "After the first card",
+  "after": "{{firstCardId}}",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+> {% client.global.set("middleCardId", response.body.data.id); %}
+
+### Create a card before the last sibling. The card at 98304 now sits above it, so this is their midpoint, 114688.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Before the bottom card",
+  "before": "{{bottomCardId}}",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Name a card in another list as an anchor. 400 notSibling on after.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Stranger anchor",
+  "after": "{{cardId}}",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card at a number. A client number is stored as sent, so 250.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Numbered card",
+  "position": 250,
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card at a number sent as a string. It comes back as 0.5.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Numbered card as a string",
+  "position": "0.5",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card between two named siblings. The first card and the one after it are neighbours, so it's their midpoint, 81920.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Between two cards",
+  "after": "{{firstCardId}}",
+  "before": "{{middleCardId}}",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card at position 0. 400 outOfRange on position.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Zero card",
+  "position": 0,
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card at a name that isn't top or bottom. 400 unknownValue on position.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Middle card",
+  "position": "middle",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Send a card's position together with after. 400 mutuallyExclusive with a null field.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Two meanings card",
+  "position": "bottom",
+  "after": "{{firstCardId}}",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Name a card anchor that doesn't exist. 400 notFound on before.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Ghost anchor card",
+  "before": "{{$uuid}}",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Name card anchors that aren't neighbours in that order. 400 notAdjacent on before.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Wrong order card",
+  "after": "{{bottomCardId}}",
+  "before": "{{firstCardId}}",
+  "listId": "{{placementListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create the list the respread requests below use.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Respread",
+  "boardId": "{{placementBoardId}}",
+  "isArchived": false
+}
+
+> {% client.global.set("respreadListId", response.body.data.id); %}
+
+### Fill one gap. These two numbers are neighbouring doubles, so nothing fits between them. Halving a gap over and over reaches this state after about 52 drops.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Gap floor",
+  "position": 1,
+  "listId": "{{respreadListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+> {% client.global.set("gapFloorCardId", response.body.data.id); %}
+
+### The other side of the gap. It comes back as 1.0000000000000002.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Gap ceiling",
+  "position": 1.0000000000000002,
+  "listId": "{{respreadListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+> {% client.global.set("gapCeilingCardId", response.body.data.id); %}
+
+### Drop into that gap. No midpoint fits, so the list is respread and this card comes back at 131072.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "No room",
+  "after": "{{gapFloorCardId}}",
+  "before": "{{gapCeilingCardId}}",
+  "listId": "{{respreadListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Read the respread list. The three cards are at 65536, 131072 and 196608, in the order they were placed.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{respreadListId}}

@@ -12,4 +12,7 @@ public static class ErrorCodes
     public const string StartAfterDue = "startAfterDue";
     public const string NotFound = "notFound";
     public const string Duplicate = "duplicate";
+    public const string MutuallyExclusive = "mutuallyExclusive";
+    public const string NotSibling = "notSibling";
+    public const string NotAdjacent = "notAdjacent";
 }

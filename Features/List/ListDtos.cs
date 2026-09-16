@@ -6,7 +6,7 @@ public record ListDto
 (
     Guid Id,
     string Name,
-    int Position,
+    double Position,
     Guid BoardId,
     Color? Color,
     bool IsArchived,
@@ -20,7 +20,9 @@ public record ListDto
 public record CreateListDto
 (
     string? Name,
-    int? Position,
+    PositionValue? Position,
+    Guid? Before,
+    Guid? After,
     Guid? BoardId,
     Color? Color,
     bool? IsArchived
@@ -32,7 +34,7 @@ public record CreateListDto
 public record UpdateListDto
 (
     string? Name,
-    int? Position,
+    double? Position,
     Guid? BoardId,
     Color? Color,
     bool? IsArchived
