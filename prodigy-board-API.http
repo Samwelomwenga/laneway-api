@@ -23,8 +23,7 @@ Content-Type: application/json
 
 {
   "name": "Field shapes",
-  "visibility": "Public",
-  "isArchived": false
+  "visibility": "Public"
 }
 
 > {% client.global.set("workspaceId", response.body.data.id); %}
@@ -37,8 +36,7 @@ Content-Type: application/json
 {
   "name": "Field shapes",
   "description": null,
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 ### Search workspaces by visibility name.
@@ -52,8 +50,7 @@ Content-Type: application/json
 {
   "name": "Sprint 1",
   "workspaceId": "{{workspaceId}}",
-  "visibility": "Workspace",
-  "isArchived": false
+  "visibility": "Workspace"
 }
 
 > {% client.global.set("boardId", response.body.data.id); %}
@@ -67,8 +64,7 @@ Content-Type: application/json
   "name": "Sprint 1",
   "description": null,
   "workspaceId": "{{workspaceId}}",
-  "visibility": "Public",
-  "isArchived": false
+  "visibility": "Public"
 }
 
 ### Search boards by visibility name.
@@ -83,8 +79,7 @@ Content-Type: application/json
   "name": "To do",
   "position": 1,
   "boardId": "{{boardId}}",
-  "color": "Sky",
-  "isArchived": false
+  "color": "Sky"
 }
 
 > {% client.global.set("listId", response.body.data.id); %}
@@ -97,8 +92,7 @@ Content-Type: application/json
 {
   "name": "Doing",
   "position": 2,
-  "boardId": "{{boardId}}",
-  "isArchived": false
+  "boardId": "{{boardId}}"
 }
 
 ### Create a label with the "Lime" color. Names are unique per board, so a plain "Bug" is free on a board created by this run.
@@ -133,8 +127,7 @@ Content-Type: application/json
   "title": "Write the spec",
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 > {% client.global.set("cardId", response.body.data.id); %}
@@ -151,7 +144,6 @@ Content-Type: application/json
   "dueReminderMinutes": 60,
   "position": 1,
   "listId": "{{listId}}",
-  "isArchived": false,
   "labelIds": ["{{labelId}}"]
 }
 
@@ -172,8 +164,7 @@ Content-Type: application/json
 {
   "name": "  Validation  ",
   "description": "  kept as sent  ",
-  "visibility": "public",
-  "isArchived": false
+  "visibility": "public"
 }
 
 > {% client.global.set("validationWorkspaceId", response.body.data.id); %}
@@ -237,11 +228,10 @@ Content-Type: application/json
 {
   "name": "   ",
   "visibility": "Private",
-  "isArchived": false,
   "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 }
 
-### Create a workspace with a null visibility and no isArchived. 400 required on both.
+### Create a workspace with a null visibility. 400 required on visibility.
 POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
 X-User-Id: {{actorId}}
 Content-Type: application/json
@@ -258,11 +248,10 @@ Content-Type: application/json
 
 {
   "visibility": "Private",
-  "isArchived": false,
   "name": "  nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn  "
 }
 
-### Replace the workspace with an empty object. 400 required on name, visibility, and isArchived.
+### Replace the workspace with an empty object. 400 required on name and visibility.
 PUT {{prodigy_board_API_HostAddress}}/api/v1/workspaces/{{validationWorkspaceId}}
 X-User-Id: {{actorId}}
 Content-Type: application/json
@@ -276,8 +265,7 @@ Content-Type: application/json
 
 {
   "name": " Validation renamed ",
-  "visibility": "PRIVATE",
-  "isArchived": false
+  "visibility": "PRIVATE"
 }
 
 ### Create a card with a due date that has no offset. 400 invalidFormat on dueDate.
@@ -289,8 +277,7 @@ Content-Type: application/json
   "title": "No offset",
   "dueDate": "2026-10-01T17:00:00",
   "position": 1,
-  "listId": "{{listId}}",
-  "isArchived": false
+  "listId": "{{listId}}"
 }
 
 ### Create a card with a due date in +03:00. It comes back as "2026-10-01T14:00:00Z".
@@ -303,8 +290,7 @@ Content-Type: application/json
   "dueDate": "2026-10-01T17:00:00+03:00",
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card whose second label doesn't exist. 400 notFound on labelIds[1].
@@ -317,7 +303,6 @@ Content-Type: application/json
   "position": 1,
   "listId": "{{listId}}",
   "isDueComplete": false,
-  "isArchived": false,
   "labelIds": ["{{labelId}}", "{{$uuid}}"]
 }
 
@@ -329,13 +314,12 @@ Content-Type: application/json
 {
   "name": "  Validation board  ",
   "workspaceId": "{{workspaceId}}",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 > {% client.global.set("validationBoardId", response.body.data.id); %}
 
-### Create a board from an empty object. 400 required on name, workspaceId, visibility, and isArchived.
+### Create a board from an empty object. 400 required on name, workspaceId, and visibility.
 POST {{prodigy_board_API_HostAddress}}/api/v1/boards
 X-User-Id: {{actorId}}
 Content-Type: application/json
@@ -350,8 +334,7 @@ Content-Type: application/json
 {
   "name": "   ",
   "workspaceId": "{{workspaceId}}",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 ### Create a board with a name of 101 characters and a description of 1,001. One 400 holds tooLong on both.
@@ -363,8 +346,7 @@ Content-Type: application/json
   "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
   "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "workspaceId": "{{workspaceId}}",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 ### Create a board whose workspaceId is the empty GUID. 400 notFound on workspaceId.
@@ -375,11 +357,10 @@ Content-Type: application/json
 {
   "name": "Empty workspace id",
   "workspaceId": "00000000-0000-0000-0000-000000000000",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
-### Replace the board with an empty object. 400 required on name, workspaceId, visibility, and isArchived.
+### Replace the board with an empty object. 400 required on name, workspaceId, and visibility.
 PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{validationBoardId}}
 X-User-Id: {{actorId}}
 Content-Type: application/json
@@ -394,8 +375,7 @@ Content-Type: application/json
 {
   "name": "Validation board",
   "workspaceId": "{{$uuid}}",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 ### Create a list with a padded name and a color. The name comes back trimmed.
@@ -407,13 +387,12 @@ Content-Type: application/json
   "name": "  Validation list  ",
   "position": 3,
   "boardId": "{{boardId}}",
-  "color": "Pink",
-  "isArchived": false
+  "color": "Pink"
 }
 
 > {% client.global.set("validationListId", response.body.data.id); %}
 
-### Create a list with a blank name and nothing else. 400 required on name, boardId, and isArchived. Position is optional now.
+### Create a list with a blank name and nothing else. 400 required on name and boardId. Position is optional now.
 POST {{prodigy_board_API_HostAddress}}/api/v1/lists
 X-User-Id: {{actorId}}
 Content-Type: application/json
@@ -430,8 +409,7 @@ Content-Type: application/json
 {
   "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
   "position": 4,
-  "boardId": "{{boardId}}",
-  "isArchived": false
+  "boardId": "{{boardId}}"
 }
 
 ### Create a list on a board that doesn't exist. 400 notFound on boardId.
@@ -442,11 +420,10 @@ Content-Type: application/json
 {
   "name": "Orphan list",
   "position": 4,
-  "boardId": "{{$uuid}}",
-  "isArchived": false
+  "boardId": "{{$uuid}}"
 }
 
-### Replace the list with an empty object. 400 required on name, position, boardId, and isArchived.
+### Replace the list with an empty object. 400 required on name, position, and boardId.
 PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{validationListId}}
 X-User-Id: {{actorId}}
 Content-Type: application/json
@@ -461,8 +438,7 @@ Content-Type: application/json
 {
   "name": "  Validation list renamed  ",
   "position": 0,
-  "boardId": "{{boardId}}",
-  "isArchived": false
+  "boardId": "{{boardId}}"
 }
 
 ### Create a card with no title that is marked complete without a due date. One 400 holds required on title and requiresDueDate on isDueComplete.
@@ -473,11 +449,10 @@ Content-Type: application/json
 {
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": true,
-  "isArchived": false
+  "isDueComplete": true
 }
 
-### Create a card from an empty object. 400 required on title, listId, isDueComplete, and isArchived. Position is optional now.
+### Create a card from an empty object. 400 required on title, listId, and isDueComplete. Position is optional now.
 POST {{prodigy_board_API_HostAddress}}/api/v1/cards
 X-User-Id: {{actorId}}
 Content-Type: application/json
@@ -494,8 +469,7 @@ Content-Type: application/json
   "dueReminderMinutes": 30,
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card with a due date and a negative reminder. 400 outOfRange on dueReminderMinutes.
@@ -509,8 +483,7 @@ Content-Type: application/json
   "dueReminderMinutes": -1,
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card that starts after its due date. 400 startAfterDue on startDate.
@@ -524,8 +497,7 @@ Content-Type: application/json
   "dueDate": "2026-10-01T17:00:00Z",
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card with a start date and no due date. 201.
@@ -538,8 +510,7 @@ Content-Type: application/json
   "startDate": "2026-10-02T09:00:00Z",
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a complete card that starts at its due time, with a reminder of 0. 201.
@@ -554,8 +525,7 @@ Content-Type: application/json
   "dueReminderMinutes": 0,
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": true,
-  "isArchived": false
+  "isDueComplete": true
 }
 
 ### Create a card with a title of 501 characters and a description of 10,001. One 400 holds tooLong on both.
@@ -568,8 +538,7 @@ Content-Type: application/json
   "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card with a padded title of 500 characters and a description of 10,000. 201, so the columns take the full limits. The title comes back trimmed.
@@ -582,8 +551,7 @@ Content-Type: application/json
   "description": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card with a blank title and a null second label id. One 400 holds required on title and invalidFormat on labelIds[1].
@@ -596,7 +564,6 @@ Content-Type: application/json
   "position": 1,
   "listId": "{{listId}}",
   "isDueComplete": false,
-  "isArchived": false,
   "labelIds": ["{{labelId}}", null]
 }
 
@@ -610,7 +577,6 @@ Content-Type: application/json
   "position": 1,
   "listId": "{{$uuid}}",
   "isDueComplete": false,
-  "isArchived": false,
   "labelIds": ["00000000-0000-0000-0000-000000000000"]
 }
 
@@ -624,11 +590,10 @@ Content-Type: application/json
   "position": 1,
   "listId": "{{listId}}",
   "isDueComplete": false,
-  "isArchived": false,
   "labelIds": ["{{labelId}}", "{{labelId}}"]
 }
 
-### Replace the card with only a title. 400 required on position, listId, isDueComplete, and isArchived.
+### Replace the card with only a title. 400 required on position, listId, and isDueComplete.
 PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{cardId}}
 X-User-Id: {{actorId}}
 Content-Type: application/json
@@ -646,8 +611,7 @@ Content-Type: application/json
   "title": "Write the spec",
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": true,
-  "isArchived": false
+  "isDueComplete": true
 }
 
 ### Replace the card with only its required fields. 200. The due date, start date and reminder come back null, the description comes back "", and the labels are cleared.
@@ -659,8 +623,7 @@ Content-Type: application/json
   "title": "Write the spec",
   "position": 1,
   "listId": "{{listId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a label with a padded name. The name comes back trimmed.
@@ -753,8 +716,7 @@ Content-Type: application/json
 {
   "name": "Orphan",
   "workspaceId": "{{$uuid}}",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 ### Check a username without the username key. 400 required on username.
@@ -828,8 +790,7 @@ Content-Type: application/json
 
 {
   "name": "Paging checks",
-  "visibility": "Public",
-  "isArchived": false
+  "visibility": "Public"
 }
 
 > {% client.global.set("pagingWorkspaceId", response.body.data.id); %}
@@ -842,8 +803,7 @@ Content-Type: application/json
 {
   "name": "Paging board",
   "workspaceId": "{{pagingWorkspaceId}}",
-  "visibility": "Public",
-  "isArchived": false
+  "visibility": "Public"
 }
 
 > {% client.global.set("pagingBoardId", response.body.data.id); %}
@@ -856,8 +816,7 @@ Content-Type: application/json
 {
   "name": "Paging list",
   "position": 1,
-  "boardId": "{{pagingBoardId}}",
-  "isArchived": false
+  "boardId": "{{pagingBoardId}}"
 }
 
 > {% client.global.set("pagingListId", response.body.data.id); %}
@@ -871,8 +830,7 @@ Content-Type: application/json
   "title": "Bug report",
   "position": 1,
   "listId": "{{pagingListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card whose title holds the LIKE wildcards.
@@ -886,8 +844,7 @@ Content-Type: application/json
   "startDate": "2026-09-30T00:00:00Z",
   "position": 2,
   "listId": "{{pagingListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card that an unescaped 50%_off pattern would match. The search below must not return it.
@@ -899,8 +856,7 @@ Content-Type: application/json
   "title": "50Xoff",
   "position": 3,
   "listId": "{{pagingListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a complete card due later.
@@ -913,8 +869,7 @@ Content-Type: application/json
   "dueDate": "2026-10-05T00:00:00Z",
   "position": 4,
   "listId": "{{pagingListId}}",
-  "isDueComplete": true,
-  "isArchived": false
+  "isDueComplete": true
 }
 
 ### Ask for a page size of 0. 400 outOfRange on pageSize, the message names 1 and 100, and the body is the plain envelope with no totalCount, pageSize, currentPage or totalPages.
@@ -956,8 +911,8 @@ GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId=not-a-guid
 ### Send a pageSize that isn't an int. 400 invalidFormat on pageSize.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards?pageSize=abc
 
-### Send isArchived as 1. 400 invalidFormat on isArchived.
-GET {{prodigy_board_API_HostAddress}}/api/v1/cards?isArchived=1
+### Send archived as 1. 400 unknownValue on archived.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?archived=1
 
 ### Break three keys at once. One 400 holds unknownField on Bogus, invalidFormat on listId, and outOfRange on pageSize.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards?pageSize=0&Bogus=1&listId=not-a-guid
@@ -1065,8 +1020,7 @@ Content-Type: application/json
 
 {
   "name": "Actor checks",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 ### Send a blank header. 400 required on X-User-Id.
@@ -1076,8 +1030,7 @@ Content-Type: application/json
 
 {
   "name": "Actor checks",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 ### Name a user who doesn't exist. 400 notFound on X-User-Id.
@@ -1087,8 +1040,7 @@ Content-Type: application/json
 
 {
   "name": "Actor checks",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 ### Create a workspace as the actor. 201, and createdBy is the actor's id.
@@ -1098,8 +1050,7 @@ Content-Type: application/json
 
 {
   "name": "Actor checks",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 > {% client.global.set("actorWorkspaceId", response.body.data.id); %}
@@ -1114,8 +1065,7 @@ Content-Type: application/json
 
 {
   "name": "Actor checks renamed",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 ### Send that same body again. 200, and updatedAt and updatedBy stay where they were.
@@ -1125,8 +1075,7 @@ Content-Type: application/json
 
 {
   "name": "Actor checks renamed",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 ### Create a board for the card stamp checks.
@@ -1137,8 +1086,7 @@ Content-Type: application/json
 {
   "name": "Actor board",
   "workspaceId": "{{actorWorkspaceId}}",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 > {% client.global.set("actorBoardId", response.body.data.id); %}
@@ -1151,8 +1099,7 @@ Content-Type: application/json
 {
   "name": "Actor list",
   "position": 1,
-  "boardId": "{{actorBoardId}}",
-  "isArchived": false
+  "boardId": "{{actorBoardId}}"
 }
 
 > {% client.global.set("actorListId", response.body.data.id); %}
@@ -1179,7 +1126,6 @@ Content-Type: application/json
   "position": 1,
   "listId": "{{actorListId}}",
   "isDueComplete": false,
-  "isArchived": false,
   "labelIds": ["{{actorLabelId}}"]
 }
 
@@ -1195,7 +1141,6 @@ Content-Type: application/json
   "position": 1,
   "listId": "{{actorListId}}",
   "isDueComplete": false,
-  "isArchived": false,
   "labelIds": ["{{actorLabelId}}"]
 }
 
@@ -1208,8 +1153,7 @@ Content-Type: application/json
   "title": "Actor card",
   "position": 1,
   "listId": "{{actorListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create the user who gets deleted.
@@ -1239,8 +1183,7 @@ Content-Type: application/json
 
 {
   "name": "Work that outlives its author",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 > {% client.global.set("doomedWorkspaceId", response.body.data.id); %}
@@ -1272,8 +1215,7 @@ Content-Type: application/json
 
 {
   "name": "Written by a ghost",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 ### Read the workspace they made. 200, because hiding a user never hides their work.
@@ -1331,8 +1273,7 @@ Content-Type: application/json
 {
   "name": "Placement board",
   "workspaceId": "{{workspaceId}}",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 > {% client.global.set("placementBoardId", response.body.data.id); %}
@@ -1344,8 +1285,7 @@ Content-Type: application/json
 
 {
   "name": "First",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 > {% client.global.set("firstListId", response.body.data.id); %}
@@ -1357,8 +1297,7 @@ Content-Type: application/json
 
 {
   "name": "Second",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 > {% client.global.set("secondListId", response.body.data.id); %}
@@ -1371,8 +1310,7 @@ Content-Type: application/json
 {
   "name": "Top",
   "position": "top",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 ### Create a list at the bottom by name. Bottom is the largest sibling plus 65536, so 196608.
@@ -1383,8 +1321,7 @@ Content-Type: application/json
 {
   "name": "Bottom",
   "position": "bottom",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 ### Create a list at a number. A client number is stored as sent, so 1.5.
@@ -1395,8 +1332,7 @@ Content-Type: application/json
 {
   "name": "Numbered",
   "position": 1.5,
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 ### Create a list at a number sent as a string. The field takes either, so it comes back as 2.5.
@@ -1407,8 +1343,7 @@ Content-Type: application/json
 {
   "name": "Numbered as a string",
   "position": "2.5",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 ### Create a list between two named siblings. First and Second are neighbours, so it's their midpoint, 98304.
@@ -1420,8 +1355,7 @@ Content-Type: application/json
   "name": "Between",
   "after": "{{firstListId}}",
   "before": "{{secondListId}}",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 ### Create a list at position 0. 400 outOfRange on position.
@@ -1432,8 +1366,7 @@ Content-Type: application/json
 {
   "name": "Zero",
   "position": 0,
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 ### Create a list at a name that isn't top or bottom. 400 unknownValue on position.
@@ -1444,8 +1377,7 @@ Content-Type: application/json
 {
   "name": "Middle",
   "position": "middle",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 ### Send position together with before. 400 mutuallyExclusive with a null field, and the message names both fields sent.
@@ -1457,8 +1389,7 @@ Content-Type: application/json
   "name": "Two meanings",
   "position": "top",
   "before": "{{firstListId}}",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 ### Name an anchor that doesn't exist. 400 notFound on before.
@@ -1469,8 +1400,7 @@ Content-Type: application/json
 {
   "name": "Ghost anchor",
   "before": "{{$uuid}}",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 ### Name an anchor that sits on another board. 400 notSibling on before.
@@ -1481,8 +1411,7 @@ Content-Type: application/json
 {
   "name": "Stranger anchor",
   "before": "{{listId}}",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 ### Name anchors that aren't neighbours in that order. 400 notAdjacent on before.
@@ -1494,8 +1423,7 @@ Content-Type: application/json
   "name": "Wrong order",
   "after": "{{secondListId}}",
   "before": "{{firstListId}}",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 ### Create the list the card placement requests below use.
@@ -1505,8 +1433,7 @@ Content-Type: application/json
 
 {
   "name": "Card placement",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 > {% client.global.set("placementListId", response.body.data.id); %}
@@ -1519,8 +1446,7 @@ Content-Type: application/json
 {
   "title": "First card",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 > {% client.global.set("firstCardId", response.body.data.id); %}
@@ -1534,8 +1460,7 @@ Content-Type: application/json
   "title": "Bottom card",
   "position": "bottom",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 > {% client.global.set("bottomCardId", response.body.data.id); %}
@@ -1549,8 +1474,7 @@ Content-Type: application/json
   "title": "Top card",
   "position": "top",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card after a named sibling. The first card and the bottom card are neighbours, so it's their midpoint, 98304.
@@ -1562,8 +1486,7 @@ Content-Type: application/json
   "title": "After the first card",
   "after": "{{firstCardId}}",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 > {% client.global.set("middleCardId", response.body.data.id); %}
@@ -1577,8 +1500,7 @@ Content-Type: application/json
   "title": "Before the bottom card",
   "before": "{{bottomCardId}}",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Name a card in another list as an anchor. 400 notSibling on after.
@@ -1590,8 +1512,7 @@ Content-Type: application/json
   "title": "Stranger anchor",
   "after": "{{cardId}}",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card at a number. A client number is stored as sent, so 250.
@@ -1603,8 +1524,7 @@ Content-Type: application/json
   "title": "Numbered card",
   "position": 250,
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card at a number sent as a string. It comes back as 0.5.
@@ -1616,8 +1536,7 @@ Content-Type: application/json
   "title": "Numbered card as a string",
   "position": "0.5",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card between two named siblings. The first card and the one after it are neighbours, so it's their midpoint, 81920.
@@ -1630,8 +1549,7 @@ Content-Type: application/json
   "after": "{{firstCardId}}",
   "before": "{{middleCardId}}",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card at position 0. 400 outOfRange on position.
@@ -1643,8 +1561,7 @@ Content-Type: application/json
   "title": "Zero card",
   "position": 0,
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create a card at a name that isn't top or bottom. 400 unknownValue on position.
@@ -1656,8 +1573,7 @@ Content-Type: application/json
   "title": "Middle card",
   "position": "middle",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Send a card's position together with after. 400 mutuallyExclusive with a null field.
@@ -1670,8 +1586,7 @@ Content-Type: application/json
   "position": "bottom",
   "after": "{{firstCardId}}",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Name a card anchor that doesn't exist. 400 notFound on before.
@@ -1683,8 +1598,7 @@ Content-Type: application/json
   "title": "Ghost anchor card",
   "before": "{{$uuid}}",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Name card anchors that aren't neighbours in that order. 400 notAdjacent on before.
@@ -1697,8 +1611,7 @@ Content-Type: application/json
   "after": "{{bottomCardId}}",
   "before": "{{firstCardId}}",
   "listId": "{{placementListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Create the list the respread requests below use.
@@ -1708,8 +1621,7 @@ Content-Type: application/json
 
 {
   "name": "Respread",
-  "boardId": "{{placementBoardId}}",
-  "isArchived": false
+  "boardId": "{{placementBoardId}}"
 }
 
 > {% client.global.set("respreadListId", response.body.data.id); %}
@@ -1723,8 +1635,7 @@ Content-Type: application/json
   "title": "Gap floor",
   "position": 1,
   "listId": "{{respreadListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 > {% client.global.set("gapFloorCardId", response.body.data.id); %}
@@ -1738,8 +1649,7 @@ Content-Type: application/json
   "title": "Gap ceiling",
   "position": 1.0000000000000002,
   "listId": "{{respreadListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 > {% client.global.set("gapCeilingCardId", response.body.data.id); %}
@@ -1754,8 +1664,7 @@ Content-Type: application/json
   "after": "{{gapFloorCardId}}",
   "before": "{{gapCeilingCardId}}",
   "listId": "{{respreadListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 ### Read the respread list. The three cards are at 65536, 131072 and 196608, in the order they were placed.
@@ -1769,8 +1678,7 @@ Content-Type: application/json
 {
   "name": "Labels board",
   "workspaceId": "{{workspaceId}}",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 > {% client.global.set("otherBoardId", response.body.data.id); %}
@@ -1782,8 +1690,7 @@ Content-Type: application/json
 
 {
   "name": "Other list",
-  "boardId": "{{otherBoardId}}",
-  "isArchived": false
+  "boardId": "{{otherBoardId}}"
 }
 
 > {% client.global.set("otherListId", response.body.data.id); %}
@@ -1911,7 +1818,6 @@ Content-Type: application/json
   "title": "Wrong board",
   "listId": "{{listId}}",
   "isDueComplete": false,
-  "isArchived": false,
   "labelIds": ["{{otherBugId}}"]
 }
 
@@ -1924,7 +1830,6 @@ Content-Type: application/json
   "title": "Wrong board and missing",
   "listId": "{{listId}}",
   "isDueComplete": false,
-  "isArchived": false,
   "labelIds": ["{{otherBugId}}", "{{$uuid}}"]
 }
 
@@ -1938,7 +1843,6 @@ Content-Type: application/json
   "position": 1,
   "listId": "{{listId}}",
   "isDueComplete": false,
-  "isArchived": false,
   "labelIds": ["{{otherBugId}}"]
 }
 
@@ -1950,8 +1854,7 @@ Content-Type: application/json
 {
   "title": "Label toggling",
   "listId": "{{otherListId}}",
-  "isDueComplete": false,
-  "isArchived": false
+  "isDueComplete": false
 }
 
 > {% client.global.set("toggleCardId", response.body.data.id); %}
@@ -2017,8 +1920,7 @@ Content-Type: application/json
 {
   "name": "Fresh board",
   "workspaceId": "{{workspaceId}}",
-  "visibility": "Private",
-  "isArchived": false
+  "visibility": "Private"
 }
 
 > {% client.global.set("freshBoardId", response.body.data.id); %}
@@ -2052,9 +1954,490 @@ X-User-Id: {{actorId}}
 ### Read the card again. The label is gone from labelIds, and updatedAt is the one noted above.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{toggleCardId}}
 
+### Archive the second board. Nothing deletes until its own flag is on. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{otherBoardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
 ### Delete the second board. 204, and its labels go with it.
 DELETE {{prodigy_board_API_HostAddress}}/api/v1/boards/{{otherBoardId}}
 X-User-Id: {{actorId}}
 
 ### Read the deleted board's labels. 400 notFound on boardId, because the board is gone.
 GET {{prodigy_board_API_HostAddress}}/api/v1/labels?boardId={{otherBoardId}}
+
+### Create the workspace the archive checks work in.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Archive",
+  "visibility": "Private"
+}
+
+> {% client.global.set("archiveWorkspaceId", response.body.data.id); %}
+
+### Read the workspace. The response has no isArchived, because workspaces have no archive.
+GET {{prodigy_board_API_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}
+
+### Send isArchived on a workspace create. 400 unknownField on isArchived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "No archive",
+  "visibility": "Private",
+  "isArchived": false
+}
+
+### Replace the workspace with isArchived. 400 unknownField on isArchived.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Archive",
+  "visibility": "Private",
+  "isArchived": true
+}
+
+### Search workspaces by isArchived. 400 unknownField on isArchived, because workspace search lost it.
+GET {{prodigy_board_API_HostAddress}}/api/v1/workspaces?isArchived=false
+
+### Create the board the archive checks hide and bring back.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Archive board",
+  "workspaceId": "{{archiveWorkspaceId}}",
+  "visibility": "Private"
+}
+
+> {% client.global.set("archiveBoardId", response.body.data.id); %}
+
+### Create a second board in the same workspace, so the workspace delete has two to count.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Spare board",
+  "workspaceId": "{{archiveWorkspaceId}}",
+  "visibility": "Private"
+}
+
+> {% client.global.set("spareBoardId", response.body.data.id); %}
+
+### A new board starts unarchived. isArchived is false.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards/{{archiveBoardId}}
+
+### Send isArchived on a board create. 400 unknownField on isArchived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Born archived",
+  "workspaceId": "{{archiveWorkspaceId}}",
+  "visibility": "Private",
+  "isArchived": true
+}
+
+### Replace the board with isArchived. 400 unknownField on isArchived.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{archiveBoardId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Archive board",
+  "workspaceId": "{{archiveWorkspaceId}}",
+  "visibility": "Private",
+  "isArchived": true
+}
+
+### Create a label on the board. Label search ignores archive, and this one proves it later.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Hidden board label",
+  "boardId": "{{archiveBoardId}}",
+  "color": "Red"
+}
+
+### Create the list the archive checks hide and bring back.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Doing",
+  "boardId": "{{archiveBoardId}}"
+}
+
+> {% client.global.set("archiveListId", response.body.data.id); %}
+
+### Send isArchived on a list create. 400 unknownField on isArchived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Born archived",
+  "boardId": "{{archiveBoardId}}",
+  "isArchived": true
+}
+
+### Replace the list with isArchived. 400 unknownField on isArchived.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{archiveListId}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Doing",
+  "position": 65536,
+  "boardId": "{{archiveBoardId}}",
+  "isArchived": true
+}
+
+### Create card A. It stays unarchived while its list is archived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Card A",
+  "listId": "{{archiveListId}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("archiveCardA", response.body.data.id); %}
+
+### Create card B. It gets archived before its list, and stays archived when the list comes back.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Card B",
+  "listId": "{{archiveListId}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("archiveCardB", response.body.data.id); %}
+
+### Send isArchived on a card create. 400 unknownField on isArchived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Born archived",
+  "listId": "{{archiveListId}}",
+  "isDueComplete": false,
+  "isArchived": true
+}
+
+### Replace card A with isArchived. 400 unknownField on isArchived.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardA}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Card A",
+  "position": 65536,
+  "listId": "{{archiveListId}}",
+  "isDueComplete": false,
+  "isArchived": true
+}
+
+### Archive a card with no header. 400 required on X-User-Id.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}/archived
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Archive a card that doesn't exist. 404.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{$uuid}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Send an empty body to the archived endpoint. 400 required on value.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Send value as a string. 400 invalidFormat on value.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": "true"
+}
+
+### Send value as a number. 400 invalidFormat on value.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": 1
+}
+
+### Send a field the archived endpoint doesn't take. 400 unknownField on isArchived.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true,
+  "isArchived": true
+}
+
+### Archive a list that doesn't exist. 404.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{$uuid}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Archive a board that doesn't exist. 404.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{$uuid}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Send an empty body to a list's archived endpoint. 400 required on value, the same as a card's.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{archiveListId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Send a board a string value. 400 invalidFormat on value.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{archiveBoardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": "true"
+}
+
+### Archive a board with no header. 400 required on X-User-Id.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{archiveBoardId}}/archived
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Restore card B, which is already unarchived. 204, and nothing is stamped.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Read card B. updatedAt and updatedBy are still null, because sending the current value changes nothing.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}
+
+### Archive card B. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Read card B. isArchived is true, and updatedAt and updatedBy are set. Note updatedAt for the check below.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}
+
+### Archive card B again. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Read card B. updatedAt is the one noted above, because the second archive changed nothing.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}
+
+### Read the archived card by id. 200, so a link to an archived card still opens.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}
+
+### Search cards in the list. The default returns card A only.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{archiveListId}}
+
+### Search the card archive view. archived=only returns card B.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{archiveListId}}&archived=only
+
+### Search with archived=include. Both cards come back.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{archiveListId}}&archived=include
+
+### Send archived in uppercase. 200, because enum keys take names in any case.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{archiveListId}}&archived=ONLY
+
+### Send an archived name that doesn't exist. 400 unknownValue on archived, and the message lists the names.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?archived=Nope
+
+### Search cards by isArchived. 400 unknownField, because card search took archived in its place.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?isArchived=true
+
+### Search lists by isArchived. 400 unknownField on isArchived.
+GET {{prodigy_board_API_HostAddress}}/api/v1/lists?isArchived=true
+
+### Search boards by isArchived. 400 unknownField on isArchived.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?isArchived=true
+
+### Send a list an archived name that doesn't exist. 400 unknownValue on archived.
+GET {{prodigy_board_API_HostAddress}}/api/v1/lists?archived=Nope
+
+### Send a board an archived name that doesn't exist. 400 unknownValue on archived.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?archived=Nope
+
+### Send labels an archived name. 400 unknownField on archived, because label search has no such key.
+GET {{prodigy_board_API_HostAddress}}/api/v1/labels?archived=only
+
+### Archive the list. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{archiveListId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Read card A. Its isArchived is still false, because archiving a list writes only the list's own flag.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardA}}
+
+### Search cards in the archived list. Nothing comes back, because the default hides cards under an archived list.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{archiveListId}}
+
+### Search the card archive view. Card B comes back and card A doesn't, because card A is hidden, not archived.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{archiveListId}}&archived=only
+
+### Search the archived list's cards with archived=include. Both come back.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{archiveListId}}&archived=include
+
+### Search lists on the board. The archived list is gone under the default.
+GET {{prodigy_board_API_HostAddress}}/api/v1/lists?boardId={{archiveBoardId}}
+
+### Search the list archive view. The list comes back.
+GET {{prodigy_board_API_HostAddress}}/api/v1/lists?boardId={{archiveBoardId}}&archived=only
+
+### Read the archived list by id. 200 in any state.
+GET {{prodigy_board_API_HostAddress}}/api/v1/lists/{{archiveListId}}
+
+### Restore the list. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{archiveListId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Search cards in the list. Card A is back and card B is still archived, so the restore brought back exactly what was hidden.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{archiveListId}}
+
+### Archive the board. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{archiveBoardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Search lists on the archived board. Nothing comes back under the default.
+GET {{prodigy_board_API_HostAddress}}/api/v1/lists?boardId={{archiveBoardId}}
+
+### Search cards in the list. Nothing comes back, because the board above the list is archived.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{archiveListId}}
+
+### Search boards in the workspace. The archived board is gone and the spare board stays.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?workspaceId={{archiveWorkspaceId}}
+
+### Search the board archive view. The archived board comes back.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?workspaceId={{archiveWorkspaceId}}&archived=only
+
+### Read the archived board by id. 200.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards/{{archiveBoardId}}
+
+### Read the archived board's labels. The label still shows, because label search ignores archive.
+GET {{prodigy_board_API_HostAddress}}/api/v1/labels?boardId={{archiveBoardId}}
+
+### Delete card A, which isn't archived. 409 notArchived with a null field.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardA}}
+X-User-Id: {{actorId}}
+
+### Delete the list, which isn't archived. 409 notArchived, even though the board above it is.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/lists/{{archiveListId}}
+X-User-Id: {{actorId}}
+
+### Delete card B, which is archived. 204, and the archived board above it doesn't get in the way.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardB}}
+X-User-Id: {{actorId}}
+
+### Delete the workspace, which still holds two boards. 409 notEmpty, and the message counts them.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}
+X-User-Id: {{actorId}}
+
+### Delete the archived board. 204, and its list, card A, and its label go with it.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/boards/{{archiveBoardId}}
+X-User-Id: {{actorId}}
+
+### Read card A. 404, because the board delete cascaded to it.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{archiveCardA}}
+
+### Read the deleted board's list. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/lists/{{archiveListId}}
+
+### Delete the workspace, which still holds the spare board. 409 notEmpty, and the message says one board.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}
+X-User-Id: {{actorId}}
+
+### Archive the spare board. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{spareBoardId}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Delete the spare board. 204.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/boards/{{spareBoardId}}
+X-User-Id: {{actorId}}
+
+### Delete the now-empty workspace. 204.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}
+X-User-Id: {{actorId}}

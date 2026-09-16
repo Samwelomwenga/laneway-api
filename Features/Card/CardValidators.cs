@@ -14,7 +14,6 @@ public sealed class CreateCardDtoValidator : AbstractValidator<CreateCardDto>
         RuleFor(x => x.IsDueComplete).Required().CompleteNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.DueReminderMinutes).NotNegative().ReminderNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.StartDate).NotAfterDueDate(x => x.DueDate);
-        RuleFor(x => x.IsArchived).Required();
         RuleForEach(x => x.LabelIds).NotNullId();
     }
 }
@@ -30,7 +29,6 @@ public sealed class UpdateCardDtoValidator : AbstractValidator<UpdateCardDto>
         RuleFor(x => x.IsDueComplete).Required().CompleteNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.DueReminderMinutes).NotNegative().ReminderNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.StartDate).NotAfterDueDate(x => x.DueDate);
-        RuleFor(x => x.IsArchived).Required();
         RuleForEach(x => x.LabelIds).NotNullId();
     }
 }

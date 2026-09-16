@@ -59,6 +59,13 @@ public class CardsController: ApiControllerBase
         return ToActionResult(response);
     }
 
+    [HttpPut("{id}/archived")]
+    public async Task<ActionResult<ApiResponse<bool>>> SetCardArchived(Guid id, [FromBody] ArchivedDto archivedDto)
+    {
+        var response = await _cardService.SetArchivedAsync(id, archivedDto);
+        return ToActionResult(response);
+    }
+
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteCard(Guid id)
     {

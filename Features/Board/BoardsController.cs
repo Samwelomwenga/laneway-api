@@ -46,6 +46,13 @@ public class BoardsController: ApiControllerBase
         return ToActionResult(response);
     }
 
+    [HttpPut("{id}/archived")]
+    public async Task<ActionResult<ApiResponse<bool>>> SetBoardArchived(Guid id, [FromBody] ArchivedDto archivedDto)
+    {
+        var response = await _boardService.SetArchivedAsync(id, archivedDto);
+        return ToActionResult(response);
+    }
+
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteBoard(Guid id)
     {

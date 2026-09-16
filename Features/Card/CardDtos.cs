@@ -35,7 +35,6 @@ public record CreateCardDto
     string? Cover,
     DateTime? StartDate,
     int? DueReminderMinutes,
-    bool? IsArchived,
     List<Guid?>? LabelIds
 )
 {
@@ -53,7 +52,6 @@ public record UpdateCardDto
     string? Cover,
     DateTime? StartDate,
     int? DueReminderMinutes,
-    bool? IsArchived,
     List<Guid?>? LabelIds
 )
 {
@@ -66,7 +64,7 @@ public record CardSearchDto
     int PageSize,
     string? SearchTerm,
     Guid? ListId,
-    bool? IsArchived,
+    ArchiveFilter Archived,
     DateOnly? DueDate,
     DateTimeOffset? DueBefore,
     DateTimeOffset? StartFrom,
@@ -78,7 +76,7 @@ public record CardSearchDto
         query.PageSize(),
         query.Text("searchTerm"),
         query.Id("listId"),
-        query.Flag("isArchived"),
+        query.EnumName<ArchiveFilter>("archived") ?? ArchiveFilter.Exclude,
         query.Day("dueDate"),
         query.Timestamp("dueBefore"),
         query.Timestamp("startFrom"),

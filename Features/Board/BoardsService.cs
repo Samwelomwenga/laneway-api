@@ -8,6 +8,7 @@ public interface IBoardService
     Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto);
     Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardDto updateBoardDto);
+    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 
@@ -43,10 +44,7 @@ public class BoardService : IBoardService
             query = query.Where(b => b.WorkspaceId == workspaceId);
         }
 
-        if (searchDto.IsArchived is { } isArchived)
-        {
-            query = query.Where(b => b.IsArchived == isArchived);
-        }
+        query = ArchiveView.Boards(query, searchDto.Archived);
 
         if (searchDto.Visibility is { } visibility)
         {
@@ -117,7 +115,6 @@ public class BoardService : IBoardService
         existingBoard.Description = updateBoardDto.Description ?? string.Empty;
         existingBoard.WorkspaceId = workspaceId;
         existingBoard.Visibility = updateBoardDto.Visibility!.Value;
-        existingBoard.IsArchived = updateBoardDto.IsArchived!.Value;
         _context.StampChange(existingBoard, _actor);
 
         await _context.SaveChangesAsync();
@@ -125,12 +122,20 @@ public class BoardService : IBoardService
         return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
     }
 
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto) =>
+        await _context.SetArchivedAsync(await _context.Boards.FindAsync(id), _actor, archivedDto, "Board");
+
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
         var existingBoard = await _context.Boards.FindAsync(id);
         if (existingBoard == null)
         {
             return ApiResponse<bool>.ErrorResponse("Board not found", 404);
+        }
+
+        if (!existingBoard.IsArchived)
+        {
+            return ArchiveErrors.NotArchived<bool>("Board");
         }
 
         _context.Boards.Remove(existingBoard);
@@ -169,7 +174,6 @@ public class BoardService : IBoardService
             Description = createBoardDto.Description ?? string.Empty,
             WorkspaceId = createBoardDto.WorkspaceId!.Value,
             Visibility = createBoardDto.Visibility!.Value,
-            IsArchived = createBoardDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

@@ -10,6 +10,7 @@ public interface ICardService
     Task<ApiResponse<List<CardDto>>> GetAllAsync(CardSearchDto searchDto);
     Task<ApiResponse<bool>> AddLabelAsync(Guid cardId, Guid labelId);
     Task<ApiResponse<bool>> RemoveLabelAsync(Guid cardId, Guid labelId);
+    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 public class CardService: ICardService
@@ -82,7 +83,6 @@ public class CardService: ICardService
         card.Cover = updateCardDto.Cover;
         card.StartDate = updateCardDto.StartDate;
         card.DueReminderMinutes = updateCardDto.DueReminderMinutes;
-        card.IsArchived = updateCardDto.IsArchived!.Value;
 
         var labelsChanged = !card.Labels.Select(label => label.Id).ToHashSet().SetEquals(labels.Select(label => label.Id));
         card.Labels.Clear();
@@ -129,10 +129,7 @@ public class CardService: ICardService
             query = query.Where(c => c.ListId == listId);
         }
 
-        if (searchDto.IsArchived is { } isArchived)
-        {
-            query = query.Where(c => c.IsArchived == isArchived);
-        }
+        query = ArchiveView.Cards(query, searchDto.Archived, _context);
 
         if (searchDto.DueDate is { } dueDate)
         {
@@ -222,12 +219,20 @@ public class CardService: ICardService
         return ApiResponse<bool>.SuccessResponse(true, message, 204);
     }
 
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto) =>
+        await _context.SetArchivedAsync(await _context.Cards.FindAsync(id), _actor, archivedDto, "Card");
+
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
         var card = await _context.Cards.FindAsync(id);
         if (card == null)
         {
             return ApiResponse<bool>.ErrorResponse("Card not found", 404);
+        }
+
+        if (!card.IsArchived)
+        {
+            return ArchiveErrors.NotArchived<bool>("Card");
         }
 
         _context.Cards.Remove(card);
@@ -312,7 +317,6 @@ public class CardService: ICardService
             Cover = createCardDto.Cover,
             StartDate = createCardDto.StartDate,
             DueReminderMinutes = createCardDto.DueReminderMinutes,
-            IsArchived = createCardDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

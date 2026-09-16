@@ -6,6 +6,7 @@ public interface IListService
 {
     Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto);
     Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListDto updateListDto);
+    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
     Task<ApiResponse<ListDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<List<ListDto>>> GetAllAsync(ListSearchDto searchDto);
@@ -71,7 +72,6 @@ public class ListService : IListService
         list.Position = updateListDto.Position!.Value;
         list.BoardId = boardId;
         list.Color = updateListDto.Color;
-        list.IsArchived = updateListDto.IsArchived!.Value;
         _context.StampChange(list, _actor);
 
         await _context.SaveChangesAsync();
@@ -80,12 +80,20 @@ public class ListService : IListService
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List updated successfully", 200);
     }
 
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto) =>
+        await _context.SetArchivedAsync(await _context.Lists.FindAsync(id), _actor, archivedDto, "List");
+
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
         var list = await _context.Lists.FindAsync(id);
         if (list == null)
         {
             return ApiResponse<bool>.ErrorResponse("List not found", 404);
+        }
+
+        if (!list.IsArchived)
+        {
+            return ArchiveErrors.NotArchived<bool>("List");
         }
 
         _context.Lists.Remove(list);
@@ -127,10 +135,7 @@ public class ListService : IListService
             query = query.Where(l => l.BoardId == boardId);
         }
 
-        if (searchDto.IsArchived is { } isArchived)
-        {
-            query = query.Where(l => l.IsArchived == isArchived);
-        }
+        query = ArchiveView.Lists(query, searchDto.Archived, _context);
 
         var (lists, totalCount) = await PagedQuery.ReadAsync(
             query.InSortOrder().Include(l => l.Cards),
@@ -178,7 +183,6 @@ public class ListService : IListService
             Position = position,
             BoardId = createListDto.BoardId!.Value,
             Color = createListDto.Color,
-            IsArchived = createListDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

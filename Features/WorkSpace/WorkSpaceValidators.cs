@@ -9,7 +9,6 @@ public sealed class CreateWorkSpaceDtoValidator : AbstractValidator<CreateWorkSp
         RuleFor(x => x.Name).Required().MaxLength(100);
         RuleFor(x => x.Description).MaxLength(1000);
         RuleFor(x => x.Visibility).Required();
-        RuleFor(x => x.IsArchived).Required();
     }
 }
 
@@ -20,6 +19,5 @@ public sealed class UpdateWorkSpaceDtoValidator : AbstractValidator<UpdateWorkSp
         RuleFor(x => x.Name).Required().MaxLength(100);
         RuleFor(x => x.Description).MaxLength(1000);
         RuleFor(x => x.Visibility).Required();
-        RuleFor(x => x.IsArchived).Required();
     }
 }

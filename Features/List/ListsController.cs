@@ -45,6 +45,13 @@ public class ListsController: ApiControllerBase
         return ToActionResult(response);
     }
 
+    [HttpPut("{id}/archived")]
+    public async Task<ActionResult<ApiResponse<bool>>> SetListArchived(Guid id, [FromBody] ArchivedDto archivedDto)
+    {
+        var response = await _listService.SetArchivedAsync(id, archivedDto);
+        return ToActionResult(response);
+    }
+
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteList(Guid id)
     {
