@@ -13,7 +13,6 @@ public record UserDto
     string TimeZone,
     string Location,
     Uri? ProfilePictureUrl,
-    bool IsActive,
     List<AccountDto> Accounts,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
@@ -32,8 +31,7 @@ public record CreateUserDto
     string Language,
     string TimeZone,
     string Location,
-    Uri? ProfilePictureUrl,
-    bool IsActive
+    Uri? ProfilePictureUrl
 );
 
 public record UpdateUserDto
@@ -47,14 +45,12 @@ public record UpdateUserDto
     string Language,
     string TimeZone,
     string Location,
-    Uri? ProfilePictureUrl,
-    bool IsActive
+    Uri? ProfilePictureUrl
 );
 
 public record UserSearchDto
 (
     int PageNumber = 1,
     int PageSize = 10,
-    string? SearchTerm = null,
-    bool? IsActive = null
+    string? SearchTerm = null
 );

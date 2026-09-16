@@ -14,10 +14,12 @@ public interface ILabelService
 public class LabelService : ILabelService
 {
     private readonly ApplicationDbContext _context;
+    private readonly Actor _actor;
 
-    public LabelService(ApplicationDbContext context)
+    public LabelService(ApplicationDbContext context, Actor actor)
     {
         _context = context;
+        _actor = actor;
     }
 
     public async Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto)
@@ -64,7 +66,7 @@ public class LabelService : ILabelService
             return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
                 [new ApiError("name", ErrorCodes.Duplicate, "A label with this name already exists.")]);
         }
-        var newLabel = MapToEntity(createLabelDto);
+        var newLabel = MapToEntity(createLabelDto, _actor.Id);
         _context.Labels.Add(newLabel);
         await _context.SaveChangesAsync();
         var labelDto = MapToDto(newLabel);
@@ -89,10 +91,8 @@ public class LabelService : ILabelService
 
         existingLabel.Name = updateLabelDto.Name!;
         existingLabel.Color = updateLabelDto.Color;
-        existingLabel.UpdatedAt = DateTime.UtcNow;
-        existingLabel.UpdatedBy = Guid.NewGuid();
+        _context.StampChange(existingLabel, _actor);
 
-        _context.Labels.Update(existingLabel);
         await _context.SaveChangesAsync();
 
         var labelDto = MapToDto(existingLabel);
@@ -126,7 +126,7 @@ public class LabelService : ILabelService
         );
     }
 
-    private static Label MapToEntity(CreateLabelDto createDto)
+    private static Label MapToEntity(CreateLabelDto createDto, Guid actorId)
     {
         return new Label
         {
@@ -134,7 +134,7 @@ public class LabelService : ILabelService
             Name = createDto.Name!,
             Color = createDto.Color,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = Guid.NewGuid()
+            CreatedBy = actorId
         };
     }
 }

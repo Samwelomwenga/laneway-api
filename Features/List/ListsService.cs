@@ -14,10 +14,12 @@ public interface IListService
 public class ListService : IListService
 {
     private readonly ApplicationDbContext _context;
+    private readonly Actor _actor;
 
-    public ListService(ApplicationDbContext context)
+    public ListService(ApplicationDbContext context, Actor actor)
     {
         _context = context;
+        _actor = actor;
     }
 
     public async Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto)
@@ -28,7 +30,7 @@ public class ListService : IListService
             return BoardNotFound(boardId);
         }
 
-        var list = MapToEntity(createListDto);
+        var list = MapToEntity(createListDto, _actor.Id);
 
         _context.Lists.Add(list);
         await _context.SaveChangesAsync();
@@ -58,8 +60,7 @@ public class ListService : IListService
         list.BoardId = boardId;
         list.Color = updateListDto.Color;
         list.IsArchived = updateListDto.IsArchived!.Value;
-        list.UpdatedAt = DateTime.UtcNow;
-        list.UpdatedBy = Guid.NewGuid();
+        _context.StampChange(list, _actor);
 
         await _context.SaveChangesAsync();
         var listDto = MapToDto(list, list.Cards.Select(c => c.Id).ToList());
@@ -156,7 +157,7 @@ public class ListService : IListService
         ApiResponse<ListDto>.ErrorResponse("A referenced resource does not exist", 400,
             [new ApiError("boardId", ErrorCodes.NotFound, $"Board {boardId} does not exist.")]);
 
-    private static List MapToEntity(CreateListDto createListDto)
+    private static List MapToEntity(CreateListDto createListDto, Guid actorId)
     {
         return new List
         {
@@ -167,7 +168,7 @@ public class ListService : IListService
             Color = createListDto.Color,
             IsArchived = createListDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = Guid.NewGuid()
+            CreatedBy = actorId
         };
     }
 }

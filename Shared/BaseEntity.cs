@@ -1,6 +1,6 @@
 namespace DefaultNamespace;
 
-public class BaseEntity
+public class BaseEntity : IStamped
 {
     public Guid Id { get; set; }
     public  DateTime CreatedAt { get; set; } = DateTime.UtcNow;

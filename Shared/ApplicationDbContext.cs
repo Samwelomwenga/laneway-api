@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace DefaultNamespace;
 
@@ -43,6 +44,8 @@ public class ApplicationDbContext : DbContext
                 .WithMany(u => u.Accounts)
                 .HasForeignKey(a => a.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(a => a.User != null && a.User.DeletedAt == null);
+            ActorKeys(entity);
         });
 
         modelBuilder.Entity<User>(entity =>
@@ -63,15 +66,14 @@ public class ApplicationDbContext : DbContext
                 .HasColumnType("varchar(255)")
                 .IsRequired();
             entity.HasIndex(u => u.Email)
-                .IsUnique();
+                .IsUnique()
+                .HasFilter("\"DeletedAt\" IS NULL");
             entity.Property(u => u.PasswordHash)
                 .HasColumnType("varchar(500)")
                 .IsRequired();
-            entity.Property(u => u.IsActive)
-                .HasDefaultValue(true);
-                        entity.Property(u => u.PhoneNumber)
-                                    .HasColumnType("varchar(20)")
-                                .HasDefaultValue(string.Empty);
+            entity.Property(u => u.PhoneNumber)
+                .HasColumnType("varchar(20)")
+                .HasDefaultValue(string.Empty);
             entity.Property(u => u.ProfilePictureUrl);
             entity.Property(u => u.Bio)
                 .HasColumnType("varchar(500)")
@@ -95,23 +97,31 @@ public class ApplicationDbContext : DbContext
                 .IsRequired(false);
             entity.Property(u => u.UpdatedBy)
                 .IsRequired(false);
+            entity.Property(u => u.DeletedAt)
+                .HasColumnType("timestamp with time zone")
+                .IsRequired(false);
+            entity.HasQueryFilter(u => u.DeletedAt == null);
+            ActorKeys(entity);
         });
 
         modelBuilder.Entity<WorkSpace>(entity =>
         {
             entity.Property(ws => ws.Name).HasColumnType($"varchar({FieldLimits.WorkspaceName})");
             entity.Property(ws => ws.Description).HasColumnType($"varchar({FieldLimits.WorkspaceDescription})");
+            ActorKeys(entity);
         });
 
         modelBuilder.Entity<Board>(entity =>
         {
             entity.Property(b => b.Name).HasColumnType($"varchar({FieldLimits.BoardName})");
             entity.Property(b => b.Description).HasColumnType($"varchar({FieldLimits.BoardDescription})");
+            ActorKeys(entity);
         });
 
         modelBuilder.Entity<List>(entity =>
         {
             entity.Property(l => l.Name).HasColumnType($"varchar({FieldLimits.ListName})");
+            ActorKeys(entity);
         });
 
         modelBuilder.Entity<Card>(entity =>
@@ -121,11 +131,25 @@ public class ApplicationDbContext : DbContext
             entity.HasMany(c => c.Labels)
                 .WithMany(l => l.Cards)
                 .UsingEntity(j => j.ToTable("CardLabels"));
+            ActorKeys(entity);
         });
 
         modelBuilder.Entity<Label>(entity =>
         {
             entity.Property(l => l.Name).HasColumnType($"varchar({FieldLimits.LabelName})");
+            ActorKeys(entity);
         });
+    }
+
+    private static void ActorKeys<TEntity>(EntityTypeBuilder<TEntity> entity) where TEntity : BaseEntity
+    {
+        entity.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(e => e.CreatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(e => e.UpdatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

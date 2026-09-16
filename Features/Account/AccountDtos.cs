@@ -12,13 +12,11 @@ public record AccountDto(
 
 public record CreateAccountDto(
     string Name,
-    Guid UserId,
-    Guid CreatedBy
+    Guid UserId
 );
 
 public record UpdateAccountDto(
-    string Name,
-    Guid? UpdatedBy
+    string Name
 );
 
 public record AccountSearchDto(
