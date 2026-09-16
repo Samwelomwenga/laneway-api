@@ -5,7 +5,7 @@ namespace DefaultNamespace;
 
 public interface IWorkSpaceService
 {
-    Task<PagedResponse<WorkSpaceDto>> GetAllAsync(WorkSpaceSearchDto searchDto);
+    Task<ApiResponse<List<WorkSpaceDto>>> GetAllAsync(WorkSpaceSearchDto searchDto);
     Task<ApiResponse<WorkSpaceDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<WorkSpaceDto>> CreateAsync(CreateWorkSpaceDto createWorkSpaceDto);
     Task<ApiResponse<WorkSpaceDto>> UpdateAsync(Guid id, UpdateWorkSpaceDto updateWorkSpaceDto);
@@ -21,41 +21,37 @@ public class WorkSpaceService : IWorkSpaceService
         _context = context;
     }
 
-    public async Task<PagedResponse<WorkSpaceDto>> GetAllAsync(WorkSpaceSearchDto searchDto)
+    public async Task<ApiResponse<List<WorkSpaceDto>>> GetAllAsync(WorkSpaceSearchDto searchDto)
     {
         var query = _context.WorkSpaces.AsQueryable();
 
-        if (!string.IsNullOrEmpty(searchDto.SearchTerm))
+        if (searchDto.SearchTerm is { } term)
         {
-            query = query.Where(ws => ws.Name.Contains(searchDto.SearchTerm) ||
-                                      ws.Description.Contains(searchDto.SearchTerm));
+            query = query.Where(ws => ws.Name.ToLower().Contains(term.ToLower()) ||
+                                      ws.Description.ToLower().Contains(term.ToLower()));
         }
-        if (searchDto.IsArchived.HasValue)
+        if (searchDto.IsArchived is { } isArchived)
         {
-            query = query.Where(ws => ws.IsArchived == searchDto.IsArchived.Value);
+            query = query.Where(ws => ws.IsArchived == isArchived);
         }
-        if (searchDto.Visibility.HasValue)
+        if (searchDto.Visibility is { } visibility)
         {
-            query = query.Where(ws => ws.Visibility == searchDto.Visibility.Value);
+            query = query.Where(ws => ws.Visibility == visibility);
         }
 
-        var totalCount = await query.CountAsync();
-        var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
-        var workSpaces = await query
-            .OrderBy(ws => ws.CreatedAt)
-            .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
-            .Include(ws => ws.Boards)
-            .ToListAsync();
+        var (workSpaces, totalCount) = await PagedQuery.ReadAsync(
+            query.OrderBy(ws => ws.CreatedAt).Include(ws => ws.Boards),
+            pageNumber: searchDto.PageNumber,
+            pageSize: searchDto.PageSize);
 
         var workSpaceDtos = workSpaces.Select(ws => MapToDto(ws, ws.Boards.Select(b => b.Id).ToList())).ToList();
 
         return PagedResponse<WorkSpaceDto>.SuccessResponse(
             workSpaceDtos,
             totalCount,
-            searchDto.PageSize,
-            searchDto.PageNumber,
-            "Workspaces retrieved successfully"
+            pageSize: searchDto.PageSize,
+            currentPage: searchDto.PageNumber,
+            message: "Workspaces retrieved successfully"
         );
     }
 

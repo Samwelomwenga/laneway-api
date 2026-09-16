@@ -14,10 +14,10 @@ public class CardsController: ApiControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<PagedResponse<CardDto>>>> GetCards([FromQuery] CardSearchDto searchDto)
+    public async Task<ActionResult<PagedResponse<CardDto>>> GetCards([FromQuery] CardSearchDto searchDto)
     {
         var response = await _cardService.GetAllAsync(searchDto);
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpGet("{id}")]

@@ -7,7 +7,7 @@ public interface ICardService
     Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto);
     Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardDto updateCardDto);
     Task<ApiResponse<CardDto>> GetByIdAsync(Guid id);
-    Task<ApiResponse<PagedResponse<CardDto>>> GetAllAsync(CardSearchDto searchDto);
+    Task<ApiResponse<List<CardDto>>> GetAllAsync(CardSearchDto searchDto);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 public class CardService: ICardService
@@ -88,66 +88,67 @@ public class CardService: ICardService
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card retrieved successfully");
     }
-    public async Task<ApiResponse<PagedResponse<CardDto>>> GetAllAsync(CardSearchDto searchDto)
+    public async Task<ApiResponse<List<CardDto>>> GetAllAsync(CardSearchDto searchDto)
     {
+        if (searchDto.ListId is { } filterListId && !await _context.Lists.AnyAsync(l => l.Id == filterListId))
+        {
+            return ReferenceErrors.NotFound<List<CardDto>>("listId", "List", filterListId);
+        }
+
         var query = _context.Cards.AsQueryable();
 
-        if (!string.IsNullOrEmpty(searchDto.searchTerm))
+        if (searchDto.SearchTerm is { } term)
         {
-            query = query.Where(c => c.Title.Contains(searchDto.searchTerm) || c.Description.Contains(searchDto.searchTerm));
+            query = query.Where(c => c.Title.ToLower().Contains(term.ToLower()) ||
+                                     c.Description.ToLower().Contains(term.ToLower()));
         }
 
-        if (searchDto.DueDate.HasValue)
+        if (searchDto.ListId is { } listId)
         {
-            query = query.Where(c => c.DueDate.HasValue && c.DueDate.Value.Date == searchDto.DueDate.Value.Date);
+            query = query.Where(c => c.ListId == listId);
         }
 
-        if (searchDto.Position.HasValue)
+        if (searchDto.IsArchived is { } isArchived)
         {
-            query = query.Where(c => c.Position == searchDto.Position.Value);
+            query = query.Where(c => c.IsArchived == isArchived);
         }
 
-        if (searchDto.ListId.HasValue)
+        if (searchDto.DueDate is { } dueDate)
         {
-            query = query.Where(c => c.ListId == searchDto.ListId.Value);
+            var dayStart = DateTime.SpecifyKind(dueDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            var dayEnd = dayStart.AddDays(1);
+            query = query.Where(c => c.DueDate >= dayStart && c.DueDate < dayEnd);
         }
 
-        if (searchDto.IsDueComplete.HasValue)
+        if (searchDto.DueBefore is { } dueBefore)
         {
-            query = query.Where(c => c.IsDueComplete == searchDto.IsDueComplete.Value);
+            var before = dueBefore.UtcDateTime;
+            query = query.Where(c => c.DueDate < before);
         }
 
-        if (searchDto.StartDate.HasValue)
+        if (searchDto.StartFrom is { } startFrom)
         {
-            query = query.Where(c => c.StartDate >= searchDto.StartDate.Value);
+            var from = startFrom.UtcDateTime;
+            query = query.Where(c => c.StartDate >= from);
         }
 
-        if (searchDto.EndDate.HasValue)
+        if (searchDto.IsDueComplete is { } isDueComplete)
         {
-            query = query.Where(c => c.DueDate <= searchDto.EndDate.Value);
+            query = query.Where(c => c.DueDate != null && c.IsDueComplete == isDueComplete);
         }
 
-        var totalCount = await query.CountAsync();
-        var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
+        var (cards, totalCount) = await PagedQuery.ReadAsync(
+            query.OrderBy(c => c.Position).Include(c => c.Labels),
+            pageNumber: searchDto.PageNumber,
+            pageSize: searchDto.PageSize);
 
-        var cards = await query
-            .OrderBy(c => c.Position)
-            .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
-            .Include(c => c.Labels)
-            .ToListAsync();
-
-        var cardDtos = cards.Select(MapToDto).ToList();
-
-        var pagedResponse = PagedResponse<CardDto>.SuccessResponse(
-            cardDtos,
+        return PagedResponse<CardDto>.SuccessResponse(
+            cards.Select(MapToDto).ToList(),
             totalCount,
-            searchDto.PageSize,
-            searchDto.PageNumber,
-            "Cards retrieved successfully"
+            pageSize: searchDto.PageSize,
+            currentPage: searchDto.PageNumber,
+            message: "Cards retrieved successfully"
         );
-
-        return ApiResponse<PagedResponse<CardDto>>.SuccessResponse(pagedResponse, "Cards retrieved successfully");
     }
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {

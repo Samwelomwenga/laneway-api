@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc;
+
 namespace DefaultNamespace;
 
 public record BoardDto
@@ -39,12 +41,22 @@ public record UpdateBoardDto
     public string? Name { get; init; } = Name?.Trim();
 }
 
+[ModelBinder(typeof(SearchQueryBinder<BoardSearchDto>))]
 public record BoardSearchDto
 (
-    int PageNumber = 1,
-    int PageSize = 10,
-    string? SearchTerm = null,
-    Guid? WorkspaceId = null,
-    bool? IsArchived = null,
-    BoardVisibility? Visibility = null
-);
+    int PageNumber,
+    int PageSize,
+    string? SearchTerm,
+    Guid? WorkspaceId,
+    bool? IsArchived,
+    BoardVisibility? Visibility
+) : ISearchQuery<BoardSearchDto>
+{
+    public static BoardSearchDto Read(QueryReader query) => new(
+        query.PageNumber(),
+        query.PageSize(),
+        query.Text("searchTerm"),
+        query.Id("workspaceId"),
+        query.Flag("isArchived"),
+        query.EnumName<BoardVisibility>("visibility"));
+}

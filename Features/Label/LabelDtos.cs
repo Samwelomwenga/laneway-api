@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc;
+
 namespace DefaultNamespace;
 
 public record LabelDto
@@ -29,9 +31,16 @@ public record UpdateLabelDto
     public string? Name { get; init; } = Name?.Trim();
 }
 
+[ModelBinder(typeof(SearchQueryBinder<LabelSearchDto>))]
 public record LabelSearchDto
 (
-    int PageNumber = 1,
-    int PageSize = 10,
-    string? SearchTerm = null
-);
+    int PageNumber,
+    int PageSize,
+    string? SearchTerm
+) : ISearchQuery<LabelSearchDto>
+{
+    public static LabelSearchDto Read(QueryReader query) => new(
+        query.PageNumber(),
+        query.PageSize(),
+        query.Text("searchTerm"));
+}

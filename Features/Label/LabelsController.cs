@@ -16,7 +16,7 @@ public class LabelsController: ApiControllerBase
     public async Task<ActionResult<PagedResponse<LabelDto>>> GetLabels([FromQuery] LabelSearchDto searchDto)
     {
         var response = await _labelService.GetAllAsync(searchDto);
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpGet("{id}")]

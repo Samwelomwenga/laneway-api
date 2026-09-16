@@ -17,7 +17,7 @@ public class ListsController: ApiControllerBase
     public async Task<ActionResult<PagedResponse<ListDto>>> GetLists([FromQuery] ListSearchDto searchDto)
     {
         var response = await _listService.GetAllAsync(searchDto);
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpGet("{id}")]

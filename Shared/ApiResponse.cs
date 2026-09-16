@@ -56,22 +56,6 @@ public  class PagedResponse<T> : ApiResponse<List<T>>
         };
     }
     
-    public static new PagedResponse<T> ErrorResponse(string message, int statusCode = 400, List<ApiError>? errors = null)
-    {
-        return new PagedResponse<T>
-        {
-            Success = false,
-            Message = message,
-            StatusCode = statusCode,
-            Errors = errors ?? new List<ApiError>(),
-            Data = new List<T>(),
-            TotalCount = 0,
-            PageSize = 0,
-            CurrentPage = 0,
-            TotalPages = 0
-        };
-    }
-    
     public bool HasNextPage => CurrentPage < TotalPages;
     public bool HasPreviousPage => CurrentPage > 1;
 }

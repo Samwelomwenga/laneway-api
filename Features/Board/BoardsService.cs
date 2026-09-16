@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 public interface IBoardService
 {
-    Task<PagedResponse<BoardDto>> GetAllAsync(BoardSearchDto searchDto);
+    Task<ApiResponse<List<BoardDto>>> GetAllAsync(BoardSearchDto searchDto);
     Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto);
     Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardDto updateBoardDto);
@@ -20,46 +20,50 @@ public class BoardService : IBoardService
         _context = context;
     }
 
-    public async Task<PagedResponse<BoardDto>> GetAllAsync(BoardSearchDto searchDto)
+    public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(BoardSearchDto searchDto)
     {
+        if (searchDto.WorkspaceId is { } filterWorkspaceId
+            && !await _context.WorkSpaces.AnyAsync(ws => ws.Id == filterWorkspaceId))
+        {
+            return ReferenceErrors.NotFound<List<BoardDto>>("workspaceId", "Workspace", filterWorkspaceId);
+        }
+
         var query = _context.Boards.AsQueryable();
 
-        if (!string.IsNullOrEmpty(searchDto.SearchTerm))
+        if (searchDto.SearchTerm is { } term)
         {
-            query = query.Where(b => b.Name.Contains(searchDto.SearchTerm) ||
-                                     b.Description.Contains(searchDto.SearchTerm));
-        }
-        if (searchDto.IsArchived.HasValue)
-        {
-            query = query.Where(b => b.IsArchived == searchDto.IsArchived.Value);
+            query = query.Where(b => b.Name.ToLower().Contains(term.ToLower()) ||
+                                     b.Description.ToLower().Contains(term.ToLower()));
         }
 
-        if (searchDto.WorkspaceId.HasValue)
+        if (searchDto.WorkspaceId is { } workspaceId)
         {
-            query = query.Where(b => b.WorkspaceId == searchDto.WorkspaceId.Value);
+            query = query.Where(b => b.WorkspaceId == workspaceId);
         }
 
-        if (searchDto.Visibility.HasValue)
+        if (searchDto.IsArchived is { } isArchived)
         {
-            query = query.Where(b => b.Visibility == searchDto.Visibility.Value);
+            query = query.Where(b => b.IsArchived == isArchived);
         }
 
-        var totalCount = await query.CountAsync();
-        var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
-        var boards = await query
-            .OrderBy(b => b.CreatedAt)
-            .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
-            .Include(b => b.Lists)
-            .ToListAsync();
+        if (searchDto.Visibility is { } visibility)
+        {
+            query = query.Where(b => b.Visibility == visibility);
+        }
+
+        var (boards, totalCount) = await PagedQuery.ReadAsync(
+            query.OrderBy(b => b.CreatedAt).Include(b => b.Lists),
+            pageNumber: searchDto.PageNumber,
+            pageSize: searchDto.PageSize);
+
         var boardDtos = boards.Select(b => MapToDto(b, b.Lists.Select(l => l.Id).ToList())).ToList();
 
         return PagedResponse<BoardDto>.SuccessResponse(
             boardDtos,
             totalCount,
-            searchDto.PageSize,
-            searchDto.PageNumber,
-            "Boards retrieved successfully"
+            pageSize: searchDto.PageSize,
+            currentPage: searchDto.PageNumber,
+            message: "Boards retrieved successfully"
         );
     }
 

@@ -127,14 +127,14 @@ Content-Type: application/json
   "labelIds": ["{{labelId}}"]
 }
 
-### Search complete cards.
+### Search complete cards. A card with no due date matches neither true nor false, so an undated card never comes back.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards?isDueComplete=true
 
-### Search cards due on or before a time. The endDate key filters on the due date.
-GET {{prodigy_board_API_HostAddress}}/api/v1/cards?endDate=2026-10-02T00:00:00Z
+### Search cards due before a time. The dueBefore key matches dueDate < value.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueBefore=2026-10-02T00:00:00Z
 
 ### Search cards due on a given day. A card with no due date never matches.
-GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueDate=2026-10-01T00:00:00Z
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueDate=2026-10-01
 
 ### Create a workspace with a padded name, a padded description, and a lowercase visibility. The name comes back trimmed, the description comes back as sent, and visibility comes back as "Public".
 POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
@@ -735,3 +735,227 @@ Content-Type: application/json
   "location": "Nairobi",
   "isActive": true
 }
+
+### Create a workspace for the paging and search checks.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+Content-Type: application/json
+
+{
+  "name": "Paging checks",
+  "visibility": "Public",
+  "isArchived": false
+}
+
+> {% client.global.set("pagingWorkspaceId", response.body.data.id); %}
+
+### Create a board to search.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+Content-Type: application/json
+
+{
+  "name": "Paging board",
+  "workspaceId": "{{pagingWorkspaceId}}",
+  "visibility": "Public",
+  "isArchived": false
+}
+
+> {% client.global.set("pagingBoardId", response.body.data.id); %}
+
+### Create a list to search.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+Content-Type: application/json
+
+{
+  "name": "Paging list",
+  "position": 1,
+  "boardId": "{{pagingBoardId}}",
+  "isArchived": false
+}
+
+> {% client.global.set("pagingListId", response.body.data.id); %}
+
+### Create a card with no due date, so that the isDueComplete checks have one to leave out.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "Bug report",
+  "position": 1,
+  "listId": "{{pagingListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card whose title holds the LIKE wildcards.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "50%_off sale",
+  "dueDate": "2026-10-01T12:00:00Z",
+  "startDate": "2026-09-30T00:00:00Z",
+  "position": 2,
+  "listId": "{{pagingListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a card that an unescaped 50%_off pattern would match. The search below must not return it.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "50Xoff",
+  "position": 3,
+  "listId": "{{pagingListId}}",
+  "isDueComplete": false,
+  "isArchived": false
+}
+
+### Create a complete card due later.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+Content-Type: application/json
+
+{
+  "title": "Ship it",
+  "dueDate": "2026-10-05T00:00:00Z",
+  "position": 4,
+  "listId": "{{pagingListId}}",
+  "isDueComplete": true,
+  "isArchived": false
+}
+
+### Ask for a page size of 0. 400 outOfRange on pageSize, the message names 1 and 100, and the body is the plain envelope with no totalCount, pageSize, currentPage or totalPages.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?pageSize=0
+
+### Ask for a page size above the maximum. 400 outOfRange on pageSize.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?pageSize=101
+
+### Ask for the maximum page size. 200.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?pageSize=100
+
+### Ask for page 0. 400 outOfRange on pageNumber.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?pageNumber=0
+
+### Ask for a page past the end. 200 with empty data and the real totalCount and totalPages.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?pageNumber=9999&pageSize=2
+
+### Ask for a page whose offset overflows int math. The offset is a long, so it's still a 200 with empty data.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?pageNumber=30000000&pageSize=100
+
+### Send a key the endpoint doesn't take. 400 unknownField on Bogus, the key as sent.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?Bogus=1
+
+### Send a known key in another case. 200, because keys match ignoring case.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?PAGESIZE=5
+
+### Send one key twice. One 400 invalidFormat on pageSize, even though the values differ.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?pageSize=10&pageSize=20
+
+### Send an empty searchTerm. 400 invalidFormat on searchTerm.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?searchTerm=
+
+### Send a whitespace-only listId. 400 invalidFormat on listId.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId=%20%20
+
+### Send a listId that isn't a GUID. 400 invalidFormat on listId.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId=not-a-guid
+
+### Send a pageSize that isn't an int. 400 invalidFormat on pageSize.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?pageSize=abc
+
+### Send isArchived as 1. 400 invalidFormat on isArchived.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?isArchived=1
+
+### Break three keys at once. One 400 holds unknownField on Bogus, invalidFormat on listId, and outOfRange on pageSize.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?pageSize=0&Bogus=1&listId=not-a-guid
+
+### Send visibility in lowercase. 200, because enum keys take names in any case.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?visibility=public
+
+### Send visibility as an integer. 400 unknownValue on visibility, and the message lists the names.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?visibility=1
+
+### Send a visibility name that doesn't exist. 400 unknownValue on visibility.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?visibility=Nope
+
+### Filter boards by a workspace that doesn't exist. 400 notFound on workspaceId.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?workspaceId=11111111-2222-3333-4444-555555555555
+
+### Filter boards by the empty GUID. 400 notFound on workspaceId.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?workspaceId=00000000-0000-0000-0000-000000000000
+
+### Filter boards by a real workspace. 200.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?workspaceId={{pagingWorkspaceId}}
+
+### Filter lists by a board that doesn't exist. 400 notFound on boardId.
+GET {{prodigy_board_API_HostAddress}}/api/v1/lists?boardId=11111111-2222-3333-4444-555555555555
+
+### Filter cards by a list that doesn't exist. 400 notFound on listId.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId=11111111-2222-3333-4444-555555555555
+
+### Search with a padded term in the wrong case. It's trimmed and matches ignoring case, so "Bug report" comes back.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?searchTerm=%20bug%20
+
+### Search for 50%_off. EF escapes % and _, so only "50%_off sale" comes back, not "50Xoff".
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?searchTerm=50%25_off
+
+### Search boards in the wrong case. Board search now ignores case too.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards?searchTerm=PAGING
+
+### Search cards due on a UTC day. Only "50%_off sale" comes back.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueDate=2026-10-01
+
+### Send dueDate as a timestamp. 400 invalidFormat on dueDate.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueDate=2026-10-01T00:00:00Z
+
+### Send dueDate without padding. 400 invalidFormat on dueDate.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueDate=2026-9-14
+
+### Send dueDate in US order. 400 invalidFormat on dueDate.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueDate=09/14/2026
+
+### Search cards due before a UTC time. dueBefore matches dueDate < value.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueBefore=2026-10-02T00:00:00Z
+
+### Send dueBefore with no offset. 400 invalidFormat on dueBefore, and the message names %2B and Z.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueBefore=2026-10-02T00:00:00
+
+### Send dueBefore with an unencoded +. The + arrives as a space, so it's 400 invalidFormat on dueBefore.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueBefore=2026-10-02T00:00:00+03:00
+
+### Send the same offset encoded as %2B. 200.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?dueBefore=2026-10-02T00:00:00%2B03:00
+
+### Search cards starting from a UTC time. startFrom matches startDate >= value.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?startFrom=2026-09-30T00:00:00Z
+
+### Send startFrom with no offset. 400 invalidFormat on startFrom, with the same message about %2B and Z.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?startFrom=2026-09-30T00:00:00
+
+### Send startFrom with an unencoded +. 400 invalidFormat on startFrom.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?startFrom=2026-09-30T00:00:00+03:00
+
+### Search incomplete cards. Only cards that have a due date and aren't complete come back, so "Bug report" doesn't.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?isDueComplete=false
+
+### Filter cards by position. The key is gone, so it's 400 unknownField on position.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?position=1
+
+### Filter cards by status. 400 unknownField on status.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?status=open
+
+### Filter cards by endDate. The key is dueBefore now, so it's 400 unknownField on endDate.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?endDate=2026-10-02T00:00:00Z
+
+### Filter cards by reminderDate. 400 unknownField on reminderDate.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?reminderDate=2026-10-02T00:00:00Z
+
+### Filter labels by board. 400 unknownField on boardId until ticket 07 adds the filter.
+GET {{prodigy_board_API_HostAddress}}/api/v1/labels?boardId={{pagingBoardId}}
+
+### Read the second page of two. Card search returns the paged shape with no second ApiResponse around it.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{pagingListId}}&pageSize=2&pageNumber=2
+
+### Send an unknown key to user search. 200, because user and account search are unchanged.
+GET {{prodigy_board_API_HostAddress}}/api/v1/users?bogus=1

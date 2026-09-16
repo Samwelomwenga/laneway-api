@@ -17,7 +17,7 @@ public class BoardsController: ApiControllerBase
     public async Task<ActionResult<PagedResponse<BoardDto>>> GetBoards([FromQuery] BoardSearchDto searchDto)
     {
         var boards = await _boardService.GetAllAsync(searchDto);
-        return Ok(boards);
+        return ToActionResult(boards);
     }
 
     [HttpGet("{id}")]

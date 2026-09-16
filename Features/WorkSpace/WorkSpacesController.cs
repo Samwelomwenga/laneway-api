@@ -19,7 +19,7 @@ public class WorkSpacesController: ApiControllerBase
     public async Task<ActionResult<PagedResponse<WorkSpaceDto>>> GetWorkSpaces([FromQuery] WorkSpaceSearchDto searchDto)
     {
         var response = await _workSpaceService.GetAllAsync(searchDto);
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpGet("{id}")]

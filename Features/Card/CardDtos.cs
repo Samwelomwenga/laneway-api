@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc;
+
 namespace DefaultNamespace;
 
 public record CardDto
@@ -55,16 +57,28 @@ public record UpdateCardDto
 {
     public string? Title { get; init; } = Title?.Trim();
 }
+[ModelBinder(typeof(SearchQueryBinder<CardSearchDto>))]
 public record CardSearchDto
 (
-    int PageNumber = 1,
-    int PageSize = 10,
-    string? searchTerm = null,
-    DateTime? DueDate = null,
-    int? Position = null,
-    Guid? ListId = null,
-    bool? IsDueComplete = null,
-    DateTime? StartDate = null,
-    DateTime? EndDate = null,
-    bool? IsArchived = null
-);
+    int PageNumber,
+    int PageSize,
+    string? SearchTerm,
+    Guid? ListId,
+    bool? IsArchived,
+    DateOnly? DueDate,
+    DateTimeOffset? DueBefore,
+    DateTimeOffset? StartFrom,
+    bool? IsDueComplete
+) : ISearchQuery<CardSearchDto>
+{
+    public static CardSearchDto Read(QueryReader query) => new(
+        query.PageNumber(),
+        query.PageSize(),
+        query.Text("searchTerm"),
+        query.Id("listId"),
+        query.Flag("isArchived"),
+        query.Day("dueDate"),
+        query.Timestamp("dueBefore"),
+        query.Timestamp("startFrom"),
+        query.Flag("isDueComplete"));
+}

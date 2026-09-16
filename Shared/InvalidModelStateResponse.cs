@@ -11,6 +11,11 @@ public static partial class InvalidModelStateResponse
 {
     public static IActionResult Create(ActionContext context)
     {
+        if (SearchQueryErrors.Recorded(context.HttpContext) is { } queryErrors)
+        {
+            return InvalidDataResult.Create(queryErrors);
+        }
+
         var bodyType = context.ActionDescriptor.Parameters
             .FirstOrDefault(parameter => parameter.BindingInfo?.BindingSource == BindingSource.Body)
             ?.ParameterType;
