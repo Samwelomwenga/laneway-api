@@ -8,6 +8,7 @@ public interface IBoardService
     Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto);
     Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardDto updateBoardDto);
+    Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardDto moveBoardDto);
     Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
@@ -112,21 +113,45 @@ public class BoardService : IBoardService
             return ArchiveErrors.ReadOnly<BoardDto>(archived, TreeItem.Board);
         }
 
-        var workspaceId = updateBoardDto.WorkspaceId!.Value;
-        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
-        {
-            return WorkspaceNotFound(workspaceId);
-        }
-
         existingBoard.Name = updateBoardDto.Name!;
         existingBoard.Description = updateBoardDto.Description ?? string.Empty;
-        existingBoard.WorkspaceId = workspaceId;
         existingBoard.Visibility = updateBoardDto.Visibility!.Value;
         _context.StampChange(existingBoard, _actor);
 
         await _context.SaveChangesAsync();
         var updatedBoardDto = MapToDto(existingBoard, existingBoard.Lists.InSortOrder().Select(l => l.Id).ToList());
         return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
+    }
+
+    public async Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardDto moveBoardDto)
+    {
+        ArgumentNullException.ThrowIfNull(moveBoardDto);
+
+        var board = await _context.Boards
+            .Include(b => b.Lists)
+            .FirstOrDefaultAsync(b => b.Id == id);
+        if (board == null)
+        {
+            return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
+        }
+
+        if (await _archive.OnBoardAsync(id) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<BoardDto>(archived, TreeItem.Board);
+        }
+
+        var workspaceId = moveBoardDto.WorkspaceId!.Value;
+        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
+        {
+            return WorkspaceNotFound(workspaceId);
+        }
+
+        board.WorkspaceId = workspaceId;
+        _context.StampChange(board, _actor);
+
+        await _context.SaveChangesAsync();
+        var movedBoardDto = MapToDto(board, board.Lists.InSortOrder().Select(l => l.Id).ToList());
+        return ApiResponse<BoardDto>.SuccessResponse(movedBoardDto, "Board moved successfully", 200);
     }
 
     public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)

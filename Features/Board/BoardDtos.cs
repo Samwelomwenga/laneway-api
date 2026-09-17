@@ -32,12 +32,16 @@ public record UpdateBoardDto
 (
     string? Name,
     string? Description,
-    Guid? WorkspaceId,
     BoardVisibility? Visibility
 )
 {
     public string? Name { get; init; } = Name?.Trim();
 }
+
+public record MoveBoardDto
+(
+    Guid? WorkspaceId
+);
 
 [ModelBinder(typeof(SearchQueryBinder<BoardSearchDto>))]
 public record BoardSearchDto

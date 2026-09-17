@@ -8,8 +8,7 @@ public sealed class CreateCardDtoValidator : AbstractValidator<CreateCardDto>
     {
         RuleFor(x => x.Title).Required().MaxLength(FieldLimits.CardTitle);
         RuleFor(x => x.Description).MaxLength(FieldLimits.CardDescription);
-        RuleFor(x => x.Position).ValidPosition();
-        RuleFor(x => x).OnePlacement(x => new Placement(x.Position, x.Before, x.After));
+        this.ValidPlacement();
         RuleFor(x => x.ListId).Required();
         RuleFor(x => x.IsDueComplete).Required().CompleteNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.DueReminderMinutes).NotNegative().ReminderNeedsDueDate(x => x.DueDate);
@@ -24,12 +23,19 @@ public sealed class UpdateCardDtoValidator : AbstractValidator<UpdateCardDto>
     {
         RuleFor(x => x.Title).Required().MaxLength(FieldLimits.CardTitle);
         RuleFor(x => x.Description).MaxLength(FieldLimits.CardDescription);
-        RuleFor(x => x.Position).Required();
-        RuleFor(x => x.ListId).Required();
         RuleFor(x => x.IsDueComplete).Required().CompleteNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.DueReminderMinutes).NotNegative().ReminderNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.StartDate).NotAfterDueDate(x => x.DueDate);
         RuleForEach(x => x.LabelIds).NotNullId();
+    }
+}
+
+public sealed class MoveCardDtoValidator : AbstractValidator<MoveCardDto>
+{
+    public MoveCardDtoValidator()
+    {
+        RuleFor(x => x.ListId).Required();
+        this.ValidPlacement();
     }
 }
 

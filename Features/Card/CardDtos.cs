@@ -36,7 +36,7 @@ public record CreateCardDto
     DateTime? StartDate,
     int? DueReminderMinutes,
     List<Guid?>? LabelIds
-)
+) : IPlacing
 {
     public string? Title { get; init; } = Title?.Trim();
 }
@@ -46,8 +46,6 @@ public record UpdateCardDto
     string? Title,
     string? Description,
     DateTime? DueDate,
-    double? Position,
-    Guid? ListId,
     bool? IsDueComplete,
     string? Cover,
     DateTime? StartDate,
@@ -57,6 +55,14 @@ public record UpdateCardDto
 {
     public string? Title { get; init; } = Title?.Trim();
 }
+
+public record MoveCardDto
+(
+    Guid? ListId,
+    PositionValue? Position,
+    Guid? Before,
+    Guid? After
+) : IPlacing;
 [ModelBinder(typeof(SearchQueryBinder<CardSearchDto>))]
 public record CardSearchDto
 (

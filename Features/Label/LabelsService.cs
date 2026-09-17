@@ -75,7 +75,7 @@ public class LabelService : ILabelService
         var name = createLabelDto.Name ?? string.Empty;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        if (!await TryLockBoardAsync(boardId))
+        if (!await _context.TryLockBoardAsync(boardId))
         {
             return ReferenceErrors.NotFound<LabelDto>("boardId", "Board", boardId);
         }
@@ -110,7 +110,7 @@ public class LabelService : ILabelService
         var name = updateLabelDto.Name ?? string.Empty;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        await TryLockBoardAsync(existingLabel.BoardId);
+        await _context.TryLockBoardAsync(existingLabel.BoardId);
 
         if (await _archive.OnBoardAsync(existingLabel.BoardId) is { } archived)
         {
@@ -143,7 +143,7 @@ public class LabelService : ILabelService
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        await TryLockBoardAsync(existingLabel.BoardId);
+        await _context.TryLockBoardAsync(existingLabel.BoardId);
 
         if (await _archive.OnBoardAsync(existingLabel.BoardId) is { } archived)
         {
@@ -155,14 +155,6 @@ public class LabelService : ILabelService
         await transaction.CommitAsync();
 
         return ApiResponse<bool>.SuccessResponse(true, "Label deleted successfully", 204);
-    }
-
-    private async Task<bool> TryLockBoardAsync(Guid boardId)
-    {
-        var boards = await _context.Boards
-            .FromSql($"SELECT * FROM \"Boards\" WHERE \"Id\" = {boardId} FOR UPDATE")
-            .ToListAsync();
-        return boards.Count > 0;
     }
 
     private async Task<ApiResponse<LabelDto>?> FindDuplicateAsync(Guid boardId, string name, Color? color, Guid? self)

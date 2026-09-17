@@ -45,6 +45,13 @@ public class CardsController: ApiControllerBase
         return ToActionResult(response);
     }
 
+    [HttpPut("{id}/position")]
+    public async Task<ActionResult<ApiResponse<CardDto>>> MoveCard(Guid id, [FromBody] MoveCardDto moveCardDto)
+    {
+        var response = await _cardService.MoveAsync(id, moveCardDto);
+        return ToActionResult(response);
+    }
+
     [HttpPost("{cardId}/labels/{labelId}")]
     public async Task<ActionResult<ApiResponse<bool>>> AddCardLabel(Guid cardId, Guid labelId)
     {

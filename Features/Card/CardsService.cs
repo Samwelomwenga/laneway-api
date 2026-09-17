@@ -6,6 +6,7 @@ public interface ICardService
 {
     Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto);
     Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardDto updateCardDto);
+    Task<ApiResponse<CardDto>> MoveAsync(Guid id, MoveCardDto moveCardDto);
     Task<ApiResponse<CardDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<List<CardDto>>> GetAllAsync(CardSearchDto searchDto);
     Task<ApiResponse<bool>> AddLabelAsync(Guid cardId, Guid labelId);
@@ -15,17 +16,26 @@ public interface ICardService
 }
 public class CardService: ICardService
 {
+    private const int MoveAttempts = 3;
+
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
     private readonly Placements _placements;
     private readonly ArchiveGuard _archive;
+    private readonly LabelMatching _labelMatching;
 
-    public CardService(ApplicationDbContext context, Actor actor, Placements placements, ArchiveGuard archive)
+    public CardService(
+        ApplicationDbContext context,
+        Actor actor,
+        Placements placements,
+        ArchiveGuard archive,
+        LabelMatching labelMatching)
     {
         _context = context;
         _actor = actor;
         _placements = placements;
         _archive = archive;
+        _labelMatching = labelMatching;
     }
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
@@ -37,8 +47,7 @@ public class CardService: ICardService
         var position = 0d;
         if (listExists)
         {
-            var placed = await _placements.ResolveInListAsync(
-                listId, new Placement(createCardDto.Position, createCardDto.Before, createCardDto.After));
+            var placed = await _placements.ResolveInListAsync(listId, Placement.Of(createCardDto));
             errors.AddRange(placed.Errors);
             position = placed.Position;
         }
@@ -80,7 +89,7 @@ public class CardService: ICardService
             return ArchiveErrors.ReadOnly<CardDto>(archived, TreeItem.Card);
         }
 
-        var (labels, _, referenceErrors) = await ResolveReferencesAsync(updateCardDto.ListId!.Value, updateCardDto.LabelIds);
+        var (labels, _, referenceErrors) = await ResolveReferencesAsync(card.ListId, updateCardDto.LabelIds);
         if (referenceErrors.Count > 0)
         {
             return ReferenceErrors.Invalid<CardDto>(referenceErrors);
@@ -89,8 +98,6 @@ public class CardService: ICardService
         card.Title = updateCardDto.Title!;
         card.Description = updateCardDto.Description ?? string.Empty;
         card.DueDate = updateCardDto.DueDate;
-        card.Position = updateCardDto.Position!.Value;
-        card.ListId = updateCardDto.ListId.Value;
         card.IsDueComplete = updateCardDto.IsDueComplete!.Value;
         card.Cover = updateCardDto.Cover;
         card.StartDate = updateCardDto.StartDate;
@@ -107,6 +114,92 @@ public class CardService: ICardService
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card updated successfully");
     }
+
+    public async Task<ApiResponse<CardDto>> MoveAsync(Guid id, MoveCardDto moveCardDto)
+    {
+        ArgumentNullException.ThrowIfNull(moveCardDto);
+
+        var listId = moveCardDto.ListId!.Value;
+        var placement = Placement.Of(moveCardDto);
+
+        for (var attempt = 1; attempt <= MoveAttempts; attempt++)
+        {
+            if (await MoveOnceAsync(id, listId, placement) is { } response)
+            {
+                return response;
+            }
+
+            _context.ChangeTracker.Clear();
+        }
+
+        throw new InvalidOperationException(
+            $"Card {id} could not move to list {listId}: the list kept changing board.");
+    }
+
+    private async Task<ApiResponse<CardDto>?> MoveOnceAsync(Guid id, Guid listId, Placement placement)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var card = await _context.Cards
+            .Include(c => c.Labels)
+            .FirstOrDefaultAsync(c => c.Id == id);
+        if (card == null)
+        {
+            return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
+        }
+
+        if (await _archive.OnCardAsync(id) is { } readOnly)
+        {
+            return ArchiveErrors.ReadOnly<CardDto>(readOnly, TreeItem.Card);
+        }
+
+        var sourceBoardId = await BoardOfListAsync(card.ListId);
+        if (await BoardOfListAsync(listId) is not { } boardId)
+        {
+            return ReferenceErrors.NotFound<CardDto>("listId", "List", listId);
+        }
+
+        var crossesBoards = boardId != sourceBoardId;
+        if (crossesBoards)
+        {
+            await _context.TryLockBoardAsync(boardId);
+        }
+
+        var placed = await _placements.ResolveMoveInListAsync(card, listId, placement);
+
+        var listChangedBoard = await BoardOfListAsync(listId) != boardId;
+        if (listChangedBoard)
+        {
+            return null;
+        }
+
+        if (placed.Errors.Count > 0)
+        {
+            return ReferenceErrors.Invalid<CardDto>(placed.Errors);
+        }
+
+        if (await _archive.OnListAsync(listId) is { } archived)
+        {
+            return ArchiveErrors.NoCreate<CardDto>(archived, "listId", TreeItem.Card);
+        }
+
+        if (crossesBoards && card.Labels.Count > 0)
+        {
+            var matched = await _labelMatching.ToBoardAsync(card.Labels, boardId);
+            card.Labels.Clear();
+            card.Labels.AddRange(matched.Select(match => match.To));
+        }
+
+        card.ListId = listId;
+        card.Position = placed.Position;
+        _context.StampChange(card, _actor);
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return ApiResponse<CardDto>.SuccessResponse(MapToDto(card), "Card moved successfully");
+    }
+
     public async Task<ApiResponse<CardDto>> GetByIdAsync(Guid id)
     {
         var card = await _context.Cards

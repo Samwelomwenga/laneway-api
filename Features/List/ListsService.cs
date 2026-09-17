@@ -37,8 +37,7 @@ public class ListService : IListService
             return BoardNotFound(boardId);
         }
 
-        var placed = await _placements.ResolveOnBoardAsync(
-            boardId, new Placement(createListDto.Position, createListDto.Before, createListDto.After));
+        var placed = await _placements.ResolveOnBoardAsync(boardId, Placement.Of(createListDto));
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<ListDto>(placed.Errors);

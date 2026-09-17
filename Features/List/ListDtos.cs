@@ -25,7 +25,7 @@ public record CreateListDto
     Guid? After,
     Guid? BoardId,
     Color? Color
-)
+) : IPlacing
 {
     public string? Name { get; init; } = Name?.Trim();
 }
