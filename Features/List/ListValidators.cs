@@ -17,7 +17,14 @@ public sealed class UpdateListDtoValidator : AbstractValidator<UpdateListDto>
     public UpdateListDtoValidator()
     {
         RuleFor(x => x.Name).Required().MaxLength(FieldLimits.ListName);
-        RuleFor(x => x.Position).Required();
+    }
+}
+
+public sealed class MoveListDtoValidator : AbstractValidator<MoveListDto>
+{
+    public MoveListDtoValidator()
+    {
         RuleFor(x => x.BoardId).Required();
+        this.ValidPlacement();
     }
 }

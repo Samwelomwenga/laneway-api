@@ -420,22 +420,20 @@ Content-Type: application/json
   "boardId": "{{$uuid}}"
 }
 
-### Replace the list with an empty object. 400 required on name, position, and boardId.
+### Replace the list with an empty object. 400 required on name, the only field left.
 PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{validationListId}}
 X-User-Id: {{actorId}}
 Content-Type: application/json
 
 {}
 
-### Replace the list with position 0 and no color. 0 and false count as present, so it's 200. The name comes back trimmed and the color comes back null.
+### Replace the list with a name and no color. 200, the name comes back trimmed and the color comes back null.
 PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{validationListId}}
 X-User-Id: {{actorId}}
 Content-Type: application/json
 
 {
-  "name": "  Validation list renamed  ",
-  "position": 0,
-  "boardId": "{{boardId}}"
+  "name": "  Validation list renamed  "
 }
 
 ### Create a card with no title that is marked complete without a due date. One 400 holds required on title and requiresDueDate on isDueComplete.
@@ -2090,8 +2088,6 @@ Content-Type: application/json
 
 {
   "name": "Doing",
-  "position": 65536,
-  "boardId": "{{archiveBoardId}}",
   "isArchived": true
 }
 
@@ -2570,9 +2566,7 @@ X-User-Id: {{actorId}}
 Content-Type: application/json
 
 {
-  "name": "Renamed while archived",
-  "position": 65536,
-  "boardId": "{{readOnlyBoardId}}"
+  "name": "Renamed while archived"
 }
 
 ### Create a card in the archived list. 409 archived on listId.
@@ -2699,9 +2693,7 @@ X-User-Id: {{actorId}}
 Content-Type: application/json
 
 {
-  "name": "Renamed under an archived board",
-  "position": 65536,
-  "boardId": "{{readOnlyBoardId}}"
+  "name": "Renamed under an archived board"
 }
 
 ### Replace the archived board itself. 409 archived, "This board is archived."
@@ -3551,4 +3543,549 @@ Content-Type: application/json
 
 {
   "workspaceId": "{{moveWorkspaceId}}"
+}
+
+### Create board D, which the lists start on.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Board D",
+  "workspaceId": "{{moveWorkspaceId}}",
+  "visibility": "Private"
+}
+
+> {% client.global.set("moveBoardD", response.body.data.id); %}
+
+### Create board E, which a list crosses to.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Board E",
+  "workspaceId": "{{moveWorkspaceId}}",
+  "visibility": "Private"
+}
+
+> {% client.global.set("moveBoardE", response.body.data.id); %}
+
+### Create list D1, the one the reorder checks drag. No placement, so 65536.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "D1",
+  "boardId": "{{moveBoardD}}"
+}
+
+> {% client.global.set("moveListD1", response.body.data.id); %}
+
+### Create list D2 on board D. 131072.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "D2",
+  "boardId": "{{moveBoardD}}"
+}
+
+> {% client.global.set("moveListD2", response.body.data.id); %}
+
+### Create list D3 on board D. 196608.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "D3",
+  "boardId": "{{moveBoardD}}"
+}
+
+> {% client.global.set("moveListD3", response.body.data.id); %}
+
+### Create list E1, the only list on board E. 65536.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "E1",
+  "boardId": "{{moveBoardE}}"
+}
+
+> {% client.global.set("moveListE1", response.body.data.id); %}
+
+### Name D1's own board with no placement. 200, still 65536, and updatedAt and updatedBy stay null.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}"
+}
+
+### Send D1 to the bottom of board D. The largest sibling plus 65536, so 262144, and updatedBy becomes the actor.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "position": "bottom"
+}
+
+### Send it back to the top. The smallest sibling halved, and D1 isn't its own sibling, so it's 131072 / 2 = 65536.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "position": "top"
+}
+
+### Drop D1 after D2. D2 and D3 are neighbours once D1 is out of the way, so it's their midpoint, 163840.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "after": "{{moveListD2}}"
+}
+
+### Drop D1 before D2. Nothing sits above D2 now, so it's 131072 / 2 = 65536.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "before": "{{moveListD2}}"
+}
+
+### Drop D1 between D2 and D3. Their midpoint, 163840.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "after": "{{moveListD2}}",
+  "before": "{{moveListD3}}"
+}
+
+### Send a number. It's stored as sent, so 500.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "position": 500
+}
+
+### Move a list with no header and no body fields. 400 required on X-User-Id on its own, because the header runs first.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+Content-Type: application/json
+
+{}
+
+### Move a list with an empty body. 400 required on boardId.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Move to a position name that isn't top or bottom. 400 unknownValue on position.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "position": "middle"
+}
+
+### Move to position 0. 400 outOfRange on position.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "position": 0
+}
+
+### Send a position together with an anchor. 400 mutuallyExclusive with a null field.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "position": "top",
+  "before": "{{moveListD2}}"
+}
+
+### Send a field the move endpoint doesn't take. 400 unknownField on name.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "name": "Renamed by a drag"
+}
+
+### Move a list that doesn't exist to a board that doesn't exist. 404, because the URL item is checked before the destination.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{$uuid}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{$uuid}}"
+}
+
+### Move to a board that doesn't exist. 400 notFound on boardId.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{$uuid}}"
+}
+
+### Name an anchor that doesn't exist. 400 notFound on before.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "before": "{{$uuid}}"
+}
+
+### Send a board and an anchor that both don't exist. 400 notFound on boardId alone, because anchors are checked against the destination and there's nothing to check them against.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{$uuid}}",
+  "before": "{{$uuid}}"
+}
+
+### Name the moving list as its own anchor. 400 notSibling on before, because a list isn't its own sibling.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "before": "{{moveListD1}}"
+}
+
+### Move to board E anchored on a list still on board D. 400 notSibling on before, because anchors sit on the destination board.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardE}}",
+  "before": "{{moveListD2}}"
+}
+
+### Name anchors that aren't neighbours in that order. 400 notAdjacent on before.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "after": "{{moveListD3}}",
+  "before": "{{moveListD2}}"
+}
+
+### Move D1 to board E with no placement. A new board with no placement means the bottom, so E1's 65536 plus 65536 = 131072.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardE}}"
+}
+
+### Bring D1 back to the top of board D. 131072 / 2 = 65536.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "position": "top"
+}
+
+### Create a red "Bug" on board D.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Bug",
+  "boardId": "{{moveBoardD}}",
+  "color": "Red"
+}
+
+> {% client.global.set("moveBugD", response.body.data.id); %}
+
+### Create an orange "urgent" on board D.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "urgent",
+  "boardId": "{{moveBoardD}}",
+  "color": "Orange"
+}
+
+> {% client.global.set("moveUrgentD", response.body.data.id); %}
+
+### Create an unnamed green label on board D.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}",
+  "color": "Green"
+}
+
+> {% client.global.set("moveGreenD", response.body.data.id); %}
+
+### Create a blue "bug" on board E. Only the name has to match, and the case doesn't.
+POST {{prodigy_board_API_HostAddress}}/api/v1/labels
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "bug",
+  "boardId": "{{moveBoardE}}",
+  "color": "Blue"
+}
+
+> {% client.global.set("moveBugE", response.body.data.id); %}
+
+### Create the labelled list on board D. The bottom of board D, so 262144.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Labelled",
+  "boardId": "{{moveBoardD}}"
+}
+
+> {% client.global.set("moveLabelledList", response.body.data.id); %}
+
+### Create labelled card 1 with "Bug" and "urgent". Labels come from the create, so updatedAt stays null.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Labelled card 1",
+  "listId": "{{moveLabelledList}}",
+  "isDueComplete": false,
+  "labelIds": ["{{moveBugD}}", "{{moveUrgentD}}"]
+}
+
+> {% client.global.set("moveLabelledCard1", response.body.data.id); %}
+
+### Create labelled card 2 with "Bug" and the unnamed green.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Labelled card 2",
+  "listId": "{{moveLabelledList}}",
+  "isDueComplete": false,
+  "labelIds": ["{{moveBugD}}", "{{moveGreenD}}"]
+}
+
+> {% client.global.set("moveLabelledCard2", response.body.data.id); %}
+
+### Create labelled card 3 with "urgent", the label it shares with card 1.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Labelled card 3",
+  "listId": "{{moveLabelledList}}",
+  "isDueComplete": false,
+  "labelIds": ["{{moveUrgentD}}"]
+}
+
+> {% client.global.set("moveLabelledCard3", response.body.data.id); %}
+
+### Archive card 3, so the move has an archived card to carry.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{moveLabelledCard3}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Read card 3 and note its updatedAt. The archive set it, and the list move below must leave it alone.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{moveLabelledCard3}}
+
+### Move the labelled list to board E. 200 at the bottom of board E, 131072, and the response carries cardIds but no label ids.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveLabelledList}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardE}}"
+}
+
+### Read board E's labels. Three: the blue "bug", still blue with updatedAt null, plus the orange "urgent" and the unnamed green the move created.
+GET {{prodigy_board_API_HostAddress}}/api/v1/labels?boardId={{moveBoardE}}
+
+### Read labelled card 1. labelIds hold board E's blue "bug" and the new "urgent", and updatedAt is still null.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{moveLabelledCard1}}
+
+### Read labelled card 2. Board E's blue "bug" and the new green, and updatedAt is still null.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{moveLabelledCard2}}
+
+### Read the archived card 3. It carries the same new "urgent" card 1 got, because cards that need one new label share it, and its updatedAt is the one the archive wrote.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{moveLabelledCard3}}
+
+### Read board D's labels. Still the same three, untouched. Source labels stay where they are.
+GET {{prodigy_board_API_HostAddress}}/api/v1/labels?boardId={{moveBoardD}}
+
+### Read board D. updatedAt stays null, because a list move never stamps a board.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards/{{moveBoardD}}
+
+### Read board E. updatedAt stays null too.
+GET {{prodigy_board_API_HostAddress}}/api/v1/boards/{{moveBoardE}}
+
+### Move the labelled list back to board D. Every label matches one board D already has, so nothing is created and it's never 409 duplicate. The bottom of board D is 196608 + 65536 = 262144.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveLabelledList}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}"
+}
+
+### Read board D's labels again. Still three, and the round trip added nothing.
+GET {{prodigy_board_API_HostAddress}}/api/v1/labels?boardId={{moveBoardD}}
+
+### Archive list D3.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD3}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Move the archived list. 409 archived with a null field, "This list is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD3}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardE}}"
+}
+
+### Move the archived list with an empty body. 400 required on boardId, because the body runs before the archive check.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD3}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Restore list D3, so the destination checks below start clean.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD3}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Archive board E. Its list E1 keeps its own flag off.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{moveBoardE}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Move a live list onto the archived board. 409 archived on boardId, "The board this list is on is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardE}}"
+}
+
+### Move a live list onto the archived board naming an anchor that doesn't exist. 400 notFound on before, because the destination's 400s run before its 409.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardE}}",
+  "before": "{{$uuid}}"
+}
+
+### Move E1 off the archived board. 409 archived with a null field, naming the board. Nothing moves out of an archived board.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListE1}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "boardId": "{{moveBoardD}}"
+}
+
+### Restore board E.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{moveBoardE}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Replace D1, still sending boardId. 400 unknownField, because a list changes board through its own endpoint.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "D1",
+  "boardId": "{{moveBoardD}}"
+}
+
+### Replace D1, still sending position. 400 unknownField, for the same reason.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{moveListD1}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "D1",
+  "position": 65536
 }

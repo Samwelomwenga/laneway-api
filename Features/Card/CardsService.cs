@@ -183,11 +183,9 @@ public class CardService: ICardService
             return ArchiveErrors.NoCreate<CardDto>(archived, "listId", TreeItem.Card);
         }
 
-        if (crossesBoards && card.Labels.Count > 0)
+        if (crossesBoards)
         {
-            var matched = await _labelMatching.ToBoardAsync(card.Labels, boardId);
-            card.Labels.Clear();
-            card.Labels.AddRange(matched.Select(match => match.To));
+            await _labelMatching.CarryToBoardAsync([card], boardId);
         }
 
         card.ListId = listId;

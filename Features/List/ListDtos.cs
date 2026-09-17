@@ -33,13 +33,19 @@ public record CreateListDto
 public record UpdateListDto
 (
     string? Name,
-    double? Position,
-    Guid? BoardId,
     Color? Color
 )
 {
     public string? Name { get; init; } = Name?.Trim();
 }
+
+public record MoveListDto
+(
+    Guid? BoardId,
+    PositionValue? Position,
+    Guid? Before,
+    Guid? After
+) : IPlacing;
 [ModelBinder(typeof(SearchQueryBinder<ListSearchDto>))]
 public record ListSearchDto
 (

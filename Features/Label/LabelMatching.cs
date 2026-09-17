@@ -45,6 +45,25 @@ public sealed class LabelMatching
         return matches;
     }
 
+    public async Task CarryToBoardAsync(IReadOnlyCollection<Card> cards, Guid boardId)
+    {
+        ArgumentNullException.ThrowIfNull(cards);
+
+        var sources = cards.SelectMany(card => card.Labels).DistinctBy(label => label.Id).ToList();
+        if (sources.Count == 0)
+        {
+            return;
+        }
+
+        var matched = (await ToBoardAsync(sources, boardId)).ToDictionary(match => match.From.Id, match => match.To);
+        foreach (var card in cards)
+        {
+            var carried = card.Labels.ConvertAll(label => matched[label.Id]);
+            card.Labels.Clear();
+            card.Labels.AddRange(carried);
+        }
+    }
+
     private Label CopyOnto(Label label, Guid boardId) =>
         new()
         {

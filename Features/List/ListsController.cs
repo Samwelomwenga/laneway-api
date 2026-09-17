@@ -45,6 +45,13 @@ public class ListsController: ApiControllerBase
         return ToActionResult(response);
     }
 
+    [HttpPut("{id}/position")]
+    public async Task<ActionResult<ApiResponse<ListDto>>> MoveList(Guid id, [FromBody] MoveListDto moveListDto)
+    {
+        var response = await _listService.MoveAsync(id, moveListDto);
+        return ToActionResult(response);
+    }
+
     [HttpPut("{id}/archived")]
     public async Task<ActionResult<ApiResponse<bool>>> SetListArchived(Guid id, [FromBody] ArchivedDto archivedDto)
     {
@@ -58,6 +65,4 @@ public class ListsController: ApiControllerBase
         var response = await _listService.DeleteAsync(id);
         return ToActionResult(response);
     }
-
-
 }

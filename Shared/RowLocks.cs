@@ -14,6 +14,17 @@ public static class RowLocks
         return boards.Count > 0;
     }
 
+    public static async Task LockBoardsAsync(this ApplicationDbContext context, params Guid[] boardIds)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(boardIds);
+
+        foreach (var boardId in boardIds.Distinct().Order())
+        {
+            await context.TryLockBoardAsync(boardId);
+        }
+    }
+
     public static async Task LockListsAsync(this ApplicationDbContext context, params Guid[] listIds)
     {
         ArgumentNullException.ThrowIfNull(context);
