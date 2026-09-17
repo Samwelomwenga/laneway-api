@@ -4089,3 +4089,756 @@ Content-Type: application/json
   "name": "D1",
   "position": 65536
 }
+
+### Create the workspace the checklist checks run in.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Checklist workspace",
+  "visibility": "Private"
+}
+
+> {% client.global.set("checklistWorkspaceId", response.body.data.id); %}
+
+### Create the board the checklist checks run on.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Checklist board",
+  "workspaceId": "{{checklistWorkspaceId}}",
+  "visibility": "Private"
+}
+
+> {% client.global.set("checklistBoardId", response.body.data.id); %}
+
+### Create the list the checklist cards sit in.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Checklist list",
+  "boardId": "{{checklistBoardId}}"
+}
+
+> {% client.global.set("checklistListId", response.body.data.id); %}
+
+### Create the card the checklists go on.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Release card",
+  "listId": "{{checklistListId}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checklistCardId", response.body.data.id); %}
+
+### Create a second card, so the anchor checks have a checklist on another card to name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Other card",
+  "listId": "{{checklistListId}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checklistOtherCardId", response.body.data.id); %}
+
+### Create a checklist with a padded name and no placement. 201, the name comes back trimmed, position is 65536, isArchived is false, and checkItems is empty until check items land.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "  Release  ",
+  "cardId": "{{checklistCardId}}"
+}
+
+> {% client.global.set("checklistRelease", response.body.data.id); %}
+
+### Create a second checklist with no placement. It goes to the bottom, 65536 + 65536 = 131072.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Follow-up",
+  "cardId": "{{checklistCardId}}"
+}
+
+> {% client.global.set("checklistFollowUp", response.body.data.id); %}
+
+### Create a checklist at the top. The smallest sibling halves, so it's 32768.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Warm-up",
+  "position": "top",
+  "cardId": "{{checklistCardId}}"
+}
+
+> {% client.global.set("checklistWarmUp", response.body.data.id); %}
+
+### Create a checklist between two siblings. The midpoint of 32768 and 65536 is 49152.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Between",
+  "after": "{{checklistWarmUp}}",
+  "before": "{{checklistRelease}}",
+  "cardId": "{{checklistCardId}}"
+}
+
+> {% client.global.set("checklistBetween", response.body.data.id); %}
+
+### Create a checklist at a number the client picked. It's stored as sent.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Numbered",
+  "position": 200000,
+  "cardId": "{{checklistCardId}}"
+}
+
+> {% client.global.set("checklistNumbered", response.body.data.id); %}
+
+### Create a second checklist called Follow-up on the same card. 201, because checklist names don't have to be unique.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Follow-up",
+  "cardId": "{{checklistCardId}}"
+}
+
+> {% client.global.set("checklistSecondFollowUp", response.body.data.id); %}
+
+### Create a checklist on the other card, for the anchor checks below.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Elsewhere",
+  "cardId": "{{checklistOtherCardId}}"
+}
+
+> {% client.global.set("checklistElsewhere", response.body.data.id); %}
+
+### Create a checklist from an empty object. 400 required on name and cardId. Placement is optional.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Create a checklist with a blank name. 400 required on name, because the name is trimmed first.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "   ",
+  "cardId": "{{checklistCardId}}"
+}
+
+### Create a checklist with a name of 101 characters. 400 tooLong on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+  "cardId": "{{checklistCardId}}"
+}
+
+### Create a checklist with a padded name of 100 characters. 201, so the column takes the full limit.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "  nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn  ",
+  "cardId": "{{checklistCardId}}"
+}
+
+### Create a checklist on a card that doesn't exist. 400 notFound on cardId.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Orphan",
+  "cardId": "{{$uuid}}"
+}
+
+### Create a checklist with a position and an anchor. 400 mutuallyExclusive with a null field.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Both",
+  "position": "top",
+  "before": "{{checklistRelease}}",
+  "cardId": "{{checklistCardId}}"
+}
+
+### Create a checklist at a position name that doesn't exist. 400 unknownValue on position.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Middling",
+  "position": "middle",
+  "cardId": "{{checklistCardId}}"
+}
+
+### Create a checklist at position 0. 400 outOfRange on position.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Zeroed",
+  "position": 0,
+  "cardId": "{{checklistCardId}}"
+}
+
+### Create a checklist before an anchor that doesn't exist. 400 notFound on before.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Anchored",
+  "before": "{{$uuid}}",
+  "cardId": "{{checklistCardId}}"
+}
+
+### Create a checklist before a checklist on another card. 400 notSibling on before.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Anchored",
+  "before": "{{checklistElsewhere}}",
+  "cardId": "{{checklistCardId}}"
+}
+
+### Create a checklist that is already archived. 400 unknownField on isArchived, because a new checklist always starts unarchived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Born archived",
+  "isArchived": true,
+  "cardId": "{{checklistCardId}}"
+}
+
+### Create a checklist with no header. 400 required on X-User-Id.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+Content-Type: application/json
+
+{
+  "name": "Headerless",
+  "cardId": "{{checklistCardId}}"
+}
+
+### Read the card's checklists. 200 in position order: Warm-up, Between, Release, Follow-up, Numbered, Follow-up, and the long one. Each carries an empty checkItems.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}
+
+### Read the first page of two. 200 with two checklists, totalCount 7, and totalPages 4.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&pageNumber=1&pageSize=2
+
+### Filter by a card that doesn't exist. 400 notFound on cardId.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists?cardId={{$uuid}}
+
+### Search checklists by name. 400 unknownField on searchTerm, because checklist search takes cardId and archived only.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists?searchTerm=Release
+
+### Read one checklist. 200.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistRelease}}
+
+### Read a checklist that doesn't exist. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{$uuid}}
+
+### Rename a checklist with a padded name. 200, the name comes back trimmed and updatedBy becomes the actor.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistRelease}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "  Release plan  "
+}
+
+### Replace a checklist with an empty object. 400 required on name, the only field it takes.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistRelease}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Rename a checklist, still sending cardId. 400 unknownField, because a checklist never changes card.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistRelease}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Release plan",
+  "cardId": "{{checklistCardId}}"
+}
+
+### Rename a checklist, still sending position. 400 unknownField, because a checklist moves through its own endpoint.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistRelease}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Release plan",
+  "position": 65536
+}
+
+### Rename a checklist, still sending isArchived. 400 unknownField, because it archives through its own endpoint.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistRelease}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Release plan",
+  "isArchived": false
+}
+
+### Read the card the renamed checklist is on. 200 with updatedAt and updatedBy still null: a checklist write stamps the checklist alone.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checklistCardId}}
+
+### Move a checklist to the top. The smallest sibling is 32768, so it halves to 16384.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "position": "top"
+}
+
+### Move it between two siblings. The midpoint of 49152 and 65536 is 57344, and updatedBy becomes the actor.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "after": "{{checklistBetween}}",
+  "before": "{{checklistRelease}}"
+}
+
+### Move it with an empty body. 200 and nothing changes, because a checklist has nowhere else to go.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Move a checklist before itself. 400 notSibling on before, because the moving checklist isn't its own sibling.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "before": "{{checklistNumbered}}"
+}
+
+### Move a checklist before one on another card. 400 notSibling on before.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "before": "{{checklistElsewhere}}"
+}
+
+### Move a checklist before an anchor that doesn't exist. 400 notFound on before.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "before": "{{$uuid}}"
+}
+
+### Move a checklist between anchors that aren't neighbours in that order. 400 notAdjacent on before.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "after": "{{checklistRelease}}",
+  "before": "{{checklistWarmUp}}"
+}
+
+### Move a checklist with a position and an anchor. 400 mutuallyExclusive with a null field.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "position": "bottom",
+  "after": "{{checklistRelease}}"
+}
+
+### Move a checklist that doesn't exist. 404.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{$uuid}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "position": "top"
+}
+
+### Archive a checklist. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistFollowUp}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Archive it again. 204, and nothing changes, so updatedAt keeps the time the first call set.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistFollowUp}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Rename the archived checklist. 409 archived with a null field, "This checklist is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistFollowUp}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed while archived"
+}
+
+### Move the archived checklist. 409 archived with a null field.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistFollowUp}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "position": "top"
+}
+
+### Move a live checklist before the archived one. 200, because an archived checklist is still an anchor. The midpoint of 65536 and 131072 is 98304.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistSecondFollowUp}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "before": "{{checklistFollowUp}}"
+}
+
+### Read the card's checklists with the default filter. 200, and the archived Follow-up is gone.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}
+
+### Read only the archived ones. 200 with the one archived checklist.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&archived=only
+
+### Read every checklist on the card. 200 with all seven.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&archived=include
+
+### Filter by an archived value that doesn't exist. 400 unknownValue on archived, and the message lists Exclude, Only, and Include.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&archived=nope
+
+### Restore the checklist. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistFollowUp}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Archive a checklist with an empty body. 400 required on value.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistFollowUp}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Archive a checklist with value as a string. 400 invalidFormat on value.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistFollowUp}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": "true"
+}
+
+### Archive a checklist and rename it in the same call. 400 unknownField on name.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistFollowUp}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true,
+  "name": "Renamed by an archive"
+}
+
+### Create the board the ancestor checks archive.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Checklist board two",
+  "workspaceId": "{{checklistWorkspaceId}}",
+  "visibility": "Private"
+}
+
+> {% client.global.set("checklistBoardTwo", response.body.data.id); %}
+
+### Create the list the ancestor checks archive.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Checklist list two",
+  "boardId": "{{checklistBoardTwo}}"
+}
+
+> {% client.global.set("checklistListTwo", response.body.data.id); %}
+
+### Create the card the ancestor checks archive.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Ancestor card",
+  "listId": "{{checklistListTwo}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checklistCardTwo", response.body.data.id); %}
+
+### Create the checklist the ancestor checks write to.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Steps",
+  "cardId": "{{checklistCardTwo}}"
+}
+
+> {% client.global.set("checklistSteps", response.body.data.id); %}
+
+### Archive the card. Its checklist keeps its own flag off.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Create a checklist on the archived card. 409 archived on cardId.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "More steps",
+  "cardId": "{{checklistCardTwo}}"
+}
+
+### Rename the checklist on the archived card. 409 archived with a null field, "The card this checklist is on is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistSteps}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Steps renamed"
+}
+
+### Archive the checklist on the archived card. 409 archived, because an archived ancestor blocks the archive endpoint too. Restore the card first.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistSteps}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Delete the checklist on the archived card. 409 archived, not notArchived, because the ancestor check runs first.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistSteps}}
+X-User-Id: {{actorId}}
+
+### Read the archived card's checklists. 200 with empty data, because exclude hides checklists on hidden cards.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists?cardId={{checklistCardTwo}}
+
+### Read them with archived=include. 200 with Steps, whose own flag is still off.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists?cardId={{checklistCardTwo}}&archived=include
+
+### Restore the card.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Archive the list the card is in.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{checklistListTwo}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Rename a checklist under the archived list. 409 archived with a null field, "The list this checklist is on is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistSteps}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Steps renamed"
+}
+
+### Restore the list.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{checklistListTwo}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Archive the board the card is on.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{checklistBoardTwo}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Rename a checklist under the archived board. 409 archived with a null field, "The board this checklist is on is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistSteps}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Steps renamed"
+}
+
+### Create a checklist on a card whose board is archived. 409 archived on cardId, naming the board.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "More steps",
+  "cardId": "{{checklistCardTwo}}"
+}
+
+### Restore the board.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{checklistBoardTwo}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Delete a checklist whose own flag is off. 409 notArchived with a null field.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistBetween}}
+X-User-Id: {{actorId}}
+
+### Archive it.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistBetween}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Delete the archived checklist. 204.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistBetween}}
+X-User-Id: {{actorId}}
+
+### Read the deleted checklist. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistBetween}}
+
+### Delete it again. 404.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistBetween}}
+X-User-Id: {{actorId}}
+
+### Delete a checklist with no header. 400 required on X-User-Id.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistSteps}}
+
+### Create the card the cascade check deletes.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Cascade card",
+  "listId": "{{checklistListId}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checklistCascadeCard", response.body.data.id); %}
+
+### Create the checklist the card takes with it.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Goes with the card",
+  "cardId": "{{checklistCascadeCard}}"
+}
+
+> {% client.global.set("checklistCascade", response.body.data.id); %}
+
+### Archive the card, so it can be deleted.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checklistCascadeCard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Delete the card. 204, and its live checklist goes with it.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checklistCascadeCard}}
+X-User-Id: {{actorId}}
+
+### Read the checklist the deleted card held. 404, so the foreign key cascaded.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistCascade}}

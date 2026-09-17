@@ -31,6 +31,7 @@ builder.Services.AddScoped<ArchiveGuard>();
 builder.Services.AddScoped<LabelMatching>();
 builder.Services.AddScoped<IBoardService, BoardService>();
 builder.Services.AddScoped<ICardService, CardService>();
+builder.Services.AddScoped<IChecklistService, ChecklistService>();
 builder.Services.AddScoped<ILabelService, LabelService>();
 builder.Services.AddScoped<IListService, ListService>();
 builder.Services.AddScoped<IWorkSpaceService, WorkSpaceService>();

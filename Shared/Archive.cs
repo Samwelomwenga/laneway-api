@@ -70,6 +70,16 @@ public static class ArchiveView
                 && context.Boards.Any(board => board.Id == list.BoardId && !board.IsArchived)));
     }
 
+    public static IQueryable<Checklist> Checklists(
+        IQueryable<Checklist> checklists, ArchiveFilter filter, ApplicationDbContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return Apply(checklists, filter, checklist => !checklist.IsArchived
+            && context.Cards.Any(card => card.Id == checklist.CardId && !card.IsArchived
+                && context.Lists.Any(list => list.Id == card.ListId && !list.IsArchived
+                    && context.Boards.Any(board => board.Id == list.BoardId && !board.IsArchived))));
+    }
+
     private static IQueryable<TEntity> Apply<TEntity>(
         IQueryable<TEntity> items, ArchiveFilter filter, Expression<Func<TEntity, bool>> visible)
         where TEntity : IArchivable =>
@@ -86,6 +96,7 @@ public enum TreeItem
     Board,
     List,
     Card,
+    Checklist,
     Label
 }
 
@@ -96,6 +107,21 @@ public sealed class ArchiveGuard
     public ArchiveGuard(ApplicationDbContext context)
     {
         _context = context;
+    }
+
+    public async Task<TreeItem?> OnChecklistAsync(Guid checklistId)
+    {
+        var checklist = await _context.Checklists
+            .Where(c => c.Id == checklistId)
+            .Select(c => new { c.IsArchived, c.CardId })
+            .FirstOrDefaultAsync();
+
+        if (checklist is null)
+        {
+            return null;
+        }
+
+        return checklist.IsArchived ? TreeItem.Checklist : await OnCardAsync(checklist.CardId);
     }
 
     public async Task<TreeItem?> OnCardAsync(Guid cardId)
@@ -162,6 +188,7 @@ public static class ArchiveErrors
             TreeItem.Board => "board",
             TreeItem.List => "list",
             TreeItem.Card => "card",
+            TreeItem.Checklist => "checklist",
             _ => "label"
         };
 }

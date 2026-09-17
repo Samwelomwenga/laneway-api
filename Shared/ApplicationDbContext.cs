@@ -14,6 +14,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<List> Lists { get; set; }
     public DbSet<Card> Cards { get; set; }
     public DbSet<Label> Labels { get; set; }
+    public DbSet<Checklist> Checklists { get; set; }
+    public DbSet<CheckItem> CheckItems { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Account> Accounts { get; set; }
 
@@ -137,6 +139,26 @@ public class ApplicationDbContext : DbContext
             entity.HasMany(c => c.Labels)
                 .WithMany(l => l.Cards)
                 .UsingEntity(j => j.ToTable("CardLabels"));
+            ActorKeys(entity);
+        });
+
+        modelBuilder.Entity<Checklist>(entity =>
+        {
+            entity.Property(c => c.Name).HasColumnType($"varchar({FieldLimits.ChecklistName})");
+            entity.HasOne<Card>()
+                .WithMany()
+                .HasForeignKey(c => c.CardId)
+                .OnDelete(DeleteBehavior.Cascade);
+            ActorKeys(entity);
+        });
+
+        modelBuilder.Entity<CheckItem>(entity =>
+        {
+            entity.Property(i => i.Name).HasColumnType($"varchar({FieldLimits.CheckItemName})");
+            entity.HasOne<Checklist>()
+                .WithMany(c => c.CheckItems)
+                .HasForeignKey(i => i.ChecklistId)
+                .OnDelete(DeleteBehavior.Cascade);
             ActorKeys(entity);
         });
 
