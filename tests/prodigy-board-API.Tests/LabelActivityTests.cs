@@ -89,6 +89,7 @@ public class LabelActivityTests : ApiTests
         var card = await CreateCardAsync(list.Id, "Write the brief");
         var label = await CreateLabelAsync(board.Id, "Urgent", Color.Red);
         await AddLabelAsync(card.Id, label.Id);
+        var onCardBefore = (await ActivityAsync($"cardId={card.Id}")).TotalCount;
 
         using var response = await DeleteAsync($"/api/v1/labels/{label.Id}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -102,7 +103,7 @@ public class LabelActivityTests : ApiTests
         Assert.Equal("Urgent", entry.Data.Text("label.name"));
 
         var onCard = await ActivityAsync($"cardId={card.Id}");
-        Assert.Equal(0, onCard.TotalCount);
+        Assert.Equal(onCardBefore, onCard.TotalCount);
     }
 
     [Fact]

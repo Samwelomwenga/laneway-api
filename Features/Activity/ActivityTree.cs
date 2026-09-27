@@ -10,6 +10,12 @@ public sealed record BoardChain(WorkspaceRef Workspace, BoardRef Board)
         new(WorkspaceId: Workspace.Id, BoardId: Board.Id, ListId: listId);
 }
 
+public sealed record ListChain(WorkspaceRef Workspace, BoardRef Board, ListRef List)
+{
+    public ActivityPlace PlaceOn(Guid cardId) =>
+        new(WorkspaceId: Workspace.Id, BoardId: Board.Id, ListId: List.Id, CardId: cardId);
+}
+
 public sealed class ActivityTree
 {
     private readonly ApplicationDbContext _context;
@@ -39,5 +45,23 @@ public sealed class ActivityTree
                 (board, workspace) => new BoardChain(
                     new WorkspaceRef(workspace.Id, workspace.Name),
                     new BoardRef(board.Id, board.Name)))
+            .FirstAsync();
+
+    public async Task<ListChain> ListAsync(Guid listId) =>
+        await _context.Lists
+            .Where(list => list.Id == listId)
+            .Join(
+                _context.Boards,
+                list => list.BoardId,
+                board => board.Id,
+                (list, board) => new { list, board })
+            .Join(
+                _context.WorkSpaces,
+                pair => pair.board.WorkspaceId,
+                workspace => workspace.Id,
+                (pair, workspace) => new ListChain(
+                    new WorkspaceRef(workspace.Id, workspace.Name),
+                    new BoardRef(pair.board.Id, pair.board.Name),
+                    new ListRef(pair.list.Id, pair.list.Name, pair.list.Color)))
             .FirstAsync();
 }

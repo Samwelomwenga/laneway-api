@@ -161,16 +161,62 @@ public abstract class ApiTests : IAsyncLifetime
         return (await response.ReadEnvelope<ListDto>()).Data!;
     }
 
-    protected async Task<CardDto> CreateCardAsync(Guid listId, string title)
+    protected async Task<CardDto> CreateCardAsync(
+        Guid listId,
+        string title,
+        DateTime? dueDate = null,
+        object? position = null,
+        IEnumerable<Guid>? labelIds = null)
     {
-        using var response = await PostAsync("/api/v1/cards", new { title, listId, isDueComplete = false });
+        using var response = await PostAsync("/api/v1/cards", new
+        {
+            title,
+            listId,
+            dueDate,
+            position,
+            labelIds,
+            isDueComplete = false
+        });
+
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.ReadEnvelope<CardDto>()).Data!;
+    }
+
+    protected Task<HttpResponseMessage> UpdateCardAsync(
+        Guid id,
+        string title,
+        string? description = null,
+        DateTime? dueDate = null,
+        IEnumerable<Guid>? labelIds = null) =>
+        PutAsync($"/api/v1/cards/{id}", new
+        {
+            title,
+            description,
+            dueDate,
+            labelIds,
+            isDueComplete = false
+        });
+
+    protected Task<HttpResponseMessage> MoveCardAsync(
+        Guid id, Guid listId, object? position = null, Guid? before = null, Guid? after = null) =>
+        PutAsync($"/api/v1/cards/{id}/position", new { listId, position, before, after });
+
+    protected async Task<CardDto> ReadCardAsync(Guid id)
+    {
+        using var response = await GetAsync($"/api/v1/cards/{id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.ReadEnvelope<CardDto>()).Data!;
     }
 
     protected async Task AddLabelAsync(Guid cardId, Guid labelId)
     {
         using var response = await PostAsync($"/api/v1/cards/{cardId}/labels/{labelId}", new { });
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    protected async Task RemoveLabelAsync(Guid cardId, Guid labelId)
+    {
+        using var response = await DeleteAsync($"/api/v1/cards/{cardId}/labels/{labelId}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
@@ -195,6 +241,9 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected Task SetListArchivedAsync(Guid id, bool value) =>
         SetArchivedAsync($"/api/v1/lists/{id}/archived", value);
+
+    protected Task SetCardArchivedAsync(Guid id, bool value) =>
+        SetArchivedAsync($"/api/v1/cards/{id}/archived", value);
 
     private async Task SetArchivedAsync(string path, bool value)
     {

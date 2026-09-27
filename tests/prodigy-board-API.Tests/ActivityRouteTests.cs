@@ -133,13 +133,13 @@ public class ActivityRouteTests : ApiTests
     }
 
     [Fact]
-    public async Task An_id_filter_that_names_a_live_row_with_no_entries_returns_an_empty_page()
+    public async Task An_id_filter_that_names_a_live_row_with_no_matching_entries_returns_an_empty_page()
     {
         var board = await CreateBoardAsync((await CreateWorkspaceAsync("Design")).Id, "Sprint 1");
         var list = await CreateListAsync(board.Id, "Doing");
         var card = await CreateCardAsync(list.Id, "Write the brief");
 
-        var page = await ActivityAsync($"cardId={card.Id}");
+        var page = await ActivityAsync($"cardId={card.Id}&type=updateCard");
 
         Assert.Empty(page.Entries);
         Assert.Equal(0, page.TotalCount);

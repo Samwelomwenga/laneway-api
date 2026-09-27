@@ -104,6 +104,74 @@ public sealed record ListFields(Was<string>? Name, Was<Color?>? Color)
         tracked.Old(list => list.Color));
 }
 
+public sealed record CardRef(Guid Id, string Title)
+{
+    public static CardRef Of(Card card)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        return new CardRef(card.Id, card.Title);
+    }
+}
+
+public sealed record CreateCardData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    IReadOnlyList<LabelRef>? Labels);
+
+public sealed record UpdateCardData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    IReadOnlyList<LabelRef>? Labels,
+    CardFields Old);
+
+public sealed record ArchiveCardData(
+    ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, ListRef List, CardRef Card);
+
+public sealed record MoveCardData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    PositionChange Position,
+    CardOrigin? From,
+    IReadOnlyList<LabelSwap>? LabelSwaps);
+
+public sealed record DeleteCardData(
+    ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, ListRef List, CardRef Card);
+
+public sealed record CardLabelData(
+    ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, ListRef List, CardRef Card, LabelRef Label);
+
+public sealed record CardOrigin(WorkspaceRef? Workspace, BoardRef? Board, ListRef List);
+
+public sealed record LabelSwap(LabelRef From, LabelRef To, bool Created);
+
+public sealed record CardFields(
+    Was<string>? Title,
+    Was<string>? Description,
+    Was<DateTime?>? DueDate,
+    Was<bool>? IsDueComplete,
+    Was<DateTime?>? StartDate,
+    Was<int?>? DueReminderMinutes,
+    Was<IReadOnlyList<LabelRef>>? Labels)
+{
+    public static CardFields Changed(EntityEntry<Card> tracked, IReadOnlyList<LabelRef>? oldLabels) => new(
+        tracked.Old(card => card.Title),
+        tracked.Old(card => card.Description),
+        tracked.Old(card => card.DueDate),
+        tracked.Old(card => card.IsDueComplete),
+        tracked.Old(card => card.StartDate),
+        tracked.Old(card => card.DueReminderMinutes),
+        oldLabels is null ? null : new Was<IReadOnlyList<LabelRef>>(oldLabels));
+}
+
 public sealed record CreateLabelData(ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, LabelRef Label);
 
 public sealed record UpdateLabelData(

@@ -26,6 +26,8 @@ public class CardService: ICardService
     private readonly LabelMatching _labelMatching;
     private readonly CardCompletion _completion;
     private readonly AttachmentCounts _attachments;
+    private readonly ActivityWriter _activity;
+    private readonly ActivityTree _tree;
 
     public CardService(
         ApplicationDbContext context,
@@ -34,7 +36,9 @@ public class CardService: ICardService
         ArchiveGuard archive,
         LabelMatching labelMatching,
         CardCompletion completion,
-        AttachmentCounts attachments)
+        AttachmentCounts attachments,
+        ActivityWriter activity,
+        ActivityTree tree)
     {
         _context = context;
         _actor = actor;
@@ -43,6 +47,8 @@ public class CardService: ICardService
         _labelMatching = labelMatching;
         _completion = completion;
         _attachments = attachments;
+        _activity = activity;
+        _tree = tree;
     }
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
@@ -73,6 +79,17 @@ public class CardService: ICardService
         card.Labels.AddRange(labels);
 
         _context.Cards.Add(card);
+        var chain = await _tree.ListAsync(listId);
+        await _activity.AddAsync(
+            ActivityType.CreateCard,
+            chain.PlaceOn(card.Id),
+            actor => new CreateCardData(
+                actor,
+                chain.Workspace,
+                chain.Board,
+                chain.List,
+                CardRef.Of(card),
+                labels.Count > 0 ? LabelRefs(labels) : null));
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
@@ -110,9 +127,28 @@ public class CardService: ICardService
         card.DueReminderMinutes = updateCardDto.DueReminderMinutes;
 
         var labelsChanged = !card.Labels.Select(label => label.Id).ToHashSet().SetEquals(labels.Select(label => label.Id));
+        var oldLabels = labelsChanged ? LabelRefs(card.Labels) : null;
         card.Labels.Clear();
         card.Labels.AddRange(labels);
         _context.StampChange(card, _actor, relatedChanged: labelsChanged);
+
+        var tracked = _context.Entry(card);
+        if (tracked.Changed())
+        {
+            var old = CardFields.Changed(tracked, oldLabels);
+            var chain = await _tree.ListAsync(card.ListId);
+            await _activity.AddAsync(
+                ActivityType.UpdateCard,
+                chain.PlaceOn(card.Id),
+                actor => new UpdateCardData(
+                    actor,
+                    chain.Workspace,
+                    chain.Board,
+                    chain.List,
+                    CardRef.Of(card),
+                    labelsChanged ? LabelRefs(labels) : null,
+                    old));
+        }
 
         await _context.SaveChangesAsync();
 
@@ -189,14 +225,44 @@ public class CardService: ICardService
             return ArchiveErrors.NoCreate<CardDto>(archived, "listId", TreeItem.Card);
         }
 
+        var swaps = new List<LabelSwap>();
         if (crossesBoards)
         {
-            await _labelMatching.CarryToBoardAsync([card], boardId);
+            var matches = await _labelMatching.CarryToBoardAsync([card], boardId);
+            swaps.AddRange(matches.ConvertAll(match =>
+                new LabelSwap(LabelRef.Of(match.From), LabelRef.Of(match.To), match.Created)));
         }
 
+        var leaving = card.ListId;
+        var wasAt = card.Position;
         card.ListId = listId;
         card.Position = placed.Position;
         _context.StampChange(card, _actor);
+
+        if (_context.Entry(card).Changed())
+        {
+            var to = await _tree.ListAsync(listId);
+            var origin = leaving == listId ? null : await OriginAsync(leaving, to);
+            await _activity.AddAsync(
+                ActivityType.MoveCard,
+                new ActivityPlace(
+                    WorkspaceId: to.Workspace.Id,
+                    BoardId: to.Board.Id,
+                    ListId: to.List.Id,
+                    CardId: card.Id,
+                    FromWorkspaceId: origin?.Workspace?.Id,
+                    FromBoardId: origin?.Board?.Id,
+                    FromListId: origin?.List.Id),
+                actor => new MoveCardData(
+                    actor,
+                    to.Workspace,
+                    to.Board,
+                    to.List,
+                    CardRef.Of(card),
+                    new PositionChange(wasAt, card.Position),
+                    origin,
+                    swaps.Count > 0 ? swaps : null));
+        }
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -335,6 +401,17 @@ public class CardService: ICardService
         }
 
         _context.StampChange(card, _actor, relatedChanged: true);
+        var chain = await _tree.ListAsync(card.ListId);
+        await _activity.AddAsync(
+            add ? ActivityType.AddLabelToCard : ActivityType.RemoveLabelFromCard,
+            chain.PlaceOn(card.Id),
+            actor => new CardLabelData(
+                actor,
+                chain.Workspace,
+                chain.Board,
+                chain.List,
+                CardRef.Of(card),
+                LabelRef.Of(label)));
         await _context.SaveChangesAsync();
 
         return ApiResponse<bool>.SuccessResponse(true, message, 204);
@@ -407,7 +484,15 @@ public class CardService: ICardService
             return ArchiveErrors.RestoreFirst<bool>(archived, TreeItem.Card);
         }
 
-        return await _context.SetArchivedAsync(card, _actor, archivedDto, "Card");
+        return await _context.SetArchivedAsync(card, _actor, archivedDto, "Card", async archived =>
+        {
+            var chain = await _tree.ListAsync(card.ListId);
+            await _activity.AddAsync(
+                archived ? ActivityType.ArchiveCard : ActivityType.RestoreCard,
+                chain.PlaceOn(card.Id),
+                actor => new ArchiveCardData(
+                    actor, chain.Workspace, chain.Board, chain.List, CardRef.Of(card)));
+        });
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
@@ -423,11 +508,28 @@ public class CardService: ICardService
             return ArchiveErrors.NotArchived<bool>(TreeItem.Card);
         }
 
+        var chain = await _tree.ListAsync(card.ListId);
         _context.Cards.Remove(card);
+        await _activity.AddAsync(
+            ActivityType.DeleteCard,
+            chain.PlaceOn(card.Id),
+            actor => new DeleteCardData(actor, chain.Workspace, chain.Board, chain.List, CardRef.Of(card)));
         await _context.SaveChangesAsync();
 
         return ApiResponse<bool>.SuccessResponse(true, "Card deleted successfully", 204);
     }
+
+    private async Task<CardOrigin> OriginAsync(Guid leftListId, ListChain to)
+    {
+        var from = await _tree.ListAsync(leftListId);
+        return new CardOrigin(
+            from.Workspace.Id == to.Workspace.Id ? null : from.Workspace,
+            from.Board.Id == to.Board.Id ? null : from.Board,
+            from.List);
+    }
+
+    private static IReadOnlyList<LabelRef> LabelRefs(List<Label> labels) => labels.ConvertAll(LabelRef.Of);
+
     private async Task<(List<Label> Labels, bool ListExists, List<ApiError> Errors)> ResolveReferencesAsync(
         Guid listId, List<Guid?>? labelIds)
     {

@@ -232,6 +232,7 @@ public class ListActivityTests : ApiTests
         await CreateLabelAsync(to.Id, "Bug", Color.Green);
         await AddLabelAsync(card.Id, carried.Id);
         await AddLabelAsync(card.Id, matched.Id);
+        var onCardBefore = (await ActivityAsync($"cardId={card.Id}")).TotalCount;
 
         using var response = await MoveListAsync(list.Id, to.Id);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -243,7 +244,7 @@ public class ListActivityTests : ApiTests
         Assert.Equal(nameof(Color.Red), created[0].Text("color"));
 
         var onCard = await ActivityAsync($"cardId={card.Id}");
-        Assert.Equal(0, onCard.TotalCount);
+        Assert.Equal(onCardBefore, onCard.TotalCount);
         var labelEntries = await ActivityAsync($"boardId={to.Id}&type=createLabel");
         Assert.Equal(1, labelEntries.TotalCount);
     }
