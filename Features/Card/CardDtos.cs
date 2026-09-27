@@ -11,7 +11,6 @@ public record CardDto
      double Position ,
      Guid ListId ,
      bool IsDueComplete ,
-     string? Cover,
      DateTime? StartDate,
      int? DueReminderMinutes ,
      bool IsArchived ,
@@ -34,7 +33,6 @@ public record CreateCardDto
     Guid? After,
     Guid? ListId,
     bool? IsDueComplete,
-    string? Cover,
     DateTime? StartDate,
     int? DueReminderMinutes,
     List<Guid?>? LabelIds
@@ -49,7 +47,6 @@ public record UpdateCardDto
     string? Description,
     DateTime? DueDate,
     bool? IsDueComplete,
-    string? Cover,
     DateTime? StartDate,
     int? DueReminderMinutes,
     List<Guid?>? LabelIds

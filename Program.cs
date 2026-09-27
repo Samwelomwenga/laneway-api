@@ -25,11 +25,17 @@ ValidatorOptions.Global.DisplayNameResolver = (_, member, _) =>
 
 builder.Services.AddOpenApi(options => options.AddSchemaTransformer<EnumSchemaTransformer>());
 
+builder.Services.Configure<AttachmentStorageOptions>(
+    builder.Configuration.GetSection(AttachmentStorageOptions.Section));
+builder.Services.AddSingleton<AttachmentStorage>();
+builder.Services.AddHostedService<PendingObjectDrainer>();
+
 builder.Services.AddScoped<Actor>();
 builder.Services.AddScoped<Placements>();
 builder.Services.AddScoped<ArchiveGuard>();
 builder.Services.AddScoped<LabelMatching>();
 builder.Services.AddScoped<CardCompletion>();
+builder.Services.AddScoped<IAttachmentService, AttachmentService>();
 builder.Services.AddScoped<IBoardService, BoardService>();
 builder.Services.AddScoped<ICardService, CardService>();
 builder.Services.AddScoped<ICheckItemService, CheckItemService>();
@@ -41,6 +47,9 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+builder.WebHost.ConfigureKestrel(options =>
+    options.Limits.MaxRequestBodySize = FieldLimits.AttachmentBytes + (1024 * 1024));
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(

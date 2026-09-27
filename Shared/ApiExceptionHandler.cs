@@ -8,6 +8,14 @@ public sealed class ApiExceptionHandler : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
+        // Kestrel compares Content-Length with its body-size limit on the first read, inside the
+        // attachment form reader, so its 413 arrives here as an exception and keeps its own shape.
+        if (exception is BadHttpRequestException { StatusCode: 413 } framework)
+        {
+            httpContext.Response.StatusCode = framework.StatusCode;
+            return true;
+        }
+
         var response = exception switch
         {
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation } } =>

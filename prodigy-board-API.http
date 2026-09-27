@@ -6048,3 +6048,861 @@ X-User-Id: {{actorId}}
 ### Read the check item the deleted checklist held. 404, so the foreign key cascaded.
 GET {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemCascade}}
 X-User-Id: {{actorId}}
+
+### Create the workspace the attachment checks hang off.
+POST {{prodigy_board_API_HostAddress}}/api/v1/workspaces
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Attachments",
+  "visibility": "Public"
+}
+
+> {% client.global.set("attachmentWorkspace", response.body.data.id); %}
+
+### Create the board.
+POST {{prodigy_board_API_HostAddress}}/api/v1/boards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Attachment board",
+  "workspaceId": "{{attachmentWorkspace}}",
+  "visibility": "Public"
+}
+
+> {% client.global.set("attachmentBoard", response.body.data.id); %}
+
+### Create the list.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Attachment list",
+  "boardId": "{{attachmentBoard}}"
+}
+
+> {% client.global.set("attachmentList", response.body.data.id); %}
+
+### Create the card every upload below goes on.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Card with files",
+  "listId": "{{attachmentList}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("attachmentCard", response.body.data.id); %}
+
+### Create a second card, for the checks that read across cards.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Other card",
+  "listId": "{{attachmentList}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("attachmentOtherCard", response.body.data.id); %}
+
+### cover is gone from card create. 400 unknownField on cover.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Covered",
+  "listId": "{{attachmentList}}",
+  "isDueComplete": false,
+  "cover": "Red"
+}
+
+### cover is gone from card PUT too. 400 unknownField on cover.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Card with files",
+  "isDueComplete": false,
+  "cover": "Red"
+}
+
+### Read the card. 200, and CardDto carries no cover field.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}
+
+### Upload a PNG with a name. 201, name "Q3 numbers", fileName "report.png", mimeType "image/png",
+### and url the /content path. The part's own Content-Type is ignored.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="name"
+
+Q3 numbers
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+Content-Type: text/html
+
+< ./http-files/report.png
+--WebAppBoundary--
+
+> {% client.global.set("attachmentFile", response.body.data.id); %}
+
+### Upload with no name. 201, and name falls back to the file name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="notes.txt"
+
+< ./http-files/notes.txt
+--WebAppBoundary--
+
+> {% client.global.set("attachmentUnnamed", response.body.data.id); %}
+
+### Upload with a blank name. 201, and blank counts as missing, so the file name wins again.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="name"
+
+   
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="rows.csv"
+
+< ./http-files/rows.csv
+--WebAppBoundary--
+
+### Upload a file name carrying a Windows path. 201, and fileName is "report.pdf" with no path.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="C:\reports\2026\report.pdf"
+
+< ./http-files/report.pdf
+--WebAppBoundary--
+
+### Upload with a name of exactly 256 characters. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="name"
+
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="readme.md"
+
+< ./http-files/readme.md
+--WebAppBoundary--
+
+### Upload with a name of 257 characters. 400 tooLong on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="name"
+
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="readme.md"
+
+< ./http-files/readme.md
+--WebAppBoundary--
+
+### Upload a file name of 257 characters. 400 tooLong on file.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.png"
+
+< ./http-files/report.png
+--WebAppBoundary--
+
+### Send the file part before the name part. 400 invalidFormat on file, because file comes last.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+
+< ./http-files/report.png
+--WebAppBoundary
+Content-Disposition: form-data; name="name"
+
+Too late
+--WebAppBoundary--
+
+### Send two file parts. 400 invalidFormat on file.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+
+< ./http-files/report.png
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="notes.txt"
+
+< ./http-files/notes.txt
+--WebAppBoundary--
+
+### Send url in the form. 400 unknownField on url, so a form can't make a link.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="url"
+
+https://example.com/page
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+
+< ./http-files/report.png
+--WebAppBoundary--
+
+### Send kind in the form. 400 unknownField on kind, because the server sets it.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="kind"
+
+Link
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+
+< ./http-files/report.png
+--WebAppBoundary--
+
+### Send name twice. 400 invalidFormat on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="name"
+
+First
+--WebAppBoundary
+Content-Disposition: form-data; name="name"
+
+Second
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+
+< ./http-files/report.png
+--WebAppBoundary--
+
+### Send no file part. 400 required on file.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="name"
+
+Nothing to hold it
+--WebAppBoundary--
+
+### Send an empty file. 400 required on file.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="empty.png"
+
+< ./http-files/empty.png
+--WebAppBoundary--
+
+### Send a body that isn't a multipart form. 415, the framework's answer to a wrong content type.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/page"
+}
+
+### Upload with no header. 400 required on X-User-Id, before the body is read.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+
+< ./http-files/report.png
+--WebAppBoundary--
+
+### Upload to an unknown card. 404.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/11111111-1111-1111-1111-111111111111/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+
+< ./http-files/report.png
+--WebAppBoundary--
+
+### A file over 10 MB is 413 tooLarge on file, and it returns on its own. The file isn't in the repo:
+### make it with `head -c 10485761 /dev/zero | tr '\0' a > http-files/over-10-mb.txt`. A request far
+### larger than that, over Kestrel's own body limit, gets Kestrel's empty 413 instead.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="nope"
+
+Dropped, because tooLarge returns alone
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="over-10-mb.txt"
+
+< ./http-files/over-10-mb.txt
+--WebAppBoundary--
+
+### Upload an extension off the allowlist. 400 typeNotAllowed on file, with the list in the message.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="run.exe"
+
+< ./http-files/run.exe
+--WebAppBoundary--
+
+### Upload an SVG. 400 typeNotAllowed, because SVG can carry script.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="logo.svg"
+
+< ./http-files/logo.svg
+--WebAppBoundary--
+
+### Upload HTML named .png. 400 typeNotAllowed, because the bytes have to match the extension.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="fake.png"
+
+< ./http-files/fake.png
+--WebAppBoundary--
+
+### Upload text holding a NUL byte as .txt. 400 typeNotAllowed.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="bad.txt"
+
+< ./http-files/bad.txt
+--WebAppBoundary--
+
+### A type failure comes back with the other body errors. 400 with tooLong on name, unknownField on
+### nope, and typeNotAllowed on file, all three in one envelope.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="name"
+
+yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+--WebAppBoundary
+Content-Disposition: form-data; name="nope"
+
+1
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="run.exe"
+
+< ./http-files/run.exe
+--WebAppBoundary--
+
+### Upload a JPEG with the extension in capitals. 201, mimeType "image/jpeg", matched ignoring case.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="PHOTO.JPG"
+
+< ./http-files/photo.jpg
+--WebAppBoundary--
+
+### Upload a GIF. 201, mimeType "image/gif".
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="anim.gif"
+
+< ./http-files/anim.gif
+--WebAppBoundary--
+
+### Upload a WebP. 201, mimeType "image/webp", matched on RIFF plus WEBP.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="shot.webp"
+
+< ./http-files/shot.webp
+--WebAppBoundary--
+
+### Upload an XLSX. 201, mimeType the spreadsheetml one, matched on the zip header.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="sheet.xlsx"
+
+< ./http-files/sheet.xlsx
+--WebAppBoundary--
+
+### Upload a zip. 201, mimeType "application/zip".
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="bundle.zip"
+
+< ./http-files/bundle.zip
+--WebAppBoundary--
+
+### Upload an old-format .doc. 201, mimeType "application/msword", matched on the OLE header.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="old.doc"
+
+< ./http-files/old.doc
+--WebAppBoundary--
+
+### Read the card's attachments. 200, newest first, with no paging fields and no filters.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+
+### Read the attachments of an unknown card. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/11111111-1111-1111-1111-111111111111/attachments
+
+### Read the other card's attachments. 200 with an empty list, because it holds none.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments
+
+### Read one attachment. 200.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+
+### Read an unknown attachment. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/11111111-1111-1111-1111-111111111111
+
+### Read the attachment through the wrong card. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentFile}}
+
+### Read the attachment through an unknown card. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/11111111-1111-1111-1111-111111111111/attachments/{{attachmentFile}}
+
+### Rename it. 200, name "Q3 report", and fileName still "report.png" so the download keeps its name.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Q3 report"
+}
+
+### Read the card again. 200, and its updatedAt is unchanged, because a rename never stamps the card.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}
+
+### Rename with no name. 400 required on name.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+}
+
+### Rename with a blank name. 400 required on name.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "   "
+}
+
+### Rename with 257 characters. 400 tooLong on name.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+}
+
+### Rename with url. 400 unknownField on url, because a link's URL never changes.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Q3 report",
+  "url": "https://example.com/page"
+}
+
+### Rename with kind. 400 unknownField on kind.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Q3 report",
+  "kind": "Link"
+}
+
+### Rename with fileName. 400 unknownField on fileName.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Q3 report",
+  "fileName": "other.png"
+}
+
+### Rename with file. 400 unknownField on file, because PUT carries no bytes.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Q3 report",
+  "file": "report.png"
+}
+
+### Rename with no header. 400 required on X-User-Id.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+Content-Type: application/json
+
+{
+  "name": "Q3 report"
+}
+
+### Rename an unknown attachment. 404.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/11111111-1111-1111-1111-111111111111
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Q3 report"
+}
+
+### Rename through the wrong card. 404.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentFile}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Q3 report"
+}
+
+### Download it. 302 to a signed URL that lasts 300 seconds, with Cache-Control: no-store. Following
+### it downloads report.png with Content-Disposition: attachment and its original file name.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}/content
+
+### Download an unknown attachment. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/11111111-1111-1111-1111-111111111111/content
+
+### Download through the wrong card. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentFile}}/content
+
+### Create the card the archive checks use.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Archived card",
+  "listId": "{{attachmentList}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("attachmentArchivedCard", response.body.data.id); %}
+
+### Put a file on it while it's live. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="notes.txt"
+
+< ./http-files/notes.txt
+--WebAppBoundary--
+
+> {% client.global.set("attachmentOnArchived", response.body.data.id); %}
+
+### Archive the card. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Upload to the archived card. 409 archived with a null field.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+
+< ./http-files/report.png
+--WebAppBoundary--
+
+### Rename on the archived card. 409 archived.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments/{{attachmentOnArchived}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed while archived"
+}
+
+### Delete on the archived card. 409 archived.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments/{{attachmentOnArchived}}
+X-User-Id: {{actorId}}
+
+### Read the archived card's attachments. 200, because reads don't care about the archive.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments
+
+### Download from the archived card. 302, because a download is a read.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments/{{attachmentOnArchived}}/content
+
+### Restore the card. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Create a list to archive, so an upload under an archived parent can be checked.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Archived list",
+  "boardId": "{{attachmentBoard}}"
+}
+
+> {% client.global.set("attachmentArchivedList", response.body.data.id); %}
+
+### Create a live card on it.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Under an archived list",
+  "listId": "{{attachmentArchivedList}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("attachmentHiddenCard", response.body.data.id); %}
+
+### Archive the list. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{attachmentArchivedList}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Upload to the live card under the archived list. 409 archived, and the message names the list.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentHiddenCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+
+< ./http-files/report.png
+--WebAppBoundary--
+
+### Restore the list. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{attachmentArchivedList}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Archive the board instead. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{attachmentBoard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Upload under the archived board. 409 archived, and the message names the board.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentHiddenCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+
+< ./http-files/report.png
+--WebAppBoundary--
+
+### Restore the board. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{attachmentBoard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Create the card the delete checks use.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Delete card",
+  "listId": "{{attachmentList}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("attachmentDeleteCard", response.body.data.id); %}
+
+### Put a file on it. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="rows.csv"
+
+< ./http-files/rows.csv
+--WebAppBoundary--
+
+> {% client.global.set("attachmentDoomed", response.body.data.id); %}
+
+### Delete it with no header. 400 required on X-User-Id.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}
+
+### Delete an unknown attachment. 404.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/11111111-1111-1111-1111-111111111111
+X-User-Id: {{actorId}}
+
+### Delete through the wrong card. 404.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentDoomed}}
+X-User-Id: {{actorId}}
+
+### Delete it. 204, with no archive step, because attachments have no archive. The trigger queues the
+### object key, and the drainer removes the object from the bucket within a minute.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}
+X-User-Id: {{actorId}}
+
+### Read the deleted attachment. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}
+
+### Download the deleted attachment. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}/content
+
+### Delete it again. 404.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}
+X-User-Id: {{actorId}}
+
+### Create the card whose delete has to take its files with it.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Cascade card",
+  "listId": "{{attachmentList}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("attachmentCascadeCard", response.body.data.id); %}
+
+### Put a file on it. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCascadeCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="readme.md"
+
+< ./http-files/readme.md
+--WebAppBoundary--
+
+> {% client.global.set("attachmentCascade", response.body.data.id); %}
+
+### Archive the card, so it can be deleted. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCascadeCard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Delete the card. 204, and the foreign key cascades to its attachments, whose rows fire the
+### trigger, so the objects go too.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCascadeCard}}
+X-User-Id: {{actorId}}
+
+### Read the attachment the deleted card held. 404, because the cascade took its row.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCascadeCard}}/attachments/{{attachmentCascade}}
+
+### A card holds at most 100 attachments. The 101st is 409 limitReached with a null field, counted
+### before any bytes go to storage. Filling a card by hand takes 100 uploads, so the assertion pass
+### covers it and this line records the rule.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments

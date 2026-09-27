@@ -16,6 +16,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Label> Labels { get; set; }
     public DbSet<Checklist> Checklists { get; set; }
     public DbSet<CheckItem> CheckItems { get; set; }
+    public DbSet<Attachment> Attachments { get; set; }
+    public DbSet<PendingObjectDelete> PendingObjectDeletes { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Account> Accounts { get; set; }
 
@@ -139,7 +141,34 @@ public class ApplicationDbContext : DbContext
             entity.HasMany(c => c.Labels)
                 .WithMany(l => l.Cards)
                 .UsingEntity(j => j.ToTable("CardLabels"));
+            entity.HasOne<Attachment>()
+                .WithMany()
+                .HasForeignKey(c => c.CoverAttachmentId)
+                .OnDelete(DeleteBehavior.SetNull);
             ActorKeys(entity);
+        });
+
+        modelBuilder.Entity<Attachment>(entity =>
+        {
+            entity.Property(a => a.Name).HasColumnType($"varchar({FieldLimits.AttachmentName})");
+            entity.Property(a => a.Url).HasColumnType($"varchar({FieldLimits.AttachmentUrl})");
+            entity.Property(a => a.FileName).HasColumnType($"varchar({FieldLimits.AttachmentFileName})");
+            entity.Property(a => a.MimeType).HasColumnType($"varchar({FieldLimits.AttachmentMimeType})");
+            entity.Property(a => a.ObjectKey).HasColumnType($"varchar({FieldLimits.AttachmentObjectKey})");
+            entity.HasOne<Card>()
+                .WithMany()
+                .HasForeignKey(a => a.CardId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.ToTable(table => table.HasCheckConstraint("CK_Attachments_Kind", KindHoldsItsColumns));
+            ActorKeys(entity);
+        });
+
+        modelBuilder.Entity<PendingObjectDelete>(entity =>
+        {
+            entity.HasKey(p => p.ObjectKey);
+            entity.Property(p => p.ObjectKey).HasColumnType($"varchar({FieldLimits.AttachmentObjectKey})");
+            entity.Property(p => p.NotBefore).HasColumnType("timestamp with time zone");
+            entity.HasIndex(p => p.NotBefore);
         });
 
         modelBuilder.Entity<Checklist>(entity =>
@@ -172,6 +201,17 @@ public class ApplicationDbContext : DbContext
             ActorKeys(entity);
         });
     }
+
+    private const string KindHoldsItsColumns = """
+        ("Kind" = 'File'
+            AND "Url" IS NULL
+            AND "FileName" IS NOT NULL AND "MimeType" IS NOT NULL
+            AND "Bytes" IS NOT NULL AND "ObjectKey" IS NOT NULL)
+        OR ("Kind" = 'Link'
+            AND "Url" IS NOT NULL
+            AND "FileName" IS NULL AND "MimeType" IS NULL
+            AND "Bytes" IS NULL AND "ObjectKey" IS NULL)
+        """;
 
     private static void ActorKeys<TEntity>(EntityTypeBuilder<TEntity> entity) where TEntity : BaseEntity
     {

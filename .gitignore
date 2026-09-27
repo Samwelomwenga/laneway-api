@@ -67,3 +67,5 @@ managed_context/
 qodana.yaml
 
 test_suite_analysis/
+
+http-files/over-10-mb.txt

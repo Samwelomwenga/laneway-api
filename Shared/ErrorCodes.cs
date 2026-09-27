@@ -21,4 +21,6 @@ public static class ErrorCodes
     public const string NotArchived = "notArchived";
     public const string NotEmpty = "notEmpty";
     public const string LimitReached = "limitReached";
+    public const string TypeNotAllowed = "typeNotAllowed";
+    public const string TooLarge = "tooLarge";
 }

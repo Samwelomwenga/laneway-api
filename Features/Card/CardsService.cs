@@ -102,7 +102,6 @@ public class CardService: ICardService
         card.Description = updateCardDto.Description ?? string.Empty;
         card.DueDate = updateCardDto.DueDate;
         card.IsDueComplete = updateCardDto.IsDueComplete!.Value;
-        card.Cover = updateCardDto.Cover;
         card.StartDate = updateCardDto.StartDate;
         card.DueReminderMinutes = updateCardDto.DueReminderMinutes;
 
@@ -419,7 +418,6 @@ public class CardService: ICardService
             card.Position,
             card.ListId,
             tally.IsComplete(card),
-            card.Cover,
             card.StartDate,
             card.DueReminderMinutes,
             card.IsArchived,
@@ -443,7 +441,6 @@ public class CardService: ICardService
             Position = position,
             ListId = createCardDto.ListId!.Value,
             IsDueComplete = createCardDto.IsDueComplete!.Value,
-            Cover = createCardDto.Cover,
             StartDate = createCardDto.StartDate,
             DueReminderMinutes = createCardDto.DueReminderMinutes,
             CreatedAt = DateTime.UtcNow,
