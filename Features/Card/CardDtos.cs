@@ -17,10 +17,25 @@ public record CardDto
      List<Guid> LabelIds,
      int CheckItemCount,
      int CheckedItemCount,
+     int AttachmentCount,
+     CardCoverDto? Cover,
       DateTime CreatedAt ,
      DateTime? UpdatedAt ,
      Guid CreatedBy ,
      Guid? UpdatedBy
+);
+
+public record CardCoverDto
+(
+    Guid? AttachmentId,
+    Color? Color,
+    string? Url
+);
+
+public record CoverDto
+(
+    Guid? AttachmentId,
+    Color? Color
 );
 
 public record CreateCardDto

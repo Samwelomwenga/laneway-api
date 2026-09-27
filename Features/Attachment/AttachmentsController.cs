@@ -62,6 +62,21 @@ public class AttachmentsController : ApiControllerBase
         return CreatedAtAction(nameof(GetAttachment), new { cardId, id = response.Data!.Id }, response);
     }
 
+    [HttpPost]
+    [Consumes("application/json")]
+    [RequiresContentType]
+    public async Task<ActionResult<ApiResponse<AttachmentDto>>> CreateLinkAttachment(
+        Guid cardId, [FromBody] CreateLinkAttachmentDto createLinkAttachmentDto)
+    {
+        var response = await _attachmentService.CreateLinkAsync(cardId, createLinkAttachmentDto);
+        if (!response.Success)
+        {
+            return ToActionResult(response);
+        }
+
+        return CreatedAtAction(nameof(GetAttachment), new { cardId, id = response.Data!.Id }, response);
+    }
+
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<AttachmentDto>>> UpdateAttachment(
         Guid cardId, Guid id, [FromBody] UpdateAttachmentDto updateAttachmentDto)

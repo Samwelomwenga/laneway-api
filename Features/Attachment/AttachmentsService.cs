@@ -5,6 +5,7 @@ namespace DefaultNamespace;
 public interface IAttachmentService
 {
     Task<ApiResponse<AttachmentDto>> CreateFileAsync(Guid cardId, AttachmentUpload upload, CancellationToken token);
+    Task<ApiResponse<AttachmentDto>> CreateLinkAsync(Guid cardId, CreateLinkAttachmentDto createLinkAttachmentDto);
     Task<ApiResponse<AttachmentDto>> UpdateAsync(Guid cardId, Guid id, UpdateAttachmentDto updateAttachmentDto);
     Task<ApiResponse<bool>> DeleteAsync(Guid cardId, Guid id);
     Task<ApiResponse<AttachmentDto>> GetByIdAsync(Guid cardId, Guid id);
@@ -48,7 +49,7 @@ public class AttachmentService : IAttachmentService
             return CardNotFound<AttachmentDto>();
         }
 
-        if (await RefusesFileAsync(cardId) is { } refused)
+        if (await RefusesAsync(cardId) is { } refused)
         {
             return refused;
         }
@@ -92,12 +93,12 @@ public class AttachmentService : IAttachmentService
             return CardNotFound<AttachmentDto>();
         }
 
-        if (await RefusesFileAsync(cardId) is { } refused)
+        if (await RefusesAsync(cardId) is { } refused)
         {
             return refused;
         }
 
-        var attachment = MapToEntity(cardId, attachmentId, objectKey, upload);
+        var attachment = MapFileToEntity(cardId, attachmentId, objectKey, upload);
         _context.Attachments.Add(attachment);
         _context.PendingObjectDeletes.Remove(pending);
 
@@ -105,7 +106,34 @@ public class AttachmentService : IAttachmentService
         await transaction.CommitAsync(token);
 
         return ApiResponse<AttachmentDto>.SuccessResponse(
-            MapToDto(attachment), "Attachment created successfully", 201);
+            AttachmentView.Of(attachment), "Attachment created successfully", 201);
+    }
+
+    public async Task<ApiResponse<AttachmentDto>> CreateLinkAsync(
+        Guid cardId, CreateLinkAttachmentDto createLinkAttachmentDto)
+    {
+        ArgumentNullException.ThrowIfNull(createLinkAttachmentDto);
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        if (!await _context.TryLockCardAsync(cardId))
+        {
+            return CardNotFound<AttachmentDto>();
+        }
+
+        if (await RefusesAsync(cardId) is { } refused)
+        {
+            return refused;
+        }
+
+        var attachment = MapLinkToEntity(cardId, createLinkAttachmentDto);
+        _context.Attachments.Add(attachment);
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return ApiResponse<AttachmentDto>.SuccessResponse(
+            AttachmentView.Of(attachment), "Attachment created successfully", 201);
     }
 
     public async Task<ApiResponse<AttachmentDto>> UpdateAsync(
@@ -130,7 +158,7 @@ public class AttachmentService : IAttachmentService
         await _context.SaveChangesAsync();
 
         return ApiResponse<AttachmentDto>.SuccessResponse(
-            MapToDto(attachment), "Attachment updated successfully");
+            AttachmentView.Of(attachment), "Attachment updated successfully");
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid cardId, Guid id)
@@ -161,7 +189,7 @@ public class AttachmentService : IAttachmentService
         }
 
         return ApiResponse<AttachmentDto>.SuccessResponse(
-            MapToDto(attachment), "Attachment retrieved successfully");
+            AttachmentView.Of(attachment), "Attachment retrieved successfully");
     }
 
     public async Task<ApiResponse<List<AttachmentDto>>> GetAllAsync(Guid cardId)
@@ -178,7 +206,7 @@ public class AttachmentService : IAttachmentService
             .ToListAsync();
 
         return ApiResponse<List<AttachmentDto>>.SuccessResponse(
-            attachments.ConvertAll(MapToDto), "Attachments retrieved successfully");
+            attachments.ConvertAll(AttachmentView.Of), "Attachments retrieved successfully");
     }
 
     public async Task<ApiResponse<string>> GetContentUrlAsync(Guid cardId, Guid id)
@@ -193,7 +221,7 @@ public class AttachmentService : IAttachmentService
         return ApiResponse<string>.SuccessResponse(url, "Attachment content found", 302);
     }
 
-    private async Task<ApiResponse<AttachmentDto>?> RefusesFileAsync(Guid cardId)
+    private async Task<ApiResponse<AttachmentDto>?> RefusesAsync(Guid cardId)
     {
         if (await _archive.OnCardAsync(cardId) is { } archived)
         {
@@ -249,31 +277,7 @@ public class AttachmentService : IAttachmentService
                 $"A card holds at most {FieldLimits.AttachmentsPerCard} attachments.")
         ]);
 
-    private static AttachmentDto MapToDto(Attachment attachment)
-    {
-        return new AttachmentDto
-        (
-            attachment.Id,
-            attachment.CardId,
-            attachment.Kind,
-            attachment.Name,
-            UrlOf(attachment),
-            attachment.FileName,
-            attachment.MimeType,
-            attachment.Bytes,
-            attachment.CreatedAt,
-            attachment.UpdatedAt,
-            attachment.CreatedBy,
-            attachment.UpdatedBy
-        );
-    }
-
-    private static string? UrlOf(Attachment attachment) =>
-        attachment.Kind == AttachmentKind.File
-            ? $"/api/v1/cards/{attachment.CardId}/attachments/{attachment.Id}/content"
-            : attachment.Url;
-
-    private Attachment MapToEntity(Guid cardId, Guid id, string objectKey, AttachmentUpload upload)
+    private Attachment MapFileToEntity(Guid cardId, Guid id, string objectKey, AttachmentUpload upload)
     {
         return new Attachment
         {
@@ -285,6 +289,24 @@ public class AttachmentService : IAttachmentService
             MimeType = upload.MimeType,
             Bytes = upload.Bytes.Length,
             ObjectKey = objectKey,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = _actor.Id
+        };
+    }
+
+    private Attachment MapLinkToEntity(Guid cardId, CreateLinkAttachmentDto createLinkAttachmentDto)
+    {
+        var url = createLinkAttachmentDto.Url!;
+
+        return new Attachment
+        {
+            Id = Guid.NewGuid(),
+            CardId = cardId,
+            Kind = AttachmentKind.Link,
+            Name = string.IsNullOrEmpty(createLinkAttachmentDto.Name)
+                ? url[..Math.Min(url.Length, FieldLimits.AttachmentName)]
+                : createLinkAttachmentDto.Name,
+            Url = url,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _actor.Id
         };

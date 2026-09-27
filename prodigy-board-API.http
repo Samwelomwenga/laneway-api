@@ -6135,7 +6135,7 @@ Content-Type: application/json
   "cover": "Red"
 }
 
-### Read the card. 200, and CardDto carries no cover field.
+### Read the card. 200, with "cover": null and "attachmentCount": 0, and no free-string cover.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}
 
 ### Upload a PNG with a name. 201, name "Q3 numbers", fileName "report.png", mimeType "image/png",
@@ -6338,14 +6338,13 @@ Content-Disposition: form-data; name="file"; filename="empty.png"
 < ./http-files/empty.png
 --WebAppBoundary--
 
-### Send a body that isn't a multipart form. 415, the framework's answer to a wrong content type.
+### Send a content type no action takes. 415, the framework's answer to a wrong content type. JSON
+### isn't one of these, because it reaches the link create further down.
 POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
 X-User-Id: {{actorId}}
-Content-Type: application/json
+Content-Type: text/plain
 
-{
-  "url": "https://example.com/page"
-}
+url=https://example.com/page
 
 ### Upload with no header. 400 required on X-User-Id, before the body is read.
 POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
@@ -6906,3 +6905,646 @@ GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCascadeCard}}/att
 ### before any bytes go to storage. Filling a card by hand takes 100 uploads, so the assertion pass
 ### covers it and this line records the rule.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
+
+### Create the card the link checks use.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Card with links",
+  "listId": "{{attachmentList}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("linkCard", response.body.data.id); %}
+
+### Attach a link with a name. 201, kind "Link", url the page it points at, and fileName, mimeType
+### and bytes all null. Content-Type picks this action apart from the multipart one on the same route.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/spec",
+  "name": "The spec"
+}
+
+> {% client.global.set("linkAttachment", response.body.data.id); %}
+
+### Attach a link with no name. 201, and name falls back to the url. The server never fetches it, so
+### a link that resolves to nothing is still fine.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://no-such-host.example/missing"
+}
+
+### The url is trimmed. 201, and url comes back without the spaces.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "   https://example.com/trimmed   "
+}
+
+### A blank name counts as missing. 201, and name falls back to the url.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/blank-name",
+  "name": "   "
+}
+
+### A 320-character url with no name. 201, and name is the url cut to 256 characters.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
+
+### A link to a private address is fine, because nothing fetches it. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "http://localhost:9999/internal"
+}
+
+### No url. 400 required on url.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Nothing to point at"
+}
+
+### A blank url. 400 required on url.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "   "
+}
+
+### A url with no scheme. 400 invalidFormat on url, because it has to be absolute.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "example.com/page"
+}
+
+### An ftp url. 400 invalidFormat on url, because only http and https get in.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "ftp://example.com/file.txt"
+}
+
+### A javascript url. 400 invalidFormat on url.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "javascript:alert(1)"
+}
+
+### A 2,049-character url. 400 tooLong on url.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
+
+### A 257-character name. 400 tooLong on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/spec",
+  "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+}
+
+### Send kind. 400 unknownField on kind, because the action sets it.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/spec",
+  "kind": "Link"
+}
+
+### Send file. 400 unknownField on file, because a link carries no bytes.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/spec",
+  "file": "report.png"
+}
+
+### Send url in a multipart form. 400 unknownField on url and required on file, so a form can't make
+### a link.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="url"
+
+https://example.com/spec
+--WebAppBoundary--
+
+### Send no content type. 400 invalidFormat with a null field, from the multipart create, the only
+### action left once the link create turns a request with no content type down.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+X-User-Id: {{actorId}}
+
+### Attach a link with no header. 400 required on X-User-Id.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+Content-Type: application/json
+
+{
+  "url": "https://example.com/spec"
+}
+
+### Attach a link to an unknown card. 404.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/11111111-1111-1111-1111-111111111111/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/spec"
+}
+
+### Read the card's attachments. 200, every link on it, newest first.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+
+### Download a link. 404, because a redirect to a stored link would make this an open redirect.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments/{{linkAttachment}}/content
+
+### Rename a link. 200, name "Renamed", and url unchanged.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments/{{linkAttachment}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed"
+}
+
+### The 100 attachments a card holds count files and links together, so a card full of files takes no
+### link either. The assertion pass fills a card and this line records the rule.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
+
+### Create the card the cover checks use.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Card with a cover",
+  "listId": "{{attachmentList}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("coverCard", response.body.data.id); %}
+
+### Upload the image the cover points at. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.png"
+
+< ./http-files/report.png
+--WebAppBoundary--
+
+> {% client.global.set("coverImage", response.body.data.id); %}
+
+### Upload a PDF to the same card, for the rule that a cover has to be an image. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="report.pdf"
+
+< ./http-files/report.pdf
+--WebAppBoundary--
+
+> {% client.global.set("coverPdf", response.body.data.id); %}
+
+### Attach a link to the same card, for the same rule. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/picture"
+}
+
+> {% client.global.set("coverLink", response.body.data.id); %}
+
+### Upload an image to the other card, for the rule that a cover sits on its own card. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="photo.jpg"
+
+< ./http-files/photo.jpg
+--WebAppBoundary--
+
+> {% client.global.set("coverElsewhere", response.body.data.id); %}
+
+### Read the card. 200, "cover": null and "attachmentCount": 3, so a board draws both from the card.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}
+
+### Set the cover to the image. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverImage}}"
+}
+
+### Read the card. 200, cover holds the attachment id, a null color, and the /content path as url,
+### and updatedAt is stamped, because the cover changed.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}
+
+### Send the same cover again. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverImage}}"
+}
+
+### Read the card. 200, and updatedAt is unchanged, because nothing changed.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}
+
+### Set a color cover instead. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "color": "Red"
+}
+
+### Read the card. 200, cover is a null attachmentId, "Red", and a null url.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}
+
+### Clear the cover with an empty body. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+}
+
+### Read the card. 200, and cover is null again.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}
+
+### Send both an attachmentId and a color. 400 mutuallyExclusive with a null field.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverImage}}",
+  "color": "Red"
+}
+
+### An unknown attachmentId. 400 notFound on attachmentId, not 404, which names the card in the URL.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "11111111-1111-1111-1111-111111111111"
+}
+
+### An image on another card. 400 notOnCard on attachmentId.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverElsewhere}}"
+}
+
+### A link. 400 notImage on attachmentId, with the image extensions in the message.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverLink}}"
+}
+
+### A PDF. 400 notImage, because only PNG, JPEG, GIF and WebP can be a cover.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverPdf}}"
+}
+
+### A color outside the set. 400 unknownValue on color, with the names in the message.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "color": "Beige"
+}
+
+### A field the request doesn't have. 400 unknownField on setCover.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverImage}}",
+  "setCover": true
+}
+
+### No body at all. 400 required with a null field.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+### No header. 400 required on X-User-Id.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+Content-Type: application/json
+
+{
+}
+
+### An unknown card. 404.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/11111111-1111-1111-1111-111111111111/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+}
+
+### Upload a JPEG, for the rest of the image group. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="photo.jpg"
+
+< ./http-files/photo.jpg
+--WebAppBoundary--
+
+> {% client.global.set("coverJpeg", response.body.data.id); %}
+
+### Cover the card with the JPEG. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverJpeg}}"
+}
+
+### Upload a GIF. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="anim.gif"
+
+< ./http-files/anim.gif
+--WebAppBoundary--
+
+> {% client.global.set("coverGif", response.body.data.id); %}
+
+### Cover the card with the GIF. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverGif}}"
+}
+
+### Upload a WebP. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="shot.webp"
+
+< ./http-files/shot.webp
+--WebAppBoundary--
+
+> {% client.global.set("coverWebp", response.body.data.id); %}
+
+### Cover the card with the WebP. 204, so every one of PNG, JPEG, GIF and WebP can be a cover.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverWebp}}"
+}
+
+### Set the cover again, so the delete below has one to clear. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverImage}}"
+}
+
+### Read the card, to hold its updatedAt next to the read after the delete. 200.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}
+
+### Delete the attachment the cover points at. 204.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}/attachments/{{coverImage}}
+X-User-Id: {{actorId}}
+
+### Read the card. 200, cover is null, updatedAt is unchanged, because the foreign key cleared the
+### cover in the same statement, and nothing fell back to another image on the card.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverCard}}
+
+### Read the cards in the list. 200, and every card carries cover and attachmentCount.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{attachmentList}}
+
+### Create the card the archive checks use.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Archived cover",
+  "listId": "{{attachmentList}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("coverArchivedCard", response.body.data.id); %}
+
+### Upload an image to it while it's live. 201.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverArchivedCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="shot.webp"
+
+< ./http-files/shot.webp
+--WebAppBoundary--
+
+> {% client.global.set("coverArchivedImage", response.body.data.id); %}
+
+### Archive the card. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverArchivedCard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Attach a link to the archived card. 409 archived with a null field.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverArchivedCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/spec"
+}
+
+### Set its cover. 409 archived.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverArchivedCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "attachmentId": "{{coverArchivedImage}}"
+}
+
+### Clear its cover. 409 archived, because clearing is a write too.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverArchivedCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+}
+
+### Read the archived card. 200, because reads don't care about the archive.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverArchivedCard}}
+
+### Restore the card. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverArchivedCard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Archive the list instead. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{attachmentList}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Set a cover under the archived list. 409 archived, and the message names the list.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverArchivedCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "color": "Blue"
+}
+
+### Attach a link under the archived list. 409 archived, and the message names the list.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverArchivedCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/spec"
+}
+
+### Restore the list. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/lists/{{attachmentList}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Archive the board instead. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{attachmentBoard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Set a cover under the archived board. 409 archived, and the message names the board.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverArchivedCard}}/cover
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "color": "Blue"
+}
+
+### Attach a link under the archived board. 409 archived, and the message names the board.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards/{{coverArchivedCard}}/attachments
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/spec"
+}
+
+### Restore the board. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/boards/{{attachmentBoard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}

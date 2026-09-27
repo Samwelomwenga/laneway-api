@@ -35,6 +35,7 @@ builder.Services.AddScoped<Placements>();
 builder.Services.AddScoped<ArchiveGuard>();
 builder.Services.AddScoped<LabelMatching>();
 builder.Services.AddScoped<CardCompletion>();
+builder.Services.AddScoped<AttachmentCounts>();
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
 builder.Services.AddScoped<IBoardService, BoardService>();
 builder.Services.AddScoped<ICardService, CardService>();

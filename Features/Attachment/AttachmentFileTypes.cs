@@ -5,6 +5,8 @@ public delegate bool ByteCheck(ReadOnlySpan<byte> bytes);
 public sealed record AttachmentFileType(string Extension, string MimeType)
 {
     public required ByteCheck Matches { get; init; }
+
+    public bool IsImage { get; init; }
 }
 
 public static class AttachmentFileTypes
@@ -13,11 +15,11 @@ public static class AttachmentFileTypes
 
     private static readonly AttachmentFileType[] Allowed =
     [
-        Signature(".png", "image/png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
-        Signature(".jpg", "image/jpeg", [0xFF, 0xD8, 0xFF]),
-        Signature(".jpeg", "image/jpeg", [0xFF, 0xD8, 0xFF]),
-        Gif(".gif", "image/gif"),
-        WebP(".webp", "image/webp"),
+        Image(Signature(".png", "image/png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])),
+        Image(Signature(".jpg", "image/jpeg", [0xFF, 0xD8, 0xFF])),
+        Image(Signature(".jpeg", "image/jpeg", [0xFF, 0xD8, 0xFF])),
+        Image(Gif(".gif", "image/gif")),
+        Image(WebP(".webp", "image/webp")),
         Signature(".pdf", "application/pdf", "%PDF-"u8.ToArray()),
         Zip(".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
         Zip(".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
@@ -34,7 +36,12 @@ public static class AttachmentFileTypes
         Zip(".zip", "application/zip")
     ];
 
-    public static string Extensions => string.Join(", ", Allowed.Select(type => type.Extension).Distinct());
+    public static string Extensions => ExtensionsOf(Allowed);
+
+    public static string ImageExtensions => ExtensionsOf(Allowed.Where(type => type.IsImage));
+
+    public static bool IsImage(string? mimeType) =>
+        Array.Exists(Allowed, type => type.IsImage && string.Equals(type.MimeType, mimeType, StringComparison.Ordinal));
 
     public static AttachmentFileType? Of(string fileName, ReadOnlySpan<byte> bytes)
     {
@@ -49,6 +56,11 @@ public static class AttachmentFileTypes
 
         return null;
     }
+
+    private static string ExtensionsOf(IEnumerable<AttachmentFileType> types) =>
+        string.Join(", ", types.Select(type => type.Extension).Distinct());
+
+    private static AttachmentFileType Image(AttachmentFileType type) => type with { IsImage = true };
 
     private static AttachmentFileType Signature(string extension, string mimeType, byte[] signature) =>
         new(extension, mimeType) { Matches = bytes => bytes.StartsWith(signature) };

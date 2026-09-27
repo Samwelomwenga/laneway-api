@@ -18,6 +18,16 @@ public record AttachmentDto
     Guid? UpdatedBy
 );
 
+public record CreateLinkAttachmentDto
+(
+    string? Url,
+    string? Name
+)
+{
+    public string? Url { get; init; } = Url?.Trim();
+    public string? Name { get; init; } = Name?.Trim();
+}
+
 public record UpdateAttachmentDto
 (
     string? Name

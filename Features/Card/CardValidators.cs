@@ -39,6 +39,17 @@ public sealed class MoveCardDtoValidator : AbstractValidator<MoveCardDto>
     }
 }
 
+public sealed class CoverDtoValidator : AbstractValidator<CoverDto>
+{
+    public CoverDtoValidator()
+    {
+        RuleFor(x => x)
+            .Must(cover => cover.AttachmentId is null || cover.Color is null)
+            .WithErrorCode(ErrorCodes.MutuallyExclusive)
+            .WithMessage("'attachmentId' can't be sent with 'color'.");
+    }
+}
+
 internal static class CardRules
 {
     public static IRuleBuilderOptions<T, bool?> CompleteNeedsDueDate<T>(
