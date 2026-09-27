@@ -50,4 +50,17 @@ public static class RowLocks
                 .ToListAsync();
         }
     }
+
+    public static async Task LockChecklistsAsync(this ApplicationDbContext context, params Guid[] checklistIds)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(checklistIds);
+
+        foreach (var checklistId in checklistIds.Distinct().Order())
+        {
+            await context.Checklists
+                .FromSql($"SELECT * FROM \"Checklists\" WHERE \"Id\" = {checklistId} FOR UPDATE")
+                .ToListAsync();
+        }
+    }
 }

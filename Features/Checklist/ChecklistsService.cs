@@ -19,17 +19,20 @@ public class ChecklistService : IChecklistService
     private readonly Actor _actor;
     private readonly Placements _placements;
     private readonly ArchiveGuard _archive;
+    private readonly CardCompletion _completion;
 
     public ChecklistService(
         ApplicationDbContext context,
         Actor actor,
         Placements placements,
-        ArchiveGuard archive)
+        ArchiveGuard archive,
+        CardCompletion completion)
     {
         _context = context;
         _actor = actor;
         _placements = placements;
         _archive = archive;
+        _completion = completion;
     }
 
     public async Task<ApiResponse<ChecklistDto>> CreateAsync(CreateChecklistDto createChecklistDto)
@@ -65,7 +68,7 @@ public class ChecklistService : IChecklistService
 
     public async Task<ApiResponse<ChecklistDto>> UpdateAsync(Guid id, UpdateChecklistDto updateChecklistDto)
     {
-        var checklist = await _context.Checklists.FindAsync(id);
+        var checklist = await WithCheckItemsAsync(id);
         if (checklist == null)
         {
             return ApiResponse<ChecklistDto>.ErrorResponse("Checklist not found", 404);
@@ -91,7 +94,7 @@ public class ChecklistService : IChecklistService
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var checklist = await _context.Checklists.FindAsync(id);
+        var checklist = await WithCheckItemsAsync(id);
         if (checklist == null)
         {
             return ApiResponse<ChecklistDto>.ErrorResponse("Checklist not found", 404);
@@ -120,6 +123,8 @@ public class ChecklistService : IChecklistService
 
     public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)
     {
+        ArgumentNullException.ThrowIfNull(archivedDto);
+
         var checklist = await _context.Checklists.FindAsync(id);
         if (checklist == null)
         {
@@ -129,6 +134,12 @@ public class ChecklistService : IChecklistService
         if (await _archive.OnCardAsync(checklist.CardId) is { } archived)
         {
             return ArchiveErrors.RestoreFirst<bool>(archived, TreeItem.Checklist);
+        }
+
+        if (archivedDto.Value == true && !checklist.IsArchived)
+        {
+            var leaving = await _context.CheckItems.CountAsync(checkItem => checkItem.ChecklistId == id);
+            await _completion.KeepComputedValueAsync(checklist.CardId, losingCheckItems: leaving);
         }
 
         return await _context.SetArchivedAsync(checklist, _actor, archivedDto, "Checklist");
@@ -160,7 +171,7 @@ public class ChecklistService : IChecklistService
 
     public async Task<ApiResponse<ChecklistDto>> GetByIdAsync(Guid id)
     {
-        var checklist = await _context.Checklists.FindAsync(id);
+        var checklist = await WithCheckItemsAsync(id);
         if (checklist == null)
         {
             return ApiResponse<ChecklistDto>.ErrorResponse("Checklist not found", 404);
@@ -189,7 +200,7 @@ public class ChecklistService : IChecklistService
         query = ArchiveView.Checklists(query, searchDto.Archived, _context);
 
         var (checklists, totalCount) = await PagedQuery.ReadAsync(
-            query.InSortOrder(),
+            query.InSortOrder().Include(c => c.CheckItems),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
@@ -202,6 +213,9 @@ public class ChecklistService : IChecklistService
         );
     }
 
+    private async Task<Checklist?> WithCheckItemsAsync(Guid id) =>
+        await _context.Checklists.Include(c => c.CheckItems).FirstOrDefaultAsync(c => c.Id == id);
+
     private static ChecklistDto MapToDto(Checklist checklist)
     {
         return new ChecklistDto(
@@ -210,7 +224,7 @@ public class ChecklistService : IChecklistService
             checklist.Name,
             checklist.Position,
             checklist.IsArchived,
-            [],
+            CheckItemView.Sorted(checklist.CheckItems),
             checklist.CreatedAt,
             checklist.UpdatedAt,
             checklist.CreatedBy,

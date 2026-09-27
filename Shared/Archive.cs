@@ -16,6 +16,12 @@ public enum ArchiveFilter
     Include
 }
 
+public enum CheckItemArchiveFilter
+{
+    Exclude,
+    Include
+}
+
 public record ArchivedDto(bool? Value);
 
 public sealed class ArchivedDtoValidator : AbstractValidator<ArchivedDto>
@@ -80,6 +86,21 @@ public static class ArchiveView
                     && context.Boards.Any(board => board.Id == list.BoardId && !board.IsArchived))));
     }
 
+    public static IQueryable<CheckItem> CheckItems(
+        IQueryable<CheckItem> checkItems, CheckItemArchiveFilter filter, ApplicationDbContext context)
+    {
+        ArgumentNullException.ThrowIfNull(checkItems);
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (filter == CheckItemArchiveFilter.Include)
+        {
+            return checkItems;
+        }
+
+        var visible = Checklists(context.Checklists, ArchiveFilter.Exclude, context);
+        return checkItems.Where(checkItem => visible.Any(checklist => checklist.Id == checkItem.ChecklistId));
+    }
+
     private static IQueryable<TEntity> Apply<TEntity>(
         IQueryable<TEntity> items, ArchiveFilter filter, Expression<Func<TEntity, bool>> visible)
         where TEntity : IArchivable =>
@@ -97,6 +118,7 @@ public enum TreeItem
     List,
     Card,
     Checklist,
+    CheckItem,
     Label
 }
 
@@ -189,6 +211,7 @@ public static class ArchiveErrors
             TreeItem.List => "list",
             TreeItem.Card => "card",
             TreeItem.Checklist => "checklist",
+            TreeItem.CheckItem => "check item",
             _ => "label"
         };
 }

@@ -4842,3 +4842,1209 @@ X-User-Id: {{actorId}}
 
 ### Read the checklist the deleted card held. 404, so the foreign key cascaded.
 GET {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checklistCascade}}
+
+### Create the list the check item cards sit in, so card search below sees only them.
+POST {{prodigy_board_API_HostAddress}}/api/v1/lists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Check item list",
+  "boardId": "{{checklistBoardId}}"
+}
+
+> {% client.global.set("checkItemListId", response.body.data.id); %}
+
+### Create the card the check item checklists go on.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Check item card",
+  "listId": "{{checkItemListId}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checkItemCardId", response.body.data.id); %}
+
+### Create the checklist the ordering checks run in.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Release",
+  "cardId": "{{checkItemCardId}}"
+}
+
+> {% client.global.set("checkItemRelease", response.body.data.id); %}
+
+### Create the checklist a check item moves into.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Follow-up",
+  "cardId": "{{checkItemCardId}}"
+}
+
+> {% client.global.set("checkItemFollowUp", response.body.data.id); %}
+
+### Create the checklist the odd check items go in, so Release keeps its six.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Spare",
+  "cardId": "{{checkItemCardId}}"
+}
+
+> {% client.global.set("checkItemSpare", response.body.data.id); %}
+
+### Create a second card, so the notOnCard check has a checklist on another card to name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Other check item card",
+  "listId": "{{checkItemListId}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checkItemOtherCard", response.body.data.id); %}
+
+### Create the checklist on the other card.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Elsewhere",
+  "cardId": "{{checkItemOtherCard}}"
+}
+
+> {% client.global.set("checkItemElsewhere", response.body.data.id); %}
+
+### Create a check item on the other card's checklist, for the anchor checks below.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Stray",
+  "checklistId": "{{checkItemElsewhere}}"
+}
+
+> {% client.global.set("checkItemStray", response.body.data.id); %}
+
+### Create a check item with a padded name and no placement. 201, the name comes back trimmed, position is 65536, and isChecked is false.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "  Write notes  ",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+> {% client.global.set("checkItemWrite", response.body.data.id); %}
+
+### Create a second check item with no placement. It goes to the bottom, 65536 + 65536 = 131072.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Tag the release",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+> {% client.global.set("checkItemTag", response.body.data.id); %}
+
+### Create a check item at the top. The smallest sibling halves, so it's 32768.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Prep",
+  "position": "top",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+> {% client.global.set("checkItemPrep", response.body.data.id); %}
+
+### Create a check item between two siblings. The midpoint of 32768 and 65536 is 49152.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Middle",
+  "after": "{{checkItemPrep}}",
+  "before": "{{checkItemWrite}}",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+> {% client.global.set("checkItemMiddle", response.body.data.id); %}
+
+### Create a check item at a number the client picked. It's stored as sent.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Numbered",
+  "position": 200000,
+  "checklistId": "{{checkItemRelease}}"
+}
+
+> {% client.global.set("checkItemNumbered", response.body.data.id); %}
+
+### Create a check item that's already checked, so a client can paste in a list that's partly done. 201 with isChecked true, at 200000 + 65536 = 265536.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Done already",
+  "isChecked": true,
+  "checklistId": "{{checkItemRelease}}"
+}
+
+> {% client.global.set("checkItemDone", response.body.data.id); %}
+
+### Create a second check item called Middle. 201, because check item names don't have to be unique.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Middle",
+  "checklistId": "{{checkItemSpare}}"
+}
+
+### Create a check item from an empty object. 400 required on name and checklistId. isChecked and placement are optional.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Create a check item with a blank name. 400 required on name, because the name is trimmed first.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "   ",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Create a check item with a name of 501 characters. 400 tooLong on name.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Create a check item with a padded name of 500 characters. 201, so the column takes the full limit.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  ",
+  "checklistId": "{{checkItemSpare}}"
+}
+
+### Create a check item on a checklist that doesn't exist. 400 notFound on checklistId.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Nowhere",
+  "checklistId": "3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b"
+}
+
+### Create a check item with a position and an anchor. 400 mutuallyExclusive with a null field.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Both",
+  "position": "top",
+  "after": "{{checkItemWrite}}",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Create a check item at a position name that doesn't exist. 400 unknownValue on position.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Middling",
+  "position": "middle",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Create a check item at position 0. 400 outOfRange on position.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Zero",
+  "position": 0,
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Create a check item before an anchor that doesn't exist. 400 notFound on before.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Anchored",
+  "before": "3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Create a check item before one on another checklist. 400 notSibling on before.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Anchored elsewhere",
+  "before": "{{checkItemStray}}",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Create a check item that's already archived. 400 unknownField on isArchived, because check items have no archive.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Put away",
+  "isArchived": true,
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Create a check item with no header. 400 required on X-User-Id.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+Content-Type: application/json
+
+{
+  "name": "No actor",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Read the checklist's check items. 200 in position order: Prep, Middle, Write notes, Tag the release, Numbered, Done already.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items?checklistId={{checkItemRelease}}
+X-User-Id: {{actorId}}
+
+### Read the second page of three. 200 with Write notes and Tag the release, totalCount 6, and totalPages 3.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items?checklistId={{checkItemRelease}}&pageSize=2&pageNumber=2
+X-User-Id: {{actorId}}
+
+### Filter by a checklist that doesn't exist. 400 notFound on checklistId.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items?checklistId=3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b
+X-User-Id: {{actorId}}
+
+### Ask for only the archived check items. 400 unknownValue on archived, and the message lists Exclude and Include, because check items have no archive of their own.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items?archived=only
+X-User-Id: {{actorId}}
+
+### Search check items by name. 400 unknownField on searchTerm, because check item search takes checklistId and archived only.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items?searchTerm=Prep
+X-User-Id: {{actorId}}
+
+### Read one check item. 200.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemWrite}}
+X-User-Id: {{actorId}}
+
+### Read a check item that doesn't exist. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items/3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b
+X-User-Id: {{actorId}}
+
+### Read the checklist. 200, and checkItems holds all six in the same order, so a card view needs one call.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemRelease}}
+X-User-Id: {{actorId}}
+
+### Read the card's checklists. 200 with Release carrying six, Follow-up none, and Spare two.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists?cardId={{checkItemCardId}}
+X-User-Id: {{actorId}}
+
+### Rename a check item with a padded name. 200, the name comes back trimmed and updatedBy becomes the actor.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemNumbered}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "  Renamed  "
+}
+
+### Replace a check item with an empty object. 400 required on name, the only field it takes.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemNumbered}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Rename a check item, still sending checklistId. 400 unknownField, because a check item moves through its own endpoint.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemNumbered}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Rename a check item, still sending isChecked. 400 unknownField, so a rename can never wipe out a check.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemNumbered}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed",
+  "isChecked": true
+}
+
+### Rename a check item, still sending position. 400 unknownField.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemNumbered}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed",
+  "position": 65536
+}
+
+### Rename a check item that doesn't exist. 404.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Nowhere"
+}
+
+### Read the checklist the renamed check item is on. 200 with updatedAt and updatedBy still null: a check item write stamps the check item alone.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemRelease}}
+X-User-Id: {{actorId}}
+
+### Read the card the renamed check item is on. 200 with updatedAt and updatedBy still null, so checking a box never looks like editing the card.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemCardId}}
+X-User-Id: {{actorId}}
+
+### Check a check item. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemWrite}}/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Read it. 200 with isChecked true and updatedBy the actor.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemWrite}}
+X-User-Id: {{actorId}}
+
+### Check it again. 204, and nothing changes, so updatedAt keeps the time the first call set.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemWrite}}/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Read it again. 200 with the same updatedAt.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemWrite}}
+X-User-Id: {{actorId}}
+
+### Uncheck it. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemWrite}}/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Check a check item with an empty body. 400 required on value.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemWrite}}/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Check a check item with value as a string. 400 invalidFormat on value.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemWrite}}/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": "true"
+}
+
+### Check a check item and rename it in the same call. 400 unknownField on name.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemWrite}}/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true,
+  "name": "Renamed by a check"
+}
+
+### Check a check item that doesn't exist. 404.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Move a check item to the top of its checklist. The smallest sibling is 32768, so it halves to 16384.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "{{checkItemRelease}}",
+  "position": "top"
+}
+
+### Move it with no placement. 200 and it keeps 16384, because a reorder with nowhere to go leaves it where it is.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Move it to the other checklist on the same card. 200, checklistId changes, and position is 65536 because Follow-up was empty.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "{{checkItemFollowUp}}",
+  "position": "top"
+}
+
+### Read the checklist it left. 200 with updatedAt still null, because a move stamps the check item alone.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemRelease}}
+X-User-Id: {{actorId}}
+
+### Read the checklist it landed in. 200 with updatedAt still null, and the moved check item embedded.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemFollowUp}}
+X-User-Id: {{actorId}}
+
+### Move a check item with an empty body. 400 required on checklistId, which a reorder needs too.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{}
+
+### Move a check item to a checklist that doesn't exist. 400 notFound on checklistId.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b"
+}
+
+### Move a check item before itself. 400 notSibling on before, because the moving check item isn't its own sibling.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemNumbered}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "{{checkItemFollowUp}}",
+  "before": "{{checkItemNumbered}}"
+}
+
+### Move a check item between anchors that aren't neighbours in that order. 400 notAdjacent on before, because Write notes sits between them.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemDone}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "{{checkItemRelease}}",
+  "after": "{{checkItemPrep}}",
+  "before": "{{checkItemTag}}"
+}
+
+### Move a check item with a position and an anchor. 400 mutuallyExclusive with a null field.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemDone}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "{{checkItemRelease}}",
+  "position": "top",
+  "after": "{{checkItemPrep}}"
+}
+
+### Move a check item to a checklist on another card. 400 notOnCard on checklistId, because a check item never changes card.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemDone}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "{{checkItemElsewhere}}"
+}
+
+### Move it there before an anchor that doesn't exist. 400 with both notOnCard on checklistId and notFound on before, in one envelope.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemDone}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "{{checkItemElsewhere}}",
+  "before": "3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b"
+}
+
+### Move a check item that doesn't exist. 404.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### The 200 check item cap takes 200 creates to reach, so this file stops short of it. A create past the cap, and a move into a checklist that already holds 200, are 409 limitReached on checklistId, with 200 in the message.
+
+### Create the card the completion checks run on. It has a due date and no check items, so it shows the isDueComplete it was created with.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Completion card",
+  "listId": "{{checkItemListId}}",
+  "dueDate": "2026-12-01T09:00:00Z",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checkItemDueCard", response.body.data.id); %}
+
+### Read it. 200 with isDueComplete false, checkItemCount 0, and checkedItemCount 0.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
+X-User-Id: {{actorId}}
+
+### Create its first checklist.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Release",
+  "cardId": "{{checkItemDueCard}}"
+}
+
+> {% client.global.set("checkItemDueRelease", response.body.data.id); %}
+
+### Add an open check item to it.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Open",
+  "checklistId": "{{checkItemDueRelease}}"
+}
+
+> {% client.global.set("checkItemDueA", response.body.data.id); %}
+
+### Add a checked one.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Checked",
+  "isChecked": true,
+  "checklistId": "{{checkItemDueRelease}}"
+}
+
+### Read the card. 200 with isDueComplete false, checkItemCount 2, and checkedItemCount 1, for a "1/2" badge.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
+X-User-Id: {{actorId}}
+
+### Check the open one. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemDueA}}/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Read the card. 200 with isDueComplete true, because a card with a due date is complete when every counted check item is checked.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
+X-User-Id: {{actorId}}
+
+### Add a second checklist to the same card.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Follow-up",
+  "cardId": "{{checkItemDueCard}}"
+}
+
+> {% client.global.set("checkItemDueFollowUp", response.body.data.id); %}
+
+### Add an open check item to it.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Still open",
+  "checklistId": "{{checkItemDueFollowUp}}"
+}
+
+> {% client.global.set("checkItemDueC", response.body.data.id); %}
+
+### Read the card. 200 with isDueComplete false and checkItemCount 3, because counted check items span every unarchived checklist.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
+X-User-Id: {{actorId}}
+
+### Archive the second checklist. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemDueFollowUp}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Read the card. 200 with isDueComplete true and checkItemCount back to 2, because check items on an archived checklist stop counting.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
+X-User-Id: {{actorId}}
+
+### Restore the second checklist. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemDueFollowUp}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Read the card. 200 with isDueComplete false again, because restoring counts the open check item again.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
+X-User-Id: {{actorId}}
+
+### Check the last open one. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemDueC}}/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Replace the card with isDueComplete false. 200, and it comes back true, because the card stores what the client sent and returns the computed value.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Completion card",
+  "dueDate": "2026-12-01T09:00:00Z",
+  "isDueComplete": false
+}
+
+### Uncheck one. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemDueA}}/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Read the card. 200 with isDueComplete false, because the rule holds both ways: a client can't make the card complete while one check item is open.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
+X-User-Id: {{actorId}}
+
+### Check it again, so the card search below finds this card complete. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemDueA}}/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Create a card with no due date.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Undated card",
+  "listId": "{{checkItemListId}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checkItemUndatedCard", response.body.data.id); %}
+
+### Give it a checklist.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Steps",
+  "cardId": "{{checkItemUndatedCard}}"
+}
+
+> {% client.global.set("checkItemUndatedList", response.body.data.id); %}
+
+### Give it one checked check item.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Checked",
+  "isChecked": true,
+  "checklistId": "{{checkItemUndatedList}}"
+}
+
+### Read it. 200 with isDueComplete false and checkItemCount 1, because a card with no due date is never complete.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemUndatedCard}}
+X-User-Id: {{actorId}}
+
+### Create the card the delete copy rule runs on.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Delete copy card",
+  "listId": "{{checkItemListId}}",
+  "dueDate": "2026-12-01T09:00:00Z",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checkItemCopyCard", response.body.data.id); %}
+
+### Give it a checklist.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Steps",
+  "cardId": "{{checkItemCopyCard}}"
+}
+
+> {% client.global.set("checkItemCopyList", response.body.data.id); %}
+
+### Give it one checked check item, which makes the card complete.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Only",
+  "isChecked": true,
+  "checklistId": "{{checkItemCopyList}}"
+}
+
+> {% client.global.set("checkItemCopyOnly", response.body.data.id); %}
+
+### Read the card. 200 with isDueComplete true, from the one checked check item.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemCopyCard}}
+X-User-Id: {{actorId}}
+
+### Delete the last counted check item. 204.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemCopyOnly}}
+X-User-Id: {{actorId}}
+
+### Read the card. 200 with isDueComplete still true and checkItemCount 0, because the write copied the computed value into the stored column before the last counted check item left.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemCopyCard}}
+X-User-Id: {{actorId}}
+
+### Create the card the archive copy rule runs on.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Archive copy card",
+  "listId": "{{checkItemListId}}",
+  "dueDate": "2026-12-01T09:00:00Z",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checkItemArchiveCard", response.body.data.id); %}
+
+### Give it a checklist.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Steps",
+  "cardId": "{{checkItemArchiveCard}}"
+}
+
+> {% client.global.set("checkItemArchiveList", response.body.data.id); %}
+
+### Give it one checked check item.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Only",
+  "isChecked": true,
+  "checklistId": "{{checkItemArchiveList}}"
+}
+
+### Archive the last unarchived checklist that holds check items. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemArchiveList}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Read the card. 200 with isDueComplete still true and checkItemCount 0, and updatedAt still null, because the copy never stamps the card.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemArchiveCard}}
+X-User-Id: {{actorId}}
+
+### Create the card that shows deleting an archived checklist never copies.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Keep stored card",
+  "listId": "{{checkItemListId}}",
+  "dueDate": "2026-12-01T09:00:00Z",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checkItemKeepCard", response.body.data.id); %}
+
+### Give it a live checklist with an open check item.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Live",
+  "cardId": "{{checkItemKeepCard}}"
+}
+
+> {% client.global.set("checkItemKeepLive", response.body.data.id); %}
+
+### Add the open check item.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Open",
+  "checklistId": "{{checkItemKeepLive}}"
+}
+
+### Give it a second checklist, which gets archived and deleted.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Doomed",
+  "cardId": "{{checkItemKeepCard}}"
+}
+
+> {% client.global.set("checkItemKeepArchived", response.body.data.id); %}
+
+### Add a checked check item to it.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Checked",
+  "isChecked": true,
+  "checklistId": "{{checkItemKeepArchived}}"
+}
+
+### Archive it, so it can be deleted. 204, and the live checklist still holds a counted check item, so nothing is copied.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemKeepArchived}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Delete it. 204.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemKeepArchived}}
+X-User-Id: {{actorId}}
+
+### Read the card. 200 with isDueComplete false and checkItemCount 1, because an archived checklist's check items weren't counted, so deleting it copies nothing.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemKeepCard}}
+X-User-Id: {{actorId}}
+
+### Search the check item list for complete cards. 200 with Completion card, Delete copy card, and Archive copy card, because the filter reads the computed value.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{checkItemListId}}&isDueComplete=true&pageSize=100
+X-User-Id: {{actorId}}
+
+### Search it for cards that aren't complete. 200 with Keep stored card alone, because a card with no due date never matches either way.
+GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{checkItemListId}}&isDueComplete=false&pageSize=100
+X-User-Id: {{actorId}}
+
+### Create the card the archived checks write to.
+POST {{prodigy_board_API_HostAddress}}/api/v1/cards
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "title": "Archived checks card",
+  "listId": "{{checkItemListId}}",
+  "isDueComplete": false
+}
+
+> {% client.global.set("checkItemHiddenCard", response.body.data.id); %}
+
+### Give it the checklist that gets archived.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Put away",
+  "cardId": "{{checkItemHiddenCard}}"
+}
+
+> {% client.global.set("checkItemHiddenList", response.body.data.id); %}
+
+### Give it a check item.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Hidden step",
+  "checklistId": "{{checkItemHiddenList}}"
+}
+
+> {% client.global.set("checkItemHidden", response.body.data.id); %}
+
+### Give the card a second checklist that stays live.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Still live",
+  "cardId": "{{checkItemHiddenCard}}"
+}
+
+> {% client.global.set("checkItemLiveList", response.body.data.id); %}
+
+### Give that one a check item.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Live step",
+  "checklistId": "{{checkItemLiveList}}"
+}
+
+> {% client.global.set("checkItemLive", response.body.data.id); %}
+
+### Archive the first checklist. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemHiddenList}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Read its check items with the default filter. 200 with empty data, because exclude hides check items on archived checklists.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items?checklistId={{checkItemHiddenList}}
+X-User-Id: {{actorId}}
+
+### Read them with archived=include. 200 with the hidden step.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items?checklistId={{checkItemHiddenList}}&archived=include
+X-User-Id: {{actorId}}
+
+### Read the archived checklist. 200, and checkItems still holds it, because a checklist embeds every check item whatever its state.
+GET {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemHiddenList}}
+X-User-Id: {{actorId}}
+
+### Create a check item on the archived checklist. 409 archived on checklistId.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Too late",
+  "checklistId": "{{checkItemHiddenList}}"
+}
+
+### Rename the check item on the archived checklist. 409 archived with a null field, "The checklist this check item is on is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemHidden}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed"
+}
+
+### Check it. 409 archived with a null field.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemHidden}}/checked
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Move it out of the archived checklist. 409 archived with a null field, because an archived checklist is read-only both ways.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemHidden}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "{{checkItemLiveList}}"
+}
+
+### Delete it. 409 archived with a null field.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemHidden}}
+X-User-Id: {{actorId}}
+
+### Move a live check item into the archived checklist. 409 archived on checklistId, because the field naming the destination carries it.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemLive}}/position
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "checklistId": "{{checkItemHiddenList}}"
+}
+
+### Archive the card. Its live checklist keeps its own flag off.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemHiddenCard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Rename a check item under the archived card. 409 archived with a null field, "The card this check item is on is archived."
+PUT {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemLive}}
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Renamed"
+}
+
+### Read the live checklist's check items. 200 with empty data, because exclude hides check items on hidden cards too.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items?checklistId={{checkItemLiveList}}
+X-User-Id: {{actorId}}
+
+### Read them with archived=include. 200 with the live step.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items?checklistId={{checkItemLiveList}}&archived=include
+X-User-Id: {{actorId}}
+
+### Restore the card.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/cards/{{checkItemHiddenCard}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": false
+}
+
+### Delete a check item. 204, with no archive step, because a check item is one line.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemLive}}
+X-User-Id: {{actorId}}
+
+### Read the deleted check item. 404.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemLive}}
+X-User-Id: {{actorId}}
+
+### Delete it again. 404.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemLive}}
+X-User-Id: {{actorId}}
+
+### Delete a check item with no header. 400 required on X-User-Id.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemWrite}}
+
+### Create the checklist the cascade check deletes.
+POST {{prodigy_board_API_HostAddress}}/api/v1/checklists
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Goes with the checklist",
+  "cardId": "{{checkItemCardId}}"
+}
+
+> {% client.global.set("checkItemCascadeList", response.body.data.id); %}
+
+### Create the check item the checklist takes with it.
+POST {{prodigy_board_API_HostAddress}}/api/v1/check-items
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "name": "Doomed",
+  "checklistId": "{{checkItemCascadeList}}"
+}
+
+> {% client.global.set("checkItemCascade", response.body.data.id); %}
+
+### Archive the checklist, so it can be deleted. 204.
+PUT {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemCascadeList}}/archived
+X-User-Id: {{actorId}}
+Content-Type: application/json
+
+{
+  "value": true
+}
+
+### Delete the checklist. 204, and its check item goes with it.
+DELETE {{prodigy_board_API_HostAddress}}/api/v1/checklists/{{checkItemCascadeList}}
+X-User-Id: {{actorId}}
+
+### Read the check item the deleted checklist held. 404, so the foreign key cascaded.
+GET {{prodigy_board_API_HostAddress}}/api/v1/check-items/{{checkItemCascade}}
+X-User-Id: {{actorId}}

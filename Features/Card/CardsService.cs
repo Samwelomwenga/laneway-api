@@ -23,19 +23,22 @@ public class CardService: ICardService
     private readonly Placements _placements;
     private readonly ArchiveGuard _archive;
     private readonly LabelMatching _labelMatching;
+    private readonly CardCompletion _completion;
 
     public CardService(
         ApplicationDbContext context,
         Actor actor,
         Placements placements,
         ArchiveGuard archive,
-        LabelMatching labelMatching)
+        LabelMatching labelMatching,
+        CardCompletion completion)
     {
         _context = context;
         _actor = actor;
         _placements = placements;
         _archive = archive;
         _labelMatching = labelMatching;
+        _completion = completion;
     }
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
@@ -69,7 +72,7 @@ public class CardService: ICardService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var cardDto = MapToDto(card);
+        var cardDto = MapToDto(card, default);
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card created successfully", 201);
     }
@@ -110,7 +113,7 @@ public class CardService: ICardService
 
         await _context.SaveChangesAsync();
 
-        var cardDto = MapToDto(card);
+        var cardDto = MapToDto(card, await _completion.TallyAsync(id));
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card updated successfully");
     }
@@ -195,7 +198,8 @@ public class CardService: ICardService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        return ApiResponse<CardDto>.SuccessResponse(MapToDto(card), "Card moved successfully");
+        return ApiResponse<CardDto>.SuccessResponse(
+            MapToDto(card, await _completion.TallyAsync(id)), "Card moved successfully");
     }
 
     public async Task<ApiResponse<CardDto>> GetByIdAsync(Guid id)
@@ -208,7 +212,7 @@ public class CardService: ICardService
             return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
         }
 
-        var cardDto = MapToDto(card);
+        var cardDto = MapToDto(card, await _completion.TallyAsync(id));
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card retrieved successfully");
     }
@@ -255,7 +259,7 @@ public class CardService: ICardService
 
         if (searchDto.IsDueComplete is { } isDueComplete)
         {
-            query = query.Where(c => c.DueDate != null && c.IsDueComplete == isDueComplete);
+            query = query.Where(_completion.Matching(isDueComplete));
         }
 
         var (cards, totalCount) = await PagedQuery.ReadAsync(
@@ -263,8 +267,10 @@ public class CardService: ICardService
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
+        var tallies = await _completion.TallyAsync(cards.ConvertAll(c => c.Id));
+
         return PagedResponse<CardDto>.SuccessResponse(
-            cards.Select(MapToDto).ToList(),
+            cards.ConvertAll(card => MapToDto(card, tallies.GetValueOrDefault(card.Id))),
             totalCount,
             pageSize: searchDto.PageSize,
             currentPage: searchDto.PageNumber,
@@ -402,7 +408,7 @@ public class CardService: ICardService
 
     private static ApiError NotOnBoard(string field, Guid labelId, Guid boardId) =>
         new(field, ErrorCodes.NotOnBoard, $"Label {labelId} isn't on board {boardId}.");
-    private static CardDto MapToDto(Card card)
+    private static CardDto MapToDto(Card card, CardTally tally)
     {
         return new CardDto
         (
@@ -412,12 +418,14 @@ public class CardService: ICardService
             card.DueDate,
             card.Position,
             card.ListId,
-            card.IsDueComplete,
+            tally.IsComplete(card),
             card.Cover,
             card.StartDate,
             card.DueReminderMinutes,
             card.IsArchived,
             card.Labels.Select(l => l.Id).ToList(),
+            tally.CheckItemCount,
+            tally.CheckedItemCount,
             card.CreatedAt,
             card.UpdatedAt,
             card.CreatedBy,

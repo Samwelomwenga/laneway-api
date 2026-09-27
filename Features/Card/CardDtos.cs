@@ -16,6 +16,8 @@ public record CardDto
      int? DueReminderMinutes ,
      bool IsArchived ,
      List<Guid> LabelIds,
+     int CheckItemCount,
+     int CheckedItemCount,
       DateTime CreatedAt ,
      DateTime? UpdatedAt ,
      Guid CreatedBy ,

@@ -16,7 +16,9 @@ public static class ErrorCodes
     public const string NotSibling = "notSibling";
     public const string NotAdjacent = "notAdjacent";
     public const string NotOnBoard = "notOnBoard";
+    public const string NotOnCard = "notOnCard";
     public const string Archived = "archived";
     public const string NotArchived = "notArchived";
     public const string NotEmpty = "notEmpty";
+    public const string LimitReached = "limitReached";
 }
