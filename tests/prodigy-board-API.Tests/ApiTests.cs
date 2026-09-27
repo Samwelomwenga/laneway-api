@@ -117,6 +117,91 @@ public abstract class ApiTests : IAsyncLifetime
         return (await response.ReadEnvelope<BoardDto>()).Data!;
     }
 
+    protected Task<HttpResponseMessage> UpdateBoardAsync(
+        Guid id,
+        string name,
+        string? description = null,
+        BoardVisibility visibility = BoardVisibility.Workspace) =>
+        PutAsync($"/api/v1/boards/{id}", new
+        {
+            name,
+            description,
+            visibility = visibility.ToString()
+        });
+
+    protected Task<HttpResponseMessage> MoveBoardAsync(Guid id, Guid workspaceId) =>
+        PutAsync($"/api/v1/boards/{id}/workspace", new { workspaceId });
+
+    protected async Task<ListDto> CreateListAsync(
+        Guid boardId, string name, Color? color = null, object? position = null)
+    {
+        using var response = await PostAsync("/api/v1/lists", new
+        {
+            name,
+            boardId,
+            color = color?.ToString(),
+            position
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.ReadEnvelope<ListDto>()).Data!;
+    }
+
+    protected Task<HttpResponseMessage> UpdateListAsync(Guid id, string name, Color? color = null) =>
+        PutAsync($"/api/v1/lists/{id}", new { name, color = color?.ToString() });
+
+    protected Task<HttpResponseMessage> MoveListAsync(
+        Guid id, Guid boardId, object? position = null, Guid? before = null, Guid? after = null) =>
+        PutAsync($"/api/v1/lists/{id}/position", new { boardId, position, before, after });
+
+    protected async Task<ListDto> ReadListAsync(Guid id)
+    {
+        using var response = await GetAsync($"/api/v1/lists/{id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadEnvelope<ListDto>()).Data!;
+    }
+
+    protected async Task<CardDto> CreateCardAsync(Guid listId, string title)
+    {
+        using var response = await PostAsync("/api/v1/cards", new { title, listId, isDueComplete = false });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.ReadEnvelope<CardDto>()).Data!;
+    }
+
+    protected async Task AddLabelAsync(Guid cardId, Guid labelId)
+    {
+        using var response = await PostAsync($"/api/v1/cards/{cardId}/labels/{labelId}", new { });
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    protected async Task<LabelDto> CreateLabelAsync(Guid boardId, string? name, Color? color = null)
+    {
+        using var response = await PostAsync("/api/v1/labels", new
+        {
+            name,
+            boardId,
+            color = color?.ToString()
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.ReadEnvelope<LabelDto>()).Data!;
+    }
+
+    protected Task<HttpResponseMessage> UpdateLabelAsync(Guid id, string? name, Color? color = null) =>
+        PutAsync($"/api/v1/labels/{id}", new { name, color = color?.ToString() });
+
+    protected Task SetBoardArchivedAsync(Guid id, bool value) =>
+        SetArchivedAsync($"/api/v1/boards/{id}/archived", value);
+
+    protected Task SetListArchivedAsync(Guid id, bool value) =>
+        SetArchivedAsync($"/api/v1/lists/{id}/archived", value);
+
+    private async Task SetArchivedAsync(string path, bool value)
+    {
+        using var response = await PutAsync(path, new { value });
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
     protected async Task<ApiPage<ActivityEntryDto>> ActivityAsync(string query = "")
     {
         using var response = await GetAsync(ActivityPath(query));

@@ -32,6 +32,7 @@ builder.Services.AddHostedService<PendingObjectDrainer>();
 
 builder.Services.AddScoped<Actor>();
 builder.Services.AddScoped<ActivityWriter>();
+builder.Services.AddScoped<ActivityTree>();
 builder.Services.AddScoped<Placements>();
 builder.Services.AddScoped<ArchiveGuard>();
 builder.Services.AddScoped<LabelMatching>();

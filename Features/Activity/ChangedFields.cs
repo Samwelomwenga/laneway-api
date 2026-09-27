@@ -12,20 +12,12 @@ public static class ChangedFields
         return entry.State == EntityState.Modified;
     }
 
-    public static string? Old<TEntity>(this EntityEntry<TEntity> entry, Expression<Func<TEntity, string>> field)
+    public static Was<TValue>? Old<TEntity, TValue>(
+        this EntityEntry<TEntity> entry, Expression<Func<TEntity, TValue>> field)
         where TEntity : class
     {
         ArgumentNullException.ThrowIfNull(entry);
         var property = entry.Property(field);
-        return property.IsModified ? property.OriginalValue : null;
-    }
-
-    public static TValue? Old<TEntity, TValue>(
-        this EntityEntry<TEntity> entry, Expression<Func<TEntity, TValue>> field)
-        where TEntity : class where TValue : struct
-    {
-        ArgumentNullException.ThrowIfNull(entry);
-        var property = entry.Property(field);
-        return property.IsModified ? property.OriginalValue : null;
+        return property.IsModified ? new Was<TValue>(property.OriginalValue) : null;
     }
 }

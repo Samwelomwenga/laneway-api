@@ -20,19 +20,25 @@ public class ListService : IListService
     private readonly Placements _placements;
     private readonly ArchiveGuard _archive;
     private readonly LabelMatching _labelMatching;
+    private readonly ActivityWriter _activity;
+    private readonly ActivityTree _tree;
 
     public ListService(
         ApplicationDbContext context,
         Actor actor,
         Placements placements,
         ArchiveGuard archive,
-        LabelMatching labelMatching)
+        LabelMatching labelMatching,
+        ActivityWriter activity,
+        ActivityTree tree)
     {
         _context = context;
         _actor = actor;
         _placements = placements;
         _archive = archive;
         _labelMatching = labelMatching;
+        _activity = activity;
+        _tree = tree;
     }
 
     public async Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto)
@@ -59,6 +65,11 @@ public class ListService : IListService
         var list = MapToEntity(createListDto, _actor.Id, placed.Position);
 
         _context.Lists.Add(list);
+        var chain = await _tree.BoardAsync(boardId);
+        await _activity.AddAsync(
+            ActivityType.CreateList,
+            chain.PlaceOn(list.Id),
+            actor => new CreateListData(actor, chain.Workspace, chain.Board, ListRef.Of(list)));
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
         var listDto = MapToDto(list);
@@ -84,6 +95,17 @@ public class ListService : IListService
         list.Name = updateListDto.Name!;
         list.Color = updateListDto.Color;
         _context.StampChange(list, _actor);
+
+        var tracked = _context.Entry(list);
+        if (tracked.Changed())
+        {
+            var old = ListFields.Changed(tracked);
+            var chain = await _tree.BoardAsync(list.BoardId);
+            await _activity.AddAsync(
+                ActivityType.UpdateList,
+                chain.PlaceOn(list.Id),
+                actor => new UpdateListData(actor, chain.Workspace, chain.Board, ListRef.Of(list), old));
+        }
 
         await _context.SaveChangesAsync();
         var listDto = MapToDto(list, list.Cards.InSortOrder().Select(c => c.Id).ToList());
@@ -128,18 +150,44 @@ public class ListService : IListService
             return ArchiveErrors.NoCreate<ListDto>(archived, "boardId", TreeItem.List);
         }
 
+        var createdLabels = new List<LabelRef>();
         if (crossesBoards)
         {
             var cards = await _context.Cards
                 .Where(card => card.ListId == id)
                 .Include(card => card.Labels)
                 .ToListAsync();
-            await _labelMatching.CarryToBoardAsync(cards, boardId);
+            var matches = await _labelMatching.CarryToBoardAsync(cards, boardId);
+            createdLabels.AddRange(matches.Where(match => match.Created).Select(match => LabelRef.Of(match.To)));
         }
 
+        var leaving = list.BoardId;
+        var wasAt = list.Position;
         list.BoardId = boardId;
         list.Position = placed.Position;
         _context.StampChange(list, _actor);
+
+        if (_context.Entry(list).Changed())
+        {
+            var to = await _tree.BoardAsync(boardId);
+            var origin = crossesBoards ? await OriginAsync(leaving, to) : null;
+            await _activity.AddAsync(
+                ActivityType.MoveList,
+                new ActivityPlace(
+                    WorkspaceId: to.Workspace.Id,
+                    BoardId: to.Board.Id,
+                    ListId: list.Id,
+                    FromWorkspaceId: origin?.Workspace?.Id,
+                    FromBoardId: origin?.Board.Id),
+                actor => new MoveListData(
+                    actor,
+                    to.Workspace,
+                    to.Board,
+                    ListRef.Of(list),
+                    new PositionChange(wasAt, list.Position),
+                    origin,
+                    createdLabels.Count > 0 ? createdLabels : null));
+        }
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -161,7 +209,14 @@ public class ListService : IListService
             return ArchiveErrors.RestoreFirst<bool>(archived, TreeItem.List);
         }
 
-        return await _context.SetArchivedAsync(list, _actor, archivedDto, "List");
+        return await _context.SetArchivedAsync(list, _actor, archivedDto, "List", async archived =>
+        {
+            var chain = await _tree.BoardAsync(list.BoardId);
+            await _activity.AddAsync(
+                archived ? ActivityType.ArchiveList : ActivityType.RestoreList,
+                chain.PlaceOn(list.Id),
+                actor => new ArchiveListData(actor, chain.Workspace, chain.Board, ListRef.Of(list)));
+        });
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
@@ -177,7 +232,12 @@ public class ListService : IListService
             return ArchiveErrors.NotArchived<bool>(TreeItem.List);
         }
 
+        var chain = await _tree.BoardAsync(list.BoardId);
         _context.Lists.Remove(list);
+        await _activity.AddAsync(
+            ActivityType.DeleteList,
+            chain.PlaceOn(list.Id),
+            actor => new DeleteListData(actor, chain.Workspace, chain.Board, ListRef.Of(list)));
         await _context.SaveChangesAsync();
 
         return ApiResponse<bool>.SuccessResponse(true, "List deleted successfully", 204);
@@ -232,6 +292,12 @@ public class ListService : IListService
             currentPage: searchDto.PageNumber,
             message: "Lists retrieved successfully"
         );
+    }
+
+    private async Task<ListOrigin> OriginAsync(Guid leftBoardId, BoardChain to)
+    {
+        var from = await _tree.BoardAsync(leftBoardId);
+        return new ListOrigin(from.Workspace.Id == to.Workspace.Id ? null : from.Workspace, from.Board);
     }
 
     private static ListDto MapToDto(List list, List<Guid>? cardIds = null)

@@ -51,6 +51,7 @@ public sealed class ActivityWriter
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
         JsonSettings.Apply(options);
+        options.Converters.Add(new WasConverter());
         return options;
     }
 

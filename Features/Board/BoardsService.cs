@@ -18,12 +18,21 @@ public class BoardService : IBoardService
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
     private readonly ArchiveGuard _archive;
+    private readonly ActivityWriter _activity;
+    private readonly ActivityTree _tree;
 
-    public BoardService(ApplicationDbContext context, Actor actor, ArchiveGuard archive)
+    public BoardService(
+        ApplicationDbContext context,
+        Actor actor,
+        ArchiveGuard archive,
+        ActivityWriter activity,
+        ActivityTree tree)
     {
         _context = context;
         _actor = actor;
         _archive = archive;
+        _activity = activity;
+        _tree = tree;
     }
 
     public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(BoardSearchDto searchDto)
@@ -86,13 +95,17 @@ public class BoardService : IBoardService
     public async Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto)
     {
         var workspaceId = createBoardDto.WorkspaceId!.Value;
-        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
+        if (await _tree.FindWorkspaceAsync(workspaceId) is not { } workspace)
         {
             return WorkspaceNotFound(workspaceId);
         }
 
         var boardEntity = MapToEntity(createBoardDto, _actor.Id);
         _context.Boards.Add(boardEntity);
+        await _activity.AddAsync(
+            ActivityType.CreateBoard,
+            new ActivityPlace(WorkspaceId: workspaceId, BoardId: boardEntity.Id),
+            actor => new CreateBoardData(actor, workspace, BoardRef.Of(boardEntity)));
         await _context.SaveChangesAsync();
         var boardDto = MapToDto(boardEntity);
         return ApiResponse<BoardDto>.SuccessResponse(boardDto, "Board created successfully", 201);
@@ -118,6 +131,17 @@ public class BoardService : IBoardService
         existingBoard.Visibility = updateBoardDto.Visibility!.Value;
         _context.StampChange(existingBoard, _actor);
 
+        var tracked = _context.Entry(existingBoard);
+        if (tracked.Changed())
+        {
+            var old = BoardFields.Changed(tracked);
+            var workspace = await _tree.WorkspaceAsync(existingBoard.WorkspaceId);
+            await _activity.AddAsync(
+                ActivityType.UpdateBoard,
+                new ActivityPlace(WorkspaceId: existingBoard.WorkspaceId, BoardId: existingBoard.Id),
+                actor => new UpdateBoardData(actor, workspace, BoardRef.Of(existingBoard), old));
+        }
+
         await _context.SaveChangesAsync();
         var updatedBoardDto = MapToDto(existingBoard, existingBoard.Lists.InSortOrder().Select(l => l.Id).ToList());
         return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
@@ -141,13 +165,24 @@ public class BoardService : IBoardService
         }
 
         var workspaceId = moveBoardDto.WorkspaceId!.Value;
-        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
+        if (await _tree.FindWorkspaceAsync(workspaceId) is not { } workspace)
         {
             return WorkspaceNotFound(workspaceId);
         }
 
+        var leaving = board.WorkspaceId;
         board.WorkspaceId = workspaceId;
         _context.StampChange(board, _actor);
+
+        if (_context.Entry(board).Changed())
+        {
+            var from = await _tree.WorkspaceAsync(leaving);
+            await _activity.AddAsync(
+                ActivityType.MoveBoard,
+                new ActivityPlace(
+                    WorkspaceId: workspaceId, BoardId: board.Id, FromWorkspaceId: from.Id),
+                actor => new MoveBoardData(actor, workspace, BoardRef.Of(board), new BoardOrigin(from)));
+        }
 
         await _context.SaveChangesAsync();
         var movedBoardDto = MapToDto(board, board.Lists.InSortOrder().Select(l => l.Id).ToList());
@@ -162,7 +197,14 @@ public class BoardService : IBoardService
             return ApiResponse<bool>.ErrorResponse("Board not found", 404);
         }
 
-        return await _context.SetArchivedAsync(board, _actor, archivedDto, "Board");
+        return await _context.SetArchivedAsync(board, _actor, archivedDto, "Board", async archived =>
+        {
+            var workspace = await _tree.WorkspaceAsync(board.WorkspaceId);
+            await _activity.AddAsync(
+                archived ? ActivityType.ArchiveBoard : ActivityType.RestoreBoard,
+                new ActivityPlace(WorkspaceId: board.WorkspaceId, BoardId: board.Id),
+                actor => new ArchiveBoardData(actor, workspace, BoardRef.Of(board)));
+        });
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
@@ -178,7 +220,12 @@ public class BoardService : IBoardService
             return ArchiveErrors.NotArchived<bool>(TreeItem.Board);
         }
 
+        var workspace = await _tree.WorkspaceAsync(existingBoard.WorkspaceId);
         _context.Boards.Remove(existingBoard);
+        await _activity.AddAsync(
+            ActivityType.DeleteBoard,
+            new ActivityPlace(WorkspaceId: existingBoard.WorkspaceId, BoardId: existingBoard.Id),
+            actor => new DeleteBoardData(actor, workspace, BoardRef.Of(existingBoard)));
         await _context.SaveChangesAsync();
         return ApiResponse<bool>.SuccessResponse(true, "Board deleted successfully", 204);
     }
