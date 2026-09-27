@@ -91,6 +91,37 @@ public sealed class QueryReader
         return Enum.Parse<TEnum>(match);
     }
 
+    public List<TEnum> EnumNames<TEnum>(string key) where TEnum : struct, Enum
+    {
+        if (Value(key) is not { } value)
+        {
+            return [];
+        }
+
+        var names = Enum.GetNames<TEnum>();
+        var chosen = new List<TEnum>();
+        foreach (var part in value.Split(',').Select(part => part.Trim()))
+        {
+            if (part.Length == 0)
+            {
+                Add(key, ErrorCodes.InvalidFormat, $"'{key}' has an empty entry.");
+                continue;
+            }
+
+            var match = names.FirstOrDefault(name => string.Equals(name, part, StringComparison.OrdinalIgnoreCase));
+            if (match is null)
+            {
+                Add(key, ErrorCodes.UnknownValue,
+                    $"'{key}' doesn't take '{part}'. It takes one or more of: {string.Join(", ", names)}.");
+                continue;
+            }
+
+            chosen.Add(Enum.Parse<TEnum>(match));
+        }
+
+        return chosen;
+    }
+
     public DateOnly? Day(string key)
     {
         if (Value(key) is not { } value)

@@ -25,6 +25,10 @@ file_size_limit = "10MiB"
 public = false
 file_size_limit = "10MiB"
 
+[storage.buckets.attachments-test]
+public = false
+file_size_limit = "10MiB"
+
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:54421"

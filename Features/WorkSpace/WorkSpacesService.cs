@@ -16,11 +16,13 @@ public class WorkSpaceService : IWorkSpaceService
 {
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
+    private readonly ActivityWriter _activity;
 
-    public WorkSpaceService(ApplicationDbContext context, Actor actor)
+    public WorkSpaceService(ApplicationDbContext context, Actor actor, ActivityWriter activity)
     {
         _context = context;
         _actor = actor;
+        _activity = activity;
     }
 
     public async Task<ApiResponse<List<WorkSpaceDto>>> GetAllAsync(WorkSpaceSearchDto searchDto)
@@ -71,6 +73,10 @@ public class WorkSpaceService : IWorkSpaceService
     {
         var newWorkSpace = MapToEntity(createWorkSpaceDto, _actor.Id);
         _context.WorkSpaces.Add(newWorkSpace);
+        await _activity.AddAsync(
+            ActivityType.CreateWorkspace,
+            ActivityPlace.OnWorkspace(newWorkSpace.Id),
+            actor => new CreateWorkspaceData(actor, WorkspaceRef.Of(newWorkSpace)));
         await _context.SaveChangesAsync();
         return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(newWorkSpace), "Workspace created successfully", 201);
     }
@@ -89,6 +95,16 @@ public class WorkSpaceService : IWorkSpaceService
         existingWorkSpace.Description = updateWorkSpaceDto.Description ?? string.Empty;
         existingWorkSpace.Visibility = updateWorkSpaceDto.Visibility!.Value;
         _context.StampChange(existingWorkSpace, _actor);
+
+        var tracked = _context.Entry(existingWorkSpace);
+        if (tracked.Changed())
+        {
+            var old = WorkspaceFields.Changed(tracked);
+            await _activity.AddAsync(
+                ActivityType.UpdateWorkspace,
+                ActivityPlace.OnWorkspace(existingWorkSpace.Id),
+                actor => new UpdateWorkspaceData(actor, WorkspaceRef.Of(existingWorkSpace), old));
+        }
 
         await _context.SaveChangesAsync();
 
@@ -112,6 +128,10 @@ public class WorkSpaceService : IWorkSpaceService
         }
 
         _context.WorkSpaces.Remove(workSpace);
+        await _activity.AddAsync(
+            ActivityType.DeleteWorkspace,
+            ActivityPlace.OnWorkspace(workSpace.Id),
+            actor => new DeleteWorkspaceData(actor, WorkspaceRef.Of(workSpace)));
         await _context.SaveChangesAsync();
         return ApiResponse<bool>.SuccessResponse(true, "Workspace deleted successfully", 204);
     }
