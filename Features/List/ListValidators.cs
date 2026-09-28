@@ -28,3 +28,13 @@ public sealed class MoveListDtoValidator : AbstractValidator<MoveListDto>
         this.ValidPlacement();
     }
 }
+
+public sealed class CopyListDtoValidator : AbstractValidator<CopyListDto>
+{
+    public CopyListDtoValidator()
+    {
+        RuleFor(x => x.BoardId).Required();
+        RuleFor(x => x.Name).MaxLength(FieldLimits.ListName);
+        this.ValidPlacement();
+    }
+}

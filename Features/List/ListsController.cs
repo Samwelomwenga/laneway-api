@@ -7,10 +7,12 @@ namespace DefaultNamespace;
 public class ListsController: ApiControllerBase
 {
     private readonly IListService _listService;
+    private readonly IListCopyService _listCopyService;
 
-    public ListsController(IListService listService)
+    public ListsController(IListService listService, IListCopyService listCopyService)
     {
         _listService = listService;
+        _listCopyService = listCopyService;
     }
 
     [HttpGet]
@@ -36,6 +38,18 @@ public class ListsController: ApiControllerBase
             return ToActionResult(response);
         }
         return CreatedAtAction(nameof(GetList), new { id = response.Data!.Id }, response);
+    }
+
+    [HttpPost("{id}/copies")]
+    public async Task<ActionResult<ApiResponse<CopyJobDto>>> CopyList(Guid id, [FromBody] CopyListDto copyListDto)
+    {
+        var response = await _listCopyService.CopyAsync(id, copyListDto);
+        if (!response.Success)
+        {
+            return ToActionResult(response);
+        }
+        return AcceptedAtAction(
+            nameof(CopyJobsController.GetCopyJob), "CopyJobs", new { id = response.Data!.Id }, response);
     }
 
     [HttpPut("{id}")]

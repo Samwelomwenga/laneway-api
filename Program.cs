@@ -29,6 +29,9 @@ builder.Services.Configure<AttachmentStorageOptions>(
     builder.Configuration.GetSection(AttachmentStorageOptions.Section));
 builder.Services.AddSingleton<AttachmentStorage>();
 builder.Services.AddHostedService<PendingObjectDrainer>();
+builder.Services.AddSingleton<CopyJobSignal>();
+builder.Services.AddSingleton<CopyJobClaims>();
+builder.Services.AddHostedService<CopyJobWorker>();
 
 builder.Services.AddScoped<Actor>();
 builder.Services.AddScoped<ActivityWriter>();
@@ -38,6 +41,8 @@ builder.Services.AddScoped<ArchiveGuard>();
 builder.Services.AddScoped<LabelMatching>();
 builder.Services.AddScoped<CardCompletion>();
 builder.Services.AddScoped<CardSnapshots>();
+builder.Services.AddScoped<ListSnapshots>();
+builder.Services.AddScoped<CopyJobSweep>();
 builder.Services.AddScoped<ObjectCopies>();
 builder.Services.AddScoped<AttachmentCounts>();
 builder.Services.AddScoped<CommentCounts>();
@@ -51,6 +56,9 @@ builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<IChecklistService, ChecklistService>();
 builder.Services.AddScoped<ILabelService, LabelService>();
 builder.Services.AddScoped<IListService, ListService>();
+builder.Services.AddScoped<IListCopyService, ListCopyService>();
+builder.Services.AddScoped<ICopyJobService, CopyJobService>();
+builder.Services.AddScoped<ICopyJobRunner, ListCopyRunner>();
 builder.Services.AddScoped<IWorkSpaceService, WorkSpaceService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAccountService, AccountService>();

@@ -19,6 +19,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Attachment> Attachments { get; set; }
     public DbSet<PendingObjectDelete> PendingObjectDeletes { get; set; }
     public DbSet<ActivityEntry> ActivityEntries { get; set; }
+    public DbSet<CopyJob> CopyJobs { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Account> Accounts { get; set; }
 
@@ -210,6 +211,20 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.CardId)
                 .HasDatabaseName("IX_ActivityEntries_CardId_Comment")
                 .HasFilter($"\"Type\" = '{nameof(ActivityType.Comment)}'");
+        });
+
+        modelBuilder.Entity<CopyJob>(entity =>
+        {
+            entity.Property(job => job.Request).HasColumnType("jsonb");
+            entity.Property(job => job.Errors).HasColumnType("jsonb");
+            entity.Property(job => job.CreatedAt).HasColumnType("timestamp with time zone");
+            entity.Property(job => job.StartedAt).HasColumnType("timestamp with time zone");
+            entity.Property(job => job.FinishedAt).HasColumnType("timestamp with time zone");
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(job => job.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(job => new { job.FinishedAt, job.CreatedAt });
         });
 
         modelBuilder.Entity<Label>(entity =>

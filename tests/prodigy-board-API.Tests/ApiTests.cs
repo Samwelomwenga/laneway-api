@@ -368,10 +368,76 @@ public abstract class ApiTests : IAsyncLifetime
         return await read(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
     }
 
+    protected async Task<T> FromServicesAsync<T>(Func<IServiceProvider, Task<T>> use)
+    {
+        ArgumentNullException.ThrowIfNull(use);
+
+        var factory = _factory ?? throw new InvalidOperationException("The test host isn't up yet.");
+        await using var scope = factory.Services.CreateAsyncScope();
+        return await use(scope.ServiceProvider);
+    }
+
     protected static string CopyPath(Guid cardId) => $"/api/v1/cards/{cardId}/copies";
+
+    protected static string ListCopyPath(Guid listId) => $"/api/v1/lists/{listId}/copies";
+
+    protected static string CopyJobPath(Guid id) => $"/api/v1/copy-jobs/{id}";
 
     protected Task<HttpResponseMessage> SendCardCopyAsync(Guid id, object body, Guid? actor = null) =>
         PostAsync(CopyPath(id), body, actor);
+
+    protected Task<HttpResponseMessage> SendListCopyAsync(Guid id, object body, Guid? actor = null) =>
+        PostAsync(ListCopyPath(id), body, actor);
+
+    protected async Task<CopyJobDto> CopyListAsync(
+        Guid id,
+        Guid boardId,
+        string? name = null,
+        IEnumerable<string>? keep = null,
+        object? position = null,
+        Guid? before = null,
+        Guid? after = null,
+        Guid? actor = null)
+    {
+        using var response = await SendListCopyAsync(
+            id, new { boardId, name, keep, position, before, after }, actor);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        return (await response.ReadEnvelope<CopyJobDto>()).Data!;
+    }
+
+    protected async Task<CopyJobDto> ReadCopyJobAsync(Guid id)
+    {
+        using var response = await GetAsync(CopyJobPath(id));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadEnvelope<CopyJobDto>()).Data!;
+    }
+
+    protected async Task<CopyJobDto> AwaitCopyJobAsync(Guid id, CopyJobStatus status = CopyJobStatus.Succeeded)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        while (true)
+        {
+            var job = await ReadCopyJobAsync(id);
+            if (job.Status == status)
+            {
+                return job;
+            }
+
+            if (job.FinishedAt is not null || DateTime.UtcNow > deadline)
+            {
+                throw new InvalidOperationException(
+                    $"Copy job {id} is {job.Status}, not {status}. Errors: {Described(job.Errors)}");
+            }
+
+            await Task.Delay(100);
+        }
+    }
+
+    protected async Task<List<CardDto>> ReadCardsOfListAsync(Guid listId) =>
+        (await ReadCardsAsync($"listId={listId}&pageSize=100")).Entries;
+
+    private static string Described(List<ApiError>? errors) =>
+        errors is null ? "none" : string.Join("; ", errors.Select(error => $"{error.Field}/{error.Code}"));
 
     protected async Task<CardDto> CopyCardAsync(
         Guid id,

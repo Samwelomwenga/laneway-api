@@ -67,14 +67,15 @@ public sealed class CardCopyService : ICardCopyService
             return CardNotFound();
         }
 
-        var plan = CardCopyPlan.From(snapshot, copyCardDto.Title, CopyKeep.Of(copyCardDto.Keep), DateTime.UtcNow);
+        var plan = CopyPlan.Of([], [snapshot], CopyKeep.Of(copyCardDto.Keep), DateTime.UtcNow);
+        var title = string.IsNullOrEmpty(copyCardDto.Title) ? snapshot.Card.Title : copyCardDto.Title;
         var pending = await _objects.QueueAsync(plan.Objects);
         var copied = await _objects.CopyAsync(plan.Objects);
 
         ApiResponse<CardDto> written;
         try
         {
-            written = await WriteAsync(new CardCopy(snapshot, plan, listId, placement, copied, pending));
+            written = await WriteAsync(new CardCopy(snapshot, plan, title, listId, placement, copied, pending));
         }
         catch
         {
@@ -131,7 +132,7 @@ public sealed class CardCopyService : ICardCopyService
 
     private async Task<ApiResponse<CardDto>?> WriteOnceAsync(CardCopy copy)
     {
-        var (snapshot, plan, listId, placement, copied, pending) = copy;
+        var (snapshot, plan, title, listId, placement, copied, pending) = copy;
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -168,30 +169,29 @@ public sealed class CardCopyService : ICardCopyService
         }
 
         var (labels, swaps) = await LabelsOnAsync(snapshot, plan.Keep, boardId);
-        var card = BuildCard(snapshot, plan, listId, placed.Position, labels);
-        var checklists = BuildChecklists(snapshot, plan);
-        var attachments = BuildAttachments(snapshot, plan, copied);
+        var rows = new CardCopyRows(plan, _actor.Id, copied)
+            .Build(snapshot, listId, placed.Position, title, labels);
 
-        _context.Cards.Add(card);
-        _context.Checklists.AddRange(checklists);
-        _context.Attachments.AddRange(attachments);
+        _context.Cards.Add(rows.Card);
+        _context.Checklists.AddRange(rows.Checklists);
+        _context.Attachments.AddRange(rows.Attachments);
         _objects.Keep(pending);
-        await RecordAsync(snapshot, plan, card, sourceListId, listId, swaps);
+        await RecordAsync(snapshot, plan, rows.Card, sourceListId, listId, swaps);
         await _context.SaveChangesAsync();
 
-        if (CoverOf(snapshot, plan, attachments) is { } cover)
+        if (rows.CoverId is { } cover)
         {
-            card.CoverAttachmentId = cover;
+            rows.Card.CoverAttachmentId = cover;
             await _context.SaveChangesAsync();
         }
 
         await transaction.CommitAsync();
 
-        var items = checklists.SelectMany(checklist => checklist.CheckItems).ToList();
+        var items = rows.Checklists.SelectMany(checklist => checklist.CheckItems).ToList();
         var tally = new CardTally(items.Count, items.Count(item => item.IsChecked));
 
         return ApiResponse<CardDto>.SuccessResponse(
-            CardView.Of(card, tally, attachments.Count, commentCount: 0), "Card copied successfully", 201);
+            CardView.Of(rows.Card, tally, rows.Attachments.Count, commentCount: 0), "Card copied successfully", 201);
     }
 
     private async Task<(List<Label> Labels, List<LabelSwap>? Swaps)> LabelsOnAsync(
@@ -219,108 +219,9 @@ public sealed class CardCopyService : ICardCopyService
                 new LabelSwap(LabelRef.Of(match.From), LabelRef.Of(match.To), match.Created)));
     }
 
-    private Card BuildCard(
-        CardSnapshot snapshot, CardCopyPlan plan, Guid listId, double position, List<Label> labels)
-    {
-        var source = snapshot.Card;
-        var card = new Card
-        {
-            Id = plan.CardId,
-            Title = plan.Title,
-            Description = source.Description,
-            DueDate = source.DueDate,
-            Position = position,
-            ListId = listId,
-            IsDueComplete = snapshot.IsDueComplete,
-            StartDate = source.StartDate,
-            DueReminderMinutes = source.DueReminderMinutes,
-            CoverColor = source.CoverColor,
-            CreatedAt = plan.CreatedAtFor(source.Id),
-            CreatedBy = _actor.Id
-        };
-        card.Labels.AddRange(labels);
-
-        return card;
-    }
-
-    private List<Checklist> BuildChecklists(CardSnapshot snapshot, CardCopyPlan plan)
-    {
-        if (!plan.Keep.Checklists)
-        {
-            return [];
-        }
-
-        return snapshot.Checklists.ConvertAll(source => new Checklist
-        {
-            Id = plan.IdFor(source.Id),
-            Name = source.Name,
-            CardId = plan.CardId,
-            Position = source.Position,
-            CreatedAt = plan.CreatedAtFor(source.Id),
-            CreatedBy = _actor.Id,
-            CheckItems = source.CheckItems.ConvertAll(item => new CheckItem
-            {
-                Id = plan.IdFor(item.Id),
-                Name = item.Name,
-                ChecklistId = plan.IdFor(source.Id),
-                Position = item.Position,
-                IsChecked = item.IsChecked,
-                CreatedAt = plan.CreatedAtFor(item.Id),
-                CreatedBy = _actor.Id
-            })
-        });
-    }
-
-    private List<Attachment> BuildAttachments(CardSnapshot snapshot, CardCopyPlan plan, HashSet<string> copied)
-    {
-        if (!plan.Keep.Attachments)
-        {
-            return [];
-        }
-
-        var attachments = new List<Attachment>();
-        foreach (var source in snapshot.Attachments)
-        {
-            var id = plan.IdFor(source.Id);
-            var objectKey = source.ObjectKey is null ? null : AttachmentStorage.KeyFor(plan.CardId, id);
-            if (objectKey is not null && !copied.Contains(objectKey))
-            {
-                continue;
-            }
-
-            attachments.Add(new Attachment
-            {
-                Id = id,
-                CardId = plan.CardId,
-                Kind = source.Kind,
-                Name = source.Name,
-                Url = source.Url,
-                FileName = source.FileName,
-                MimeType = source.MimeType,
-                Bytes = source.Bytes,
-                ObjectKey = objectKey,
-                CreatedAt = plan.CreatedAtFor(source.Id),
-                CreatedBy = _actor.Id
-            });
-        }
-
-        return attachments;
-    }
-
-    private static Guid? CoverOf(CardSnapshot snapshot, CardCopyPlan plan, List<Attachment> attachments)
-    {
-        if (!plan.Keep.Attachments || snapshot.Card.CoverAttachmentId is not { } covering)
-        {
-            return null;
-        }
-
-        var id = plan.IdFor(covering);
-        return attachments.Exists(attachment => attachment.Id == id) ? id : null;
-    }
-
     private async Task RecordAsync(
         CardSnapshot snapshot,
-        CardCopyPlan plan,
+        CopyPlan plan,
         Card card,
         Guid sourceListId,
         Guid listId,
@@ -358,7 +259,8 @@ public sealed class CardCopyService : ICardCopyService
 
     private sealed record CardCopy(
         CardSnapshot Snapshot,
-        CardCopyPlan Plan,
+        CopyPlan Plan,
+        string Title,
         Guid ListId,
         Placement Placement,
         HashSet<string> Copied,

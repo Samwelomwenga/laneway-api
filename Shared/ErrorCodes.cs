@@ -25,4 +25,5 @@ public static class ErrorCodes
     public const string TooLarge = "tooLarge";
     public const string NotImage = "notImage";
     public const string NotAuthor = "notAuthor";
+    public const string InternalError = "internalError";
 }

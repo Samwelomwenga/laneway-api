@@ -30,6 +30,9 @@ public sealed class Placements
         return await InListAsync(listId, placement, card);
     }
 
+    public Task<PlacementResult> CheckOnBoardAsync(Guid boardId, Placement placement) =>
+        OnBoardAsync(boardId, placement, moving: null);
+
     public async Task<PlacementResult> ResolveOnBoardAsync(Guid boardId, Placement placement)
     {
         await _context.LockBoardsAsync(boardId);

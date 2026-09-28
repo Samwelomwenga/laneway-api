@@ -93,7 +93,26 @@ public sealed record MoveListData(
 
 public sealed record DeleteListData(ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, ListRef List);
 
-public sealed record ListOrigin(WorkspaceRef? Workspace, BoardRef Board);
+public sealed record ListOrigin(WorkspaceRef? Workspace, BoardRef Board)
+{
+    public static ListOrigin Between(BoardChain from, BoardChain to)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
+
+        return new ListOrigin(from.Workspace.Id == to.Workspace.Id ? null : from.Workspace, from.Board);
+    }
+}
+
+public sealed record CopyListData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    ListRef Source,
+    ListOrigin? From,
+    IReadOnlyList<CopyPart> Keep,
+    IReadOnlyList<LabelRef>? CreatedLabels);
 
 public sealed record PositionChange(double Old, double New);
 
