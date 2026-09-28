@@ -314,3 +314,59 @@ public sealed record CheckItemFields(Was<string>? Name)
     public static CheckItemFields Changed(EntityEntry<CheckItem> tracked) => new(
         tracked.Old(checkItem => checkItem.Name));
 }
+
+public sealed record AttachmentRef(Guid Id, string Name, AttachmentKind Kind)
+{
+    public static AttachmentRef Of(Attachment attachment)
+    {
+        ArgumentNullException.ThrowIfNull(attachment);
+        return new AttachmentRef(attachment.Id, attachment.Name, attachment.Kind);
+    }
+}
+
+public sealed record AddAttachmentData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    AttachmentRef Attachment);
+
+public sealed record UpdateAttachmentData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    AttachmentRef Attachment,
+    AttachmentFields Old);
+
+public sealed record DeleteAttachmentData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    AttachmentRef Attachment,
+    bool? WasCover);
+
+public sealed record AttachmentFields(Was<string>? Name)
+{
+    public static AttachmentFields Changed(EntityEntry<Attachment> tracked) => new(
+        tracked.Old(attachment => attachment.Name));
+}
+
+public sealed record CoverRef(AttachmentRef? Attachment, Color? Color)
+{
+    public static CoverRef? Of(AttachmentRef? attachment, Color? color) =>
+        attachment is null && color is null ? null : new CoverRef(attachment, color);
+}
+
+public sealed record UpdateCardCoverData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    CoverRef? Cover,
+    CoverRef? Old);

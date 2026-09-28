@@ -443,15 +443,38 @@ public class CardService: ICardService
             return ReferenceErrors.Invalid<bool>([error]);
         }
 
+        var wasAttachmentId = card.CoverAttachmentId;
+        var wasColor = card.CoverColor;
         card.CoverAttachmentId = coverDto.AttachmentId;
         card.CoverColor = coverDto.Color;
         _context.StampChange(card, _actor);
+
+        if (_context.Entry(card).Changed())
+        {
+            var cover = CoverRef.Of(await CoverRefAsync(card.CoverAttachmentId), card.CoverColor);
+            var was = CoverRef.Of(await CoverRefAsync(wasAttachmentId), wasColor);
+            var chain = await _tree.ListAsync(card.ListId);
+            await _activity.AddAsync(
+                ActivityType.UpdateCardCover,
+                chain.PlaceOn(card.Id),
+                actor => new UpdateCardCoverData(
+                    actor,
+                    chain.Workspace,
+                    chain.Board,
+                    chain.List,
+                    CardRef.Of(card),
+                    cover,
+                    was));
+        }
 
         await _context.SaveChangesAsync();
 
         return ApiResponse<bool>.SuccessResponse(
             true, coverDto is { AttachmentId: null, Color: null } ? "Cover cleared" : "Cover set", 204);
     }
+
+    private async Task<AttachmentRef?> CoverRefAsync(Guid? attachmentId) =>
+        attachmentId is { } coveredBy ? await _tree.AttachmentRefAsync(coveredBy) : null;
 
     private async Task<ApiError?> CoverErrorAsync(Guid cardId, Guid attachmentId)
     {

@@ -23,6 +23,8 @@ public class AttachmentService : IAttachmentService
     private readonly Actor _actor;
     private readonly ArchiveGuard _archive;
     private readonly AttachmentStorage _storage;
+    private readonly ActivityWriter _activity;
+    private readonly ActivityTree _tree;
     private readonly ILogger<AttachmentService> _logger;
 
     public AttachmentService(
@@ -30,12 +32,16 @@ public class AttachmentService : IAttachmentService
         Actor actor,
         ArchiveGuard archive,
         AttachmentStorage storage,
+        ActivityWriter activity,
+        ActivityTree tree,
         ILogger<AttachmentService> logger)
     {
         _context = context;
         _actor = actor;
         _archive = archive;
         _storage = storage;
+        _activity = activity;
+        _tree = tree;
         _logger = logger;
     }
 
@@ -101,6 +107,7 @@ public class AttachmentService : IAttachmentService
         var attachment = MapFileToEntity(cardId, attachmentId, objectKey, upload);
         _context.Attachments.Add(attachment);
         _context.PendingObjectDeletes.Remove(pending);
+        await RecordAddedAsync(attachment);
 
         await _context.SaveChangesAsync(token);
         await transaction.CommitAsync(token);
@@ -128,6 +135,7 @@ public class AttachmentService : IAttachmentService
 
         var attachment = MapLinkToEntity(cardId, createLinkAttachmentDto);
         _context.Attachments.Add(attachment);
+        await RecordAddedAsync(attachment);
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -155,6 +163,24 @@ public class AttachmentService : IAttachmentService
         attachment.Name = updateAttachmentDto.Name!;
         _context.StampChange(attachment, _actor);
 
+        var tracked = _context.Entry(attachment);
+        if (tracked.Changed())
+        {
+            var old = AttachmentFields.Changed(tracked);
+            var chain = await _tree.CardAsync(cardId);
+            await _activity.AddAsync(
+                ActivityType.UpdateAttachment,
+                chain.Place,
+                actor => new UpdateAttachmentData(
+                    actor,
+                    chain.Workspace,
+                    chain.Board,
+                    chain.List,
+                    chain.Card,
+                    AttachmentRef.Of(attachment),
+                    old));
+        }
+
         await _context.SaveChangesAsync();
 
         return ApiResponse<AttachmentDto>.SuccessResponse(
@@ -174,8 +200,26 @@ public class AttachmentService : IAttachmentService
             return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.Attachment);
         }
 
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await _context.LockCardsAsync(cardId);
+
+        var wasCover = await _context.Cards.AnyAsync(
+            card => card.Id == cardId && card.CoverAttachmentId == id);
+        var chain = await _tree.CardAsync(cardId);
         _context.Attachments.Remove(attachment);
+        await _activity.AddAsync(
+            ActivityType.DeleteAttachment,
+            chain.Place,
+            actor => new DeleteAttachmentData(
+                actor,
+                chain.Workspace,
+                chain.Board,
+                chain.List,
+                chain.Card,
+                AttachmentRef.Of(attachment),
+                wasCover ? true : null));
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         return ApiResponse<bool>.SuccessResponse(true, "Attachment deleted successfully", 204);
     }
@@ -219,6 +263,21 @@ public class AttachmentService : IAttachmentService
 
         var url = await _storage.SignedUrlAsync(objectKey, DownloadSeconds, fileName);
         return ApiResponse<string>.SuccessResponse(url, "Attachment content found", 302);
+    }
+
+    private async Task RecordAddedAsync(Attachment attachment)
+    {
+        var chain = await _tree.CardAsync(attachment.CardId);
+        await _activity.AddAsync(
+            ActivityType.AddAttachment,
+            chain.Place,
+            actor => new AddAttachmentData(
+                actor,
+                chain.Workspace,
+                chain.Board,
+                chain.List,
+                chain.Card,
+                AttachmentRef.Of(attachment)));
     }
 
     private async Task<ApiResponse<AttachmentDto>?> RefusesAsync(Guid cardId)

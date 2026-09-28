@@ -305,6 +305,62 @@ public abstract class ApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
+    protected async Task<AttachmentDto> UploadAttachmentAsync(
+        Guid cardId, string fileName = "shot.png", string? name = null)
+    {
+        using var response = await SendUploadAsync(cardId, fileName, name);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.ReadEnvelope<AttachmentDto>()).Data!;
+    }
+
+    protected async Task<AttachmentDto> CreateLinkAttachmentAsync(Guid cardId, string url, string? name = null)
+    {
+        using var response = await PostAsync(AttachmentPath(cardId), new { url, name });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.ReadEnvelope<AttachmentDto>()).Data!;
+    }
+
+    protected Task<HttpResponseMessage> RenameAttachmentAsync(Guid cardId, Guid id, string name) =>
+        PutAsync($"{AttachmentPath(cardId)}/{id}", new { name });
+
+    protected async Task DeleteAttachmentAsync(Guid cardId, Guid id)
+    {
+        using var response = await DeleteAsync($"{AttachmentPath(cardId)}/{id}");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    protected Task<HttpResponseMessage> SendCoverAsync(Guid cardId, Guid? attachmentId = null, Color? color = null) =>
+        PutAsync($"/api/v1/cards/{cardId}/cover", new { attachmentId, color = color?.ToString() });
+
+    protected async Task SetCoverAsync(Guid cardId, Guid? attachmentId = null, Color? color = null)
+    {
+        using var response = await SendCoverAsync(cardId, attachmentId, color);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    private async Task<HttpResponseMessage> SendUploadAsync(Guid cardId, string fileName, string? name)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, AttachmentPath(cardId));
+        var form = new MultipartFormDataContent();
+        if (name is not null)
+        {
+            form.Add(new StringContent(name), "name");
+        }
+
+        form.Add(new ByteArrayContent(FileBytes(fileName)), "file", fileName);
+        request.Content = form;
+        request.Headers.Add(ActorFilter.HeaderName, ActorId.ToString());
+
+        return await Client.SendAsync(request);
+    }
+
+    private static byte[] FileBytes(string fileName) =>
+        Path.GetExtension(fileName).Equals(".png", StringComparison.OrdinalIgnoreCase)
+            ? [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x0D, 0x0A, 0x1A, 0x0A]
+            : "A line of notes.\n"u8.ToArray();
+
+    private static string AttachmentPath(Guid cardId) => $"/api/v1/cards/{cardId}/attachments";
+
     protected async Task<ApiPage<ActivityEntryDto>> ActivityAsync(string query = "")
     {
         using var response = await GetAsync(ActivityPath(query));

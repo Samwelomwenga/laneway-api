@@ -132,6 +132,12 @@ public sealed class ActivityTree
                     new ChecklistRef(found.checklist.Id, found.checklist.Name)))
             .FirstAsync();
 
+    public async Task<AttachmentRef> AttachmentRefAsync(Guid attachmentId) =>
+        await _context.Attachments
+            .Where(attachment => attachment.Id == attachmentId)
+            .Select(attachment => new AttachmentRef(attachment.Id, attachment.Name, attachment.Kind))
+            .FirstAsync();
+
     public async Task<ChecklistRef> ChecklistRefAsync(Guid checklistId) =>
         await _context.Checklists
             .Where(checklist => checklist.Id == checklistId)
