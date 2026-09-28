@@ -96,7 +96,7 @@ public class CardService: ICardService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var cardDto = MapToDto(card, default, attachmentCount: 0, commentCount: 0);
+        var cardDto = CardView.Of(card, default, attachmentCount: 0, commentCount: 0);
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card created successfully", 201);
     }
@@ -161,7 +161,7 @@ public class CardService: ICardService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var cardDto = MapToDto(
+        var cardDto = CardView.Of(
             card,
             await _completion.TallyAsync(id),
             await _attachments.OnCardAsync(id),
@@ -188,7 +188,7 @@ public class CardService: ICardService
         }
 
         throw new InvalidOperationException(
-            $"Card {id} could not move to list {listId}: the list kept changing board.");
+            $"Card {id} could not move to list {listId}. The list kept changing board.");
     }
 
     private async Task<ApiResponse<CardDto>?> MoveOnceAsync(Guid id, Guid listId, Placement placement)
@@ -208,8 +208,8 @@ public class CardService: ICardService
             return ArchiveErrors.ReadOnly<CardDto>(readOnly, TreeItem.Card);
         }
 
-        var sourceBoardId = await BoardOfListAsync(card.ListId);
-        if (await BoardOfListAsync(listId) is not { } boardId)
+        var sourceBoardId = await _context.BoardOfListAsync(card.ListId);
+        if (await _context.BoardOfListAsync(listId) is not { } boardId)
         {
             return ReferenceErrors.NotFound<CardDto>("listId", "List", listId);
         }
@@ -222,7 +222,7 @@ public class CardService: ICardService
 
         var placed = await _placements.ResolveMoveInListAsync(card, listId, placement);
 
-        var listChangedBoard = await BoardOfListAsync(listId) != boardId;
+        var listChangedBoard = await _context.BoardOfListAsync(listId) != boardId;
         if (listChangedBoard)
         {
             return null;
@@ -255,7 +255,9 @@ public class CardService: ICardService
         if (_context.Entry(card).Changed())
         {
             var to = await _tree.ListAsync(listId);
-            var origin = leaving == listId ? null : await OriginAsync(leaving, to);
+            var origin = leaving == listId
+                ? null
+                : CardOrigin.Between(await _tree.ListAsync(leaving), to);
             await _activity.AddAsync(
                 ActivityType.MoveCard,
                 new ActivityPlace(
@@ -281,11 +283,11 @@ public class CardService: ICardService
         await transaction.CommitAsync();
 
         return ApiResponse<CardDto>.SuccessResponse(
-            MapToDto(
-            card,
-            await _completion.TallyAsync(id),
-            await _attachments.OnCardAsync(id),
-            await _comments.OnCardAsync(id)),
+            CardView.Of(
+                card,
+                await _completion.TallyAsync(id),
+                await _attachments.OnCardAsync(id),
+                await _comments.OnCardAsync(id)),
             "Card moved successfully");
     }
 
@@ -299,7 +301,7 @@ public class CardService: ICardService
             return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
         }
 
-        var cardDto = MapToDto(
+        var cardDto = CardView.Of(
             card,
             await _completion.TallyAsync(id),
             await _attachments.OnCardAsync(id),
@@ -364,7 +366,7 @@ public class CardService: ICardService
         var commentCounts = await _comments.OnCardsAsync(cardIds);
 
         return PagedResponse<CardDto>.SuccessResponse(
-            cards.ConvertAll(card => MapToDto(
+            cards.ConvertAll(card => CardView.Of(
                 card,
                 tallies.GetValueOrDefault(card.Id),
                 attachmentCounts.GetValueOrDefault(card.Id),
@@ -402,7 +404,7 @@ public class CardService: ICardService
             return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.Card);
         }
 
-        var boardId = await BoardOfListAsync(card.ListId);
+        var boardId = await _context.BoardOfListAsync(card.ListId);
         if (boardId is { } board && label.BoardId != board)
         {
             return ReferenceErrors.Invalid<bool>([NotOnBoard("labelId", labelId, board)]);
@@ -570,22 +572,13 @@ public class CardService: ICardService
     private static bool TouchesCompletion(Card card, UpdateCardDto updateCardDto) =>
         card.DueDate != updateCardDto.DueDate || card.IsDueComplete != updateCardDto.IsDueComplete!.Value;
 
-    private async Task<CardOrigin> OriginAsync(Guid leftListId, ListChain to)
-    {
-        var from = await _tree.ListAsync(leftListId);
-        return new CardOrigin(
-            from.Workspace.Id == to.Workspace.Id ? null : from.Workspace,
-            from.Board.Id == to.Board.Id ? null : from.Board,
-            from.List);
-    }
-
     private static IReadOnlyList<LabelRef> LabelRefs(List<Label> labels) => labels.ConvertAll(LabelRef.Of);
 
     private async Task<(List<Label> Labels, bool ListExists, List<ApiError> Errors)> ResolveReferencesAsync(
         Guid listId, List<Guid?>? labelIds)
     {
         var errors = new List<ApiError>();
-        var boardId = await BoardOfListAsync(listId);
+        var boardId = await _context.BoardOfListAsync(listId);
         if (boardId is null)
         {
             errors.Add(new ApiError("listId", ErrorCodes.NotFound, $"List {listId} does not exist."));
@@ -617,45 +610,8 @@ public class CardService: ICardService
         return (labels, boardId is not null, errors);
     }
 
-    private async Task<Guid?> BoardOfListAsync(Guid listId) =>
-        await _context.Lists.Where(l => l.Id == listId).Select(l => (Guid?)l.BoardId).FirstOrDefaultAsync();
-
     private static ApiError NotOnBoard(string field, Guid labelId, Guid boardId) =>
         new(field, ErrorCodes.NotOnBoard, $"Label {labelId} isn't on board {boardId}.");
-    private static CardDto MapToDto(Card card, CardTally tally, int attachmentCount, int commentCount)
-    {
-        return new CardDto
-        (
-            card.Id,
-            card.Title,
-            card.Description,
-            card.DueDate,
-            card.Position,
-            card.ListId,
-            tally.IsComplete(card),
-            card.StartDate,
-            card.DueReminderMinutes,
-            card.IsArchived,
-            card.Labels.Select(l => l.Id).ToList(),
-            tally.CheckItemCount,
-            tally.CheckedItemCount,
-            attachmentCount,
-            commentCount,
-            CoverOf(card),
-            card.CreatedAt,
-            card.UpdatedAt,
-            card.CreatedBy,
-            card.UpdatedBy
-        );
-    }
-    private static CardCoverDto? CoverOf(Card card) => card switch
-    {
-        { CoverAttachmentId: { } attachmentId } =>
-            new CardCoverDto(attachmentId, null, AttachmentView.ContentPath(card.Id, attachmentId)),
-        { CoverColor: { } color } => new CardCoverDto(null, color, null),
-        _ => null
-    };
-
     private static Card MapToEntity(CreateCardDto createCardDto, Guid actorId, double position)
     {
         return new Card

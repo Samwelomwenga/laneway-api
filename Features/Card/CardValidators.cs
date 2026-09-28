@@ -39,6 +39,16 @@ public sealed class MoveCardDtoValidator : AbstractValidator<MoveCardDto>
     }
 }
 
+public sealed class CopyCardDtoValidator : AbstractValidator<CopyCardDto>
+{
+    public CopyCardDtoValidator()
+    {
+        RuleFor(x => x.ListId).Required();
+        RuleFor(x => x.Title).MaxLength(FieldLimits.CardTitle);
+        this.ValidPlacement();
+    }
+}
+
 public sealed class CoverDtoValidator : AbstractValidator<CoverDto>
 {
     public CoverDtoValidator()

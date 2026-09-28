@@ -1,5 +1,7 @@
+using System.Net;
 using Microsoft.Extensions.Options;
 using Supabase.Storage;
+using Supabase.Storage.Exceptions;
 using Supabase.Storage.Interfaces;
 
 namespace DefaultNamespace;
@@ -43,7 +45,22 @@ public sealed class AttachmentStorage
         _bucket.Upload(
             bytes, key, new Supabase.Storage.FileOptions { ContentType = mimeType }, null, false, cancellationToken);
 
-    public Task<bool> CopyAsync(string fromKey, string toKey) => _bucket.Copy(fromKey, toKey);
+    public async Task<bool> TryCopyAsync(string fromKey, string toKey)
+    {
+        try
+        {
+            if (!await _bucket.Copy(fromKey, toKey))
+            {
+                throw new InvalidOperationException($"Storage would not copy {fromKey} to {toKey}.");
+            }
+        }
+        catch (SupabaseStorageException gone) when (gone.StatusCode == (int)HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        return true;
+    }
 
     public async Task<int> RemoveAsync(List<string> keys) => (await _bucket.Remove(keys))?.Count ?? 0;
 

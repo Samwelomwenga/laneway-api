@@ -7,10 +7,12 @@ namespace DefaultNamespace;
 public class CardsController: ApiControllerBase
 {
     private readonly ICardService _cardService;
+    private readonly ICardCopyService _cardCopyService;
 
-    public CardsController(ICardService cardService)
+    public CardsController(ICardService cardService, ICardCopyService cardCopyService)
     {
         _cardService = cardService;
+        _cardCopyService = cardCopyService;
     }
 
     [HttpGet]
@@ -31,6 +33,17 @@ public class CardsController: ApiControllerBase
     public async Task<ActionResult<ApiResponse<CardDto>>> CreateCard([FromBody] CreateCardDto createCardDto)
     {
         var response = await _cardService.CreateAsync(createCardDto);
+        if (!response.Success)
+        {
+            return ToActionResult(response);
+        }
+        return CreatedAtAction(nameof(GetCard), new { id = response.Data!.Id }, response);
+    }
+
+    [HttpPost("{id}/copies")]
+    public async Task<ActionResult<ApiResponse<CardDto>>> CopyCard(Guid id, [FromBody] CopyCardDto copyCardDto)
+    {
+        var response = await _cardCopyService.CopyAsync(id, copyCardDto);
         if (!response.Success)
         {
             return ToActionResult(response);

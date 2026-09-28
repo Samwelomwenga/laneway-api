@@ -78,6 +78,19 @@ public record MoveCardDto
     Guid? Before,
     Guid? After
 ) : IPlacing;
+public record CopyCardDto
+(
+    Guid? ListId,
+    string? Title,
+    List<CopyPart>? Keep,
+    PositionValue? Position,
+    Guid? Before,
+    Guid? After
+) : IPlacing
+{
+    public string? Title { get; init; } = Title?.Trim();
+}
+
 [ModelBinder(typeof(SearchQueryBinder<CardSearchDto>))]
 public record CardSearchDto
 (

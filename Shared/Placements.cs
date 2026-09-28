@@ -19,6 +19,9 @@ public sealed class Placements
         return await InListAsync(listId, placement, moving: null);
     }
 
+    public Task<PlacementResult> CheckInListAsync(Guid listId, Placement placement) =>
+        InListAsync(listId, placement, moving: null);
+
     public async Task<PlacementResult> ResolveMoveInListAsync(Card card, Guid listId, Placement placement)
     {
         ArgumentNullException.ThrowIfNull(card);

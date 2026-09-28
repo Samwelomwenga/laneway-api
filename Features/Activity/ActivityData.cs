@@ -152,9 +152,32 @@ public sealed record DeleteCardData(
 public sealed record CardLabelData(
     ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, ListRef List, CardRef Card, LabelRef Label);
 
-public sealed record CardOrigin(WorkspaceRef? Workspace, BoardRef? Board, ListRef List);
+public sealed record CardOrigin(WorkspaceRef? Workspace, BoardRef? Board, ListRef List)
+{
+    public static CardOrigin Between(ListChain from, ListChain to)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
+
+        return new CardOrigin(
+            from.Workspace.Id == to.Workspace.Id ? null : from.Workspace,
+            from.Board.Id == to.Board.Id ? null : from.Board,
+            from.List);
+    }
+}
 
 public sealed record LabelSwap(LabelRef From, LabelRef To, bool Created);
+
+public sealed record CopyCardData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    CardRef Source,
+    CardOrigin? From,
+    IReadOnlyList<CopyPart> Keep,
+    IReadOnlyList<LabelSwap>? LabelSwaps);
 
 public sealed record CardFields(
     Was<string>? Title,
