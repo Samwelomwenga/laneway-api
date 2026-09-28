@@ -166,7 +166,8 @@ public abstract class ApiTests : IAsyncLifetime
         string title,
         DateTime? dueDate = null,
         object? position = null,
-        IEnumerable<Guid>? labelIds = null)
+        IEnumerable<Guid>? labelIds = null,
+        bool isDueComplete = false)
     {
         using var response = await PostAsync("/api/v1/cards", new
         {
@@ -175,7 +176,7 @@ public abstract class ApiTests : IAsyncLifetime
             dueDate,
             position,
             labelIds,
-            isDueComplete = false
+            isDueComplete
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -187,14 +188,15 @@ public abstract class ApiTests : IAsyncLifetime
         string title,
         string? description = null,
         DateTime? dueDate = null,
-        IEnumerable<Guid>? labelIds = null) =>
+        IEnumerable<Guid>? labelIds = null,
+        bool isDueComplete = false) =>
         PutAsync($"/api/v1/cards/{id}", new
         {
             title,
             description,
             dueDate,
             labelIds,
-            isDueComplete = false
+            isDueComplete
         });
 
     protected Task<HttpResponseMessage> MoveCardAsync(
@@ -236,6 +238,52 @@ public abstract class ApiTests : IAsyncLifetime
     protected Task<HttpResponseMessage> UpdateLabelAsync(Guid id, string? name, Color? color = null) =>
         PutAsync($"/api/v1/labels/{id}", new { name, color = color?.ToString() });
 
+    protected async Task<ChecklistDto> CreateChecklistAsync(Guid cardId, string name, object? position = null)
+    {
+        using var response = await PostAsync("/api/v1/checklists", new { name, cardId, position });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.ReadEnvelope<ChecklistDto>()).Data!;
+    }
+
+    protected Task<HttpResponseMessage> UpdateChecklistAsync(Guid id, string name) =>
+        PutAsync($"/api/v1/checklists/{id}", new { name });
+
+    protected Task<HttpResponseMessage> MoveChecklistAsync(
+        Guid id, object? position = null, Guid? before = null, Guid? after = null) =>
+        PutAsync($"/api/v1/checklists/{id}/position", new { position, before, after });
+
+    protected async Task<CheckItemDto> CreateCheckItemAsync(
+        Guid checklistId, string name, bool isChecked = false, object? position = null)
+    {
+        using var response = await PostAsync("/api/v1/check-items", new
+        {
+            name,
+            checklistId,
+            isChecked,
+            position
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.ReadEnvelope<CheckItemDto>()).Data!;
+    }
+
+    protected Task<HttpResponseMessage> UpdateCheckItemAsync(Guid id, string name) =>
+        PutAsync($"/api/v1/check-items/{id}", new { name });
+
+    protected Task<HttpResponseMessage> MoveCheckItemAsync(
+        Guid id, Guid checklistId, object? position = null, Guid? before = null, Guid? after = null) =>
+        PutAsync($"/api/v1/check-items/{id}/position", new { checklistId, position, before, after });
+
+    protected Task<HttpResponseMessage> SendCheckedAsync(Guid id, bool value) =>
+        PutAsync($"/api/v1/check-items/{id}/checked", new { value });
+
+    protected async Task SetCheckedAsync(Guid id, bool value)
+    {
+        using var response = await SendCheckedAsync(id, value);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
     protected Task SetBoardArchivedAsync(Guid id, bool value) =>
         SetArchivedAsync($"/api/v1/boards/{id}/archived", value);
 
@@ -244,6 +292,12 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected Task SetCardArchivedAsync(Guid id, bool value) =>
         SetArchivedAsync($"/api/v1/cards/{id}/archived", value);
+
+    protected Task SetChecklistArchivedAsync(Guid id, bool value) =>
+        SetArchivedAsync($"/api/v1/checklists/{id}/archived", value);
+
+    protected Task<HttpResponseMessage> SendChecklistArchivedAsync(Guid id, bool value) =>
+        PutAsync($"/api/v1/checklists/{id}/archived", new { value });
 
     private async Task SetArchivedAsync(string path, bool value)
     {

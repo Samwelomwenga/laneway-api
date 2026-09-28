@@ -100,6 +100,8 @@ public class CardService: ICardService
 
     public async Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardDto updateCardDto)
     {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
         var card = await _context.Cards
             .Include(c => c.Labels)
             .FirstOrDefaultAsync(c => c.Id == id);
@@ -118,6 +120,8 @@ public class CardService: ICardService
         {
             return ReferenceErrors.Invalid<CardDto>(referenceErrors);
         }
+
+        var watch = TouchesCompletion(card, updateCardDto) ? await _completion.WatchAsync(id) : null;
 
         card.Title = updateCardDto.Title!;
         card.Description = updateCardDto.Description ?? string.Empty;
@@ -147,10 +151,12 @@ public class CardService: ICardService
                     chain.List,
                     CardRef.Of(card),
                     labelsChanged ? LabelRefs(labels) : null,
-                    old));
+                    old,
+                    watch?.Change()));
         }
 
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         var cardDto = MapToDto(card, await _completion.TallyAsync(id), await _attachments.OnCardAsync(id));
 
@@ -518,6 +524,9 @@ public class CardService: ICardService
 
         return ApiResponse<bool>.SuccessResponse(true, "Card deleted successfully", 204);
     }
+
+    private static bool TouchesCompletion(Card card, UpdateCardDto updateCardDto) =>
+        card.DueDate != updateCardDto.DueDate || card.IsDueComplete != updateCardDto.IsDueComplete!.Value;
 
     private async Task<CardOrigin> OriginAsync(Guid leftListId, ListChain to)
     {

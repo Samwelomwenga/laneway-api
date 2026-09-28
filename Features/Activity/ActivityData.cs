@@ -97,6 +97,8 @@ public sealed record ListOrigin(WorkspaceRef? Workspace, BoardRef Board);
 
 public sealed record PositionChange(double Old, double New);
 
+public sealed record CompletionChange(bool Old, bool New);
+
 public sealed record ListFields(Was<string>? Name, Was<Color?>? Color)
 {
     public static ListFields Changed(EntityEntry<List> tracked) => new(
@@ -128,7 +130,8 @@ public sealed record UpdateCardData(
     ListRef List,
     CardRef Card,
     IReadOnlyList<LabelRef>? Labels,
-    CardFields Old);
+    CardFields Old,
+    CompletionChange? Completion);
 
 public sealed record ArchiveCardData(
     ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, ListRef List, CardRef Card);
@@ -184,4 +187,130 @@ public sealed record LabelFields(Was<string>? Name, Was<Color?>? Color)
     public static LabelFields Changed(EntityEntry<Label> tracked) => new(
         tracked.Old(label => label.Name),
         tracked.Old(label => label.Color));
+}
+
+public sealed record ChecklistRef(Guid Id, string Name)
+{
+    public static ChecklistRef Of(Checklist checklist)
+    {
+        ArgumentNullException.ThrowIfNull(checklist);
+        return new ChecklistRef(checklist.Id, checklist.Name);
+    }
+}
+
+public sealed record CheckItemRef(Guid Id, string Name)
+{
+    public static CheckItemRef Of(CheckItem checkItem)
+    {
+        ArgumentNullException.ThrowIfNull(checkItem);
+        return new CheckItemRef(checkItem.Id, checkItem.Name);
+    }
+}
+
+public sealed record CreateChecklistData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    ChecklistRef Checklist);
+
+public sealed record UpdateChecklistData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    ChecklistRef Checklist,
+    ChecklistFields Old);
+
+public sealed record MoveChecklistData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    ChecklistRef Checklist,
+    PositionChange Position);
+
+public sealed record ArchiveChecklistData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    ChecklistRef Checklist,
+    CompletionChange? Completion);
+
+public sealed record DeleteChecklistData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    ChecklistRef Checklist);
+
+public sealed record ChecklistFields(Was<string>? Name)
+{
+    public static ChecklistFields Changed(EntityEntry<Checklist> tracked) => new(
+        tracked.Old(checklist => checklist.Name));
+}
+
+public sealed record CreateCheckItemData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    ChecklistRef Checklist,
+    CheckItemRef CheckItem,
+    CompletionChange? Completion);
+
+public sealed record UpdateCheckItemData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    ChecklistRef Checklist,
+    CheckItemRef CheckItem,
+    CheckItemFields Old);
+
+public sealed record MoveCheckItemData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    ChecklistRef Checklist,
+    CheckItemRef CheckItem,
+    PositionChange Position,
+    CheckItemOrigin? From);
+
+public sealed record CheckedCheckItemData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    ChecklistRef Checklist,
+    CheckItemRef CheckItem,
+    CompletionChange? Completion);
+
+public sealed record DeleteCheckItemData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    ChecklistRef Checklist,
+    CheckItemRef CheckItem,
+    CompletionChange? Completion);
+
+public sealed record CheckItemOrigin(ChecklistRef Checklist);
+
+public sealed record CheckItemFields(Was<string>? Name)
+{
+    public static CheckItemFields Changed(EntityEntry<CheckItem> tracked) => new(
+        tracked.Old(checkItem => checkItem.Name));
 }

@@ -12,6 +12,48 @@ public readonly record struct CardTally(int CheckItemCount, int CheckedItemCount
         return card.DueDate is not null
                && (CheckItemCount > 0 ? CheckedItemCount == CheckItemCount : card.IsDueComplete);
     }
+
+    public CardTally Plus(int checkItems, int checkedItems) =>
+        new(CheckItemCount + checkItems, CheckedItemCount + checkedItems);
+}
+
+public sealed class CompletionWatch
+{
+    private readonly Card? _card;
+    private readonly CardTally _before;
+    private readonly bool _wasComplete;
+
+    internal CompletionWatch(Card? card, CardTally before)
+    {
+        _card = card;
+        _before = before;
+        _wasComplete = card is not null && before.IsComplete(card);
+    }
+
+    public CompletionChange? Gaining(CardTally tally) =>
+        Change(tally.CheckItemCount, tally.CheckedItemCount);
+
+    public CompletionChange? Losing(CardTally tally) =>
+        Change(-tally.CheckItemCount, -tally.CheckedItemCount);
+
+    public CompletionChange? Change(int gainedCheckItems = 0, int gainedCheckedItems = 0)
+    {
+        if (_card is null)
+        {
+            return null;
+        }
+
+        var complete = _before.Plus(gainedCheckItems, gainedCheckedItems).IsComplete(_card);
+        return complete == _wasComplete ? null : new CompletionChange(_wasComplete, complete);
+    }
+
+    public void KeepComputedValue(int losingCheckItems)
+    {
+        if (_card is not null && losingCheckItems > 0 && _before.CheckItemCount <= losingCheckItems)
+        {
+            _card.IsDueComplete = _wasComplete;
+        }
+    }
 }
 
 public sealed class CardCompletion
@@ -59,22 +101,36 @@ public sealed class CardCompletion
                             && checklist.CheckItems.Any())
                         || card.IsDueComplete)) == isDueComplete;
 
-    public async Task KeepComputedValueAsync(Guid cardId, int losingCheckItems)
+    public async Task<CompletionWatch> WatchAsync(Guid cardId)
     {
-        if (losingCheckItems <= 0)
+        await _context.LockCardsAsync(cardId);
+        if (await _context.Cards.FindAsync(cardId) is not { } card)
         {
-            return;
+            return new CompletionWatch(null, default);
         }
 
-        var tally = await TallyAsync(cardId);
-        if (tally.CheckItemCount > losingCheckItems)
-        {
-            return;
-        }
+        await _context.Entry(card).ReloadAsync();
+        return new CompletionWatch(card, await TallyAsync(cardId));
+    }
 
-        if (await _context.Cards.FindAsync(cardId) is { } card)
-        {
-            card.IsDueComplete = tally.IsComplete(card);
-        }
+    public async Task<CompletionWatch> WatchOnChecklistAsync(Guid checklistId) =>
+        await WatchAsync(await _context.Checklists
+            .Where(checklist => checklist.Id == checklistId)
+            .Select(checklist => checklist.CardId)
+            .FirstAsync());
+
+    public async Task<CardTally> ChecklistTallyAsync(Guid checklistId)
+    {
+        var tally = await _context.CheckItems
+            .Where(checkItem => checkItem.ChecklistId == checklistId)
+            .GroupBy(checkItem => checkItem.ChecklistId)
+            .Select(group => new
+            {
+                CheckItemCount = group.Count(),
+                CheckedItemCount = group.Count(checkItem => checkItem.IsChecked)
+            })
+            .FirstOrDefaultAsync();
+
+        return tally is null ? default : new CardTally(tally.CheckItemCount, tally.CheckedItemCount);
     }
 }

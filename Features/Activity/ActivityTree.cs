@@ -16,6 +16,19 @@ public sealed record ListChain(WorkspaceRef Workspace, BoardRef Board, ListRef L
         new(WorkspaceId: Workspace.Id, BoardId: Board.Id, ListId: List.Id, CardId: cardId);
 }
 
+public sealed record CardChain(WorkspaceRef Workspace, BoardRef Board, ListRef List, CardRef Card)
+{
+    public ActivityPlace Place =>
+        new(WorkspaceId: Workspace.Id, BoardId: Board.Id, ListId: List.Id, CardId: Card.Id);
+}
+
+public sealed record ChecklistChain(
+    WorkspaceRef Workspace, BoardRef Board, ListRef List, CardRef Card, ChecklistRef Checklist)
+{
+    public ActivityPlace Place =>
+        new(WorkspaceId: Workspace.Id, BoardId: Board.Id, ListId: List.Id, CardId: Card.Id);
+}
+
 public sealed class ActivityTree
 {
     private readonly ApplicationDbContext _context;
@@ -63,5 +76,65 @@ public sealed class ActivityTree
                     new WorkspaceRef(workspace.Id, workspace.Name),
                     new BoardRef(pair.board.Id, pair.board.Name),
                     new ListRef(pair.list.Id, pair.list.Name, pair.list.Color)))
+            .FirstAsync();
+
+    public async Task<CardChain> CardAsync(Guid cardId) =>
+        await _context.Cards
+            .Where(card => card.Id == cardId)
+            .Join(
+                _context.Lists,
+                card => card.ListId,
+                list => list.Id,
+                (card, list) => new { card, list })
+            .Join(
+                _context.Boards,
+                pair => pair.list.BoardId,
+                board => board.Id,
+                (pair, board) => new { pair.card, pair.list, board })
+            .Join(
+                _context.WorkSpaces,
+                found => found.board.WorkspaceId,
+                workspace => workspace.Id,
+                (found, workspace) => new CardChain(
+                    new WorkspaceRef(workspace.Id, workspace.Name),
+                    new BoardRef(found.board.Id, found.board.Name),
+                    new ListRef(found.list.Id, found.list.Name, found.list.Color),
+                    new CardRef(found.card.Id, found.card.Title)))
+            .FirstAsync();
+
+    public async Task<ChecklistChain> ChecklistAsync(Guid checklistId) =>
+        await _context.Checklists
+            .Where(checklist => checklist.Id == checklistId)
+            .Join(
+                _context.Cards,
+                checklist => checklist.CardId,
+                card => card.Id,
+                (checklist, card) => new { checklist, card })
+            .Join(
+                _context.Lists,
+                pair => pair.card.ListId,
+                list => list.Id,
+                (pair, list) => new { pair.checklist, pair.card, list })
+            .Join(
+                _context.Boards,
+                found => found.list.BoardId,
+                board => board.Id,
+                (found, board) => new { found.checklist, found.card, found.list, board })
+            .Join(
+                _context.WorkSpaces,
+                found => found.board.WorkspaceId,
+                workspace => workspace.Id,
+                (found, workspace) => new ChecklistChain(
+                    new WorkspaceRef(workspace.Id, workspace.Name),
+                    new BoardRef(found.board.Id, found.board.Name),
+                    new ListRef(found.list.Id, found.list.Name, found.list.Color),
+                    new CardRef(found.card.Id, found.card.Title),
+                    new ChecklistRef(found.checklist.Id, found.checklist.Name)))
+            .FirstAsync();
+
+    public async Task<ChecklistRef> ChecklistRefAsync(Guid checklistId) =>
+        await _context.Checklists
+            .Where(checklist => checklist.Id == checklistId)
+            .Select(checklist => new ChecklistRef(checklist.Id, checklist.Name))
             .FirstAsync();
 }
