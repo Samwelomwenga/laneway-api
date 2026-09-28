@@ -42,7 +42,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
     {
         ArgumentNullException.ThrowIfNull(job);
 
-        var request = ListCopyRequest.In(job.Request);
+        var request = CopyRequests.In<CopyListDto>(job.Request);
         var keep = CopyKeep.Of(request.Keep);
 
         if (await _snapshots.ReadAsync(job.SourceId) is not { } snapshot)

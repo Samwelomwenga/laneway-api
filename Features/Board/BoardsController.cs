@@ -7,10 +7,12 @@ namespace DefaultNamespace;
 public class BoardsController: ApiControllerBase
 {
     private readonly IBoardService _boardService;
+    private readonly IBoardCopyService _boardCopyService;
 
-    public BoardsController(IBoardService boardService)
+    public BoardsController(IBoardService boardService, IBoardCopyService boardCopyService)
     {
         _boardService = boardService;
+        _boardCopyService = boardCopyService;
     }
 
     [HttpGet]
@@ -37,6 +39,19 @@ public class BoardsController: ApiControllerBase
         }
         return CreatedAtAction(nameof(GetBoard), new { id = response.Data!.Id }, response);
 
+    }
+
+    [HttpPost("{id}/copies")]
+    public async Task<ActionResult<ApiResponse<CopyJobDto>>> CopyBoard(
+        Guid id, [FromBody] CopyBoardDto copyBoardDto)
+    {
+        var response = await _boardCopyService.CopyAsync(id, copyBoardDto);
+        if (!response.Success)
+        {
+            return ToActionResult(response);
+        }
+        return AcceptedAtAction(
+            nameof(CopyJobsController.GetCopyJob), "CopyJobs", new { id = response.Data!.Id }, response);
     }
 
     [HttpPut("{id}")]

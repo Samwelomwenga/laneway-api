@@ -165,6 +165,27 @@ public abstract class ApiTests : IAsyncLifetime
         Guid id, Guid boardId, object? position = null, Guid? before = null, Guid? after = null) =>
         PutAsync($"/api/v1/lists/{id}/position", new { boardId, position, before, after });
 
+    protected async Task<List<ListDto>> ReadListsOfBoardAsync(Guid boardId)
+    {
+        using var response = await GetAsync($"/api/v1/lists?boardId={boardId}&archived=Include&pageSize=100");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadPage<ListDto>()).Entries;
+    }
+
+    protected async Task<List<LabelDto>> ReadLabelsOfBoardAsync(Guid boardId)
+    {
+        using var response = await GetAsync($"/api/v1/labels?boardId={boardId}&pageSize=100");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadPage<LabelDto>()).Entries;
+    }
+
+    protected async Task<BoardDto> ReadBoardAsync(Guid id)
+    {
+        using var response = await GetAsync($"/api/v1/boards/{id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadEnvelope<BoardDto>()).Data!;
+    }
+
     protected async Task<ListDto> ReadListAsync(Guid id)
     {
         using var response = await GetAsync($"/api/v1/lists/{id}");
@@ -381,6 +402,8 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected static string ListCopyPath(Guid listId) => $"/api/v1/lists/{listId}/copies";
 
+    protected static string BoardCopyPath(Guid boardId) => $"/api/v1/boards/{boardId}/copies";
+
     protected static string CopyJobPath(Guid id) => $"/api/v1/copy-jobs/{id}";
 
     protected Task<HttpResponseMessage> SendCardCopyAsync(Guid id, object body, Guid? actor = null) =>
@@ -401,6 +424,21 @@ public abstract class ApiTests : IAsyncLifetime
     {
         using var response = await SendListCopyAsync(
             id, new { boardId, name, keep, position, before, after }, actor);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        return (await response.ReadEnvelope<CopyJobDto>()).Data!;
+    }
+
+    protected Task<HttpResponseMessage> SendBoardCopyAsync(Guid id, object body, Guid? actor = null) =>
+        PostAsync(BoardCopyPath(id), body, actor);
+
+    protected async Task<CopyJobDto> CopyBoardAsync(
+        Guid id,
+        Guid workspaceId,
+        string? name = null,
+        IEnumerable<string>? keep = null,
+        Guid? actor = null)
+    {
+        using var response = await SendBoardCopyAsync(id, new { workspaceId, name, keep }, actor);
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         return (await response.ReadEnvelope<CopyJobDto>()).Data!;
     }

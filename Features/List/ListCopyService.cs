@@ -50,7 +50,7 @@ public sealed class ListCopyService : IListCopyService
             Id = Guid.NewGuid(),
             Kind = CopyJobKind.List,
             SourceId = id,
-            Request = ListCopyRequest.Of(copyListDto),
+            Request = CopyRequests.Of(copyListDto),
             Status = CopyJobStatus.Queued,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _actor.Id

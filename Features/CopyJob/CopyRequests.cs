@@ -2,16 +2,17 @@ using System.Text.Json;
 
 namespace DefaultNamespace;
 
-public static class ListCopyRequest
+public static class CopyRequests
 {
     private static readonly JsonSerializerOptions Options = BuildOptions();
 
-    public static JsonDocument Of(CopyListDto request) => JsonSerializer.SerializeToDocument(request, Options);
+    public static JsonDocument Of<TRequest>(TRequest request) =>
+        JsonSerializer.SerializeToDocument(request, Options);
 
-    public static CopyListDto In(JsonDocument stored)
+    public static TRequest In<TRequest>(JsonDocument stored)
     {
         ArgumentNullException.ThrowIfNull(stored);
-        return stored.Deserialize<CopyListDto>(Options)!;
+        return stored.Deserialize<TRequest>(Options)!;
     }
 
     private static JsonSerializerOptions BuildOptions()

@@ -67,6 +67,14 @@ public sealed record DeleteBoardData(ActorRef Actor, WorkspaceRef Workspace, Boa
 
 public sealed record BoardOrigin(WorkspaceRef Workspace);
 
+public sealed record CopyBoardData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    BoardRef Source,
+    BoardOrigin? From,
+    IReadOnlyList<BoardCopyPart> Keep);
+
 public sealed record BoardFields(Was<string>? Name, Was<string>? Description, Was<BoardVisibility>? Visibility)
 {
     public static BoardFields Changed(EntityEntry<Board> tracked) => new(
