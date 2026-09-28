@@ -64,7 +64,7 @@ public class ActivityService : IActivityService
         }
 
         return PagedResponse<ActivityEntryDto>.SuccessResponse(
-            entries.ConvertAll(MapToDto),
+            entries.ConvertAll(ActivityView.Of),
             totalCount,
             pageSize: searchDto.PageSize,
             currentPage: searchDto.PageNumber,
@@ -110,22 +110,4 @@ public class ActivityService : IActivityService
 
         errors.Add(new ApiError(key, ErrorCodes.NotFound, $"{resource} {value} does not exist."));
     }
-
-    private static ActivityEntryDto MapToDto(ActivityEntry entry) =>
-        new(
-            entry.Id,
-            entry.Type,
-            entry.CreatedAt,
-            entry.CreatedBy,
-            entry.WorkspaceId,
-            entry.BoardId,
-            entry.ListId,
-            entry.CardId,
-            entry.FromWorkspaceId,
-            entry.FromBoardId,
-            entry.FromListId,
-            entry.Data.RootElement,
-            entry.Text,
-            entry.UpdatedAt
-        );
 }

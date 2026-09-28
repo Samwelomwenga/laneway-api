@@ -26,6 +26,7 @@ public class CardService: ICardService
     private readonly LabelMatching _labelMatching;
     private readonly CardCompletion _completion;
     private readonly AttachmentCounts _attachments;
+    private readonly CommentCounts _comments;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
 
@@ -37,6 +38,7 @@ public class CardService: ICardService
         LabelMatching labelMatching,
         CardCompletion completion,
         AttachmentCounts attachments,
+        CommentCounts comments,
         ActivityWriter activity,
         ActivityTree tree)
     {
@@ -47,6 +49,7 @@ public class CardService: ICardService
         _labelMatching = labelMatching;
         _completion = completion;
         _attachments = attachments;
+        _comments = comments;
         _activity = activity;
         _tree = tree;
     }
@@ -93,7 +96,7 @@ public class CardService: ICardService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var cardDto = MapToDto(card, default, attachmentCount: 0);
+        var cardDto = MapToDto(card, default, attachmentCount: 0, commentCount: 0);
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card created successfully", 201);
     }
@@ -158,7 +161,11 @@ public class CardService: ICardService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var cardDto = MapToDto(card, await _completion.TallyAsync(id), await _attachments.OnCardAsync(id));
+        var cardDto = MapToDto(
+            card,
+            await _completion.TallyAsync(id),
+            await _attachments.OnCardAsync(id),
+            await _comments.OnCardAsync(id));
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card updated successfully");
     }
@@ -274,7 +281,11 @@ public class CardService: ICardService
         await transaction.CommitAsync();
 
         return ApiResponse<CardDto>.SuccessResponse(
-            MapToDto(card, await _completion.TallyAsync(id), await _attachments.OnCardAsync(id)),
+            MapToDto(
+            card,
+            await _completion.TallyAsync(id),
+            await _attachments.OnCardAsync(id),
+            await _comments.OnCardAsync(id)),
             "Card moved successfully");
     }
 
@@ -288,7 +299,11 @@ public class CardService: ICardService
             return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
         }
 
-        var cardDto = MapToDto(card, await _completion.TallyAsync(id), await _attachments.OnCardAsync(id));
+        var cardDto = MapToDto(
+            card,
+            await _completion.TallyAsync(id),
+            await _attachments.OnCardAsync(id),
+            await _comments.OnCardAsync(id));
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card retrieved successfully");
     }
@@ -346,10 +361,14 @@ public class CardService: ICardService
         var cardIds = cards.ConvertAll(c => c.Id);
         var tallies = await _completion.TallyAsync(cardIds);
         var attachmentCounts = await _attachments.OnCardsAsync(cardIds);
+        var commentCounts = await _comments.OnCardsAsync(cardIds);
 
         return PagedResponse<CardDto>.SuccessResponse(
             cards.ConvertAll(card => MapToDto(
-                card, tallies.GetValueOrDefault(card.Id), attachmentCounts.GetValueOrDefault(card.Id))),
+                card,
+                tallies.GetValueOrDefault(card.Id),
+                attachmentCounts.GetValueOrDefault(card.Id),
+                commentCounts.GetValueOrDefault(card.Id))),
             totalCount,
             pageSize: searchDto.PageSize,
             currentPage: searchDto.PageNumber,
@@ -603,7 +622,7 @@ public class CardService: ICardService
 
     private static ApiError NotOnBoard(string field, Guid labelId, Guid boardId) =>
         new(field, ErrorCodes.NotOnBoard, $"Label {labelId} isn't on board {boardId}.");
-    private static CardDto MapToDto(Card card, CardTally tally, int attachmentCount)
+    private static CardDto MapToDto(Card card, CardTally tally, int attachmentCount, int commentCount)
     {
         return new CardDto
         (
@@ -621,6 +640,7 @@ public class CardService: ICardService
             tally.CheckItemCount,
             tally.CheckedItemCount,
             attachmentCount,
+            commentCount,
             CoverOf(card),
             card.CreatedAt,
             card.UpdatedAt,

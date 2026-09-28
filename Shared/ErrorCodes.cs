@@ -24,4 +24,5 @@ public static class ErrorCodes
     public const string TypeNotAllowed = "typeNotAllowed";
     public const string TooLarge = "tooLarge";
     public const string NotImage = "notImage";
+    public const string NotAuthor = "notAuthor";
 }

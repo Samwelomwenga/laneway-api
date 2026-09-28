@@ -45,14 +45,17 @@ public abstract class ApiTests : IAsyncLifetime
         }
     }
 
-    protected Task<HttpResponseMessage> PostAsync(string path, object body) =>
-        SendAsync(HttpMethod.Post, path, body, ActorId.ToString());
+    protected Task<HttpResponseMessage> PostAsync(string path, object body, Guid? actor = null) =>
+        SendAsync(HttpMethod.Post, path, body, (actor ?? ActorId).ToString());
 
-    protected Task<HttpResponseMessage> PutAsync(string path, object body) =>
-        SendAsync(HttpMethod.Put, path, body, ActorId.ToString());
+    protected Task<HttpResponseMessage> PutAsync(string path, object body, Guid? actor = null) =>
+        SendAsync(HttpMethod.Put, path, body, (actor ?? ActorId).ToString());
 
-    protected Task<HttpResponseMessage> DeleteAsync(string path) =>
-        SendAsync(HttpMethod.Delete, path, null, ActorId.ToString());
+    protected Task<HttpResponseMessage> DeleteAsync(string path, Guid? actor = null) =>
+        SendAsync(HttpMethod.Delete, path, null, (actor ?? ActorId).ToString());
+
+    protected Task<HttpResponseMessage> SendWithoutActorAsync(HttpMethod method, string path, object? body) =>
+        SendAsync(method, path, body, actorHeader: null);
 
     protected Task<HttpResponseMessage> GetAsync(string path, string? actorHeader = null) =>
         SendAsync(HttpMethod.Get, path, null, actorHeader);
@@ -326,6 +329,39 @@ public abstract class ApiTests : IAsyncLifetime
     protected async Task DeleteAttachmentAsync(Guid cardId, Guid id)
     {
         using var response = await DeleteAsync($"{AttachmentPath(cardId)}/{id}");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    protected static string CommentPath(Guid cardId) => $"/api/v1/cards/{cardId}/comments";
+
+    protected async Task<ActivityEntryDto> CreateCommentAsync(Guid cardId, string text, Guid? actor = null)
+    {
+        using var response = await SendCommentAsync(cardId, new { text }, actor);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.ReadEnvelope<ActivityEntryDto>()).Data!;
+    }
+
+    protected Task<HttpResponseMessage> SendCommentAsync(Guid cardId, object body, Guid? actor = null) =>
+        PostAsync(CommentPath(cardId), body, actor);
+
+    protected Task<HttpResponseMessage> EditCommentAsync(
+        Guid cardId, Guid id, object body, Guid? actor = null) =>
+        PutAsync($"{CommentPath(cardId)}/{id}", body, actor);
+
+    protected Task<HttpResponseMessage> RemoveCommentAsync(Guid cardId, Guid id, Guid? actor = null) =>
+        DeleteAsync($"{CommentPath(cardId)}/{id}", actor);
+
+    protected async Task<ApiPage<CardDto>> ReadCardsAsync(string query)
+    {
+        using var response = await GetAsync($"/api/v1/cards?{query}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.ReadPage<CardDto>();
+    }
+
+    protected async Task DeleteCardAsync(Guid id)
+    {
+        await SetCardArchivedAsync(id, true);
+        using var response = await DeleteAsync($"/api/v1/cards/{id}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 

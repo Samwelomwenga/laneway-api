@@ -18,6 +18,7 @@ public record CardDto
      int CheckItemCount,
      int CheckedItemCount,
      int AttachmentCount,
+     int CommentCount,
      CardCoverDto? Cover,
       DateTime CreatedAt ,
      DateTime? UpdatedAt ,

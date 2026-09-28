@@ -129,7 +129,8 @@ public enum TreeItem
     Checklist,
     CheckItem,
     Label,
-    Attachment
+    Attachment,
+    Comment
 }
 
 public sealed class ArchiveGuard
@@ -223,6 +224,7 @@ public static class ArchiveErrors
             TreeItem.Checklist => "checklist",
             TreeItem.CheckItem => "check item",
             TreeItem.Attachment => "attachment",
+            TreeItem.Comment => "comment",
             _ => "label"
         };
 }
