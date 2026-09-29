@@ -32,7 +32,7 @@ public class CheckItemsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<CheckItemDto>>> CreateCheckItem(
         [FromBody] CreateCheckItemDto createCheckItemDto)
     {
-        var response = await _checkItemService.CreateAsync(createCheckItemDto);
+        var response = await _checkItemService.CreateAsync(CreateCheckItemWrite.Of(createCheckItemDto));
         if (!response.Success)
         {
             return ToActionResult(response);
@@ -44,7 +44,7 @@ public class CheckItemsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<CheckItemDto>>> UpdateCheckItem(
         Guid id, [FromBody] UpdateCheckItemDto updateCheckItemDto)
     {
-        var response = await _checkItemService.UpdateAsync(id, updateCheckItemDto);
+        var response = await _checkItemService.UpdateAsync(id, UpdateCheckItemWrite.Of(updateCheckItemDto));
         return ToActionResult(response);
     }
 
@@ -52,7 +52,7 @@ public class CheckItemsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<CheckItemDto>>> MoveCheckItem(
         Guid id, [FromBody] MoveCheckItemDto moveCheckItemDto)
     {
-        var response = await _checkItemService.MoveAsync(id, moveCheckItemDto);
+        var response = await _checkItemService.MoveAsync(id, MoveCheckItemWrite.Of(moveCheckItemDto));
         return ToActionResult(response);
     }
 
@@ -60,7 +60,7 @@ public class CheckItemsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<bool>>> SetCheckItemChecked(
         Guid id, [FromBody] CheckedDto checkedDto)
     {
-        var response = await _checkItemService.SetCheckedAsync(id, checkedDto);
+        var response = await _checkItemService.SetCheckedAsync(id, CheckedWrite.Of(checkedDto));
         return ToActionResult(response);
     }
 

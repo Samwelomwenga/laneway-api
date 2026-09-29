@@ -24,6 +24,16 @@ public enum CheckItemArchiveFilter
 
 public record ArchivedDto(bool? Value);
 
+public sealed record ArchivedWrite(bool Value)
+{
+    public static ArchivedWrite Of(ArchivedDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        return new ArchivedWrite(Writes.Required(dto.Value, "value"));
+    }
+}
+
 public sealed class ArchivedDtoValidator : AbstractValidator<ArchivedDto>
 {
     public ArchivedDtoValidator()
@@ -38,16 +48,16 @@ public static class ArchiveFlag
         this ApplicationDbContext context,
         TEntity item,
         Actor actor,
-        ArchivedDto archivedDto,
+        ArchivedWrite archived,
         string resource,
         Func<bool, Task>? onChange = null)
         where TEntity : class, IArchivable, IStamped
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(item);
-        ArgumentNullException.ThrowIfNull(archivedDto);
+        ArgumentNullException.ThrowIfNull(archived);
 
-        var value = archivedDto.Value!.Value;
+        var value = archived.Value;
         if (item.IsArchived != value)
         {
             item.IsArchived = value;

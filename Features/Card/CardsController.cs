@@ -32,7 +32,7 @@ public class CardsController: ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<CardDto>>> CreateCard([FromBody] CreateCardDto createCardDto)
     {
-        var response = await _cardService.CreateAsync(createCardDto);
+        var response = await _cardService.CreateAsync(CreateCardWrite.Of(createCardDto));
         if (!response.Success)
         {
             return ToActionResult(response);
@@ -43,7 +43,7 @@ public class CardsController: ApiControllerBase
     [HttpPost("{id}/copies")]
     public async Task<ActionResult<ApiResponse<CardDto>>> CopyCard(Guid id, [FromBody] CopyCardDto copyCardDto)
     {
-        var response = await _cardCopyService.CopyAsync(id, copyCardDto);
+        var response = await _cardCopyService.CopyAsync(id, CopyCardWrite.Of(copyCardDto));
         if (!response.Success)
         {
             return ToActionResult(response);
@@ -54,14 +54,14 @@ public class CardsController: ApiControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<CardDto>>> UpdateCard(Guid id, [FromBody] UpdateCardDto updateCardDto)
     {
-        var response = await _cardService.UpdateAsync(id, updateCardDto);
+        var response = await _cardService.UpdateAsync(id, UpdateCardWrite.Of(updateCardDto));
         return ToActionResult(response);
     }
 
     [HttpPut("{id}/position")]
     public async Task<ActionResult<ApiResponse<CardDto>>> MoveCard(Guid id, [FromBody] MoveCardDto moveCardDto)
     {
-        var response = await _cardService.MoveAsync(id, moveCardDto);
+        var response = await _cardService.MoveAsync(id, MoveCardWrite.Of(moveCardDto));
         return ToActionResult(response);
     }
 
@@ -89,7 +89,7 @@ public class CardsController: ApiControllerBase
     [HttpPut("{id}/archived")]
     public async Task<ActionResult<ApiResponse<bool>>> SetCardArchived(Guid id, [FromBody] ArchivedDto archivedDto)
     {
-        var response = await _cardService.SetArchivedAsync(id, archivedDto);
+        var response = await _cardService.SetArchivedAsync(id, ArchivedWrite.Of(archivedDto));
         return ToActionResult(response);
     }
 

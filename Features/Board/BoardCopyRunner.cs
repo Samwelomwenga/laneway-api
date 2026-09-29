@@ -10,6 +10,7 @@ public sealed class BoardCopyRunner : ICopyJobRunner
     private readonly ObjectCopies _objects;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly ILogger<BoardCopyRunner> _logger;
 
     public BoardCopyRunner(
         ApplicationDbContext context,
@@ -17,7 +18,8 @@ public sealed class BoardCopyRunner : ICopyJobRunner
         BoardSnapshots snapshots,
         ObjectCopies objects,
         ActivityWriter activity,
-        ActivityTree tree)
+        ActivityTree tree,
+        ILogger<BoardCopyRunner> logger)
     {
         _context = context;
         _actor = actor;
@@ -25,6 +27,7 @@ public sealed class BoardCopyRunner : ICopyJobRunner
         _objects = objects;
         _activity = activity;
         _tree = tree;
+        _logger = logger;
     }
 
     public CopyJobKind Kind => CopyJobKind.Board;
@@ -33,7 +36,17 @@ public sealed class BoardCopyRunner : ICopyJobRunner
     {
         ArgumentNullException.ThrowIfNull(job);
 
-        var request = CopyRequests.In<CopyBoardDto>(job.Request);
+        CopyBoardWrite request;
+        try
+        {
+            request = CopyBoardWrite.Of(CopyRequests.In<CopyBoardDto>(job.Request));
+        }
+        catch (MissingWriteFieldException missing)
+        {
+            _logger.LogError(missing, "Copy job {JobId} stored a body this runner can't read.", job.Id);
+            return CopyRunResult.Refused([CopyJobEnd.InternalError]);
+        }
+
         var keep = BoardCopyKeep.Of(request.Keep);
 
         if (await _snapshots.ReadAsync(job.SourceId, keep.Cards) is not { } snapshot)
@@ -85,7 +98,7 @@ public sealed class BoardCopyRunner : ICopyJobRunner
     private async Task<CopyRunResult> WriteAsync(BoardCopy copy, CancellationToken token)
     {
         var (job, attempt, request, keep, snapshot, plan, copied, pending) = copy;
-        var workspaceId = request.WorkspaceId!.Value;
+        var workspaceId = request.WorkspaceId;
 
         await using var transaction = await _context.Database.BeginTransactionAsync(token);
 
@@ -232,7 +245,7 @@ public sealed class BoardCopyRunner : ICopyJobRunner
     private sealed record BoardCopy(
         CopyJob Job,
         int Attempt,
-        CopyBoardDto Request,
+        CopyBoardWrite Request,
         BoardCopyKeep Keep,
         BoardSnapshot Snapshot,
         CopyPlan Plan,

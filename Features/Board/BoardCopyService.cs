@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 public interface IBoardCopyService
 {
-    Task<ApiResponse<CopyJobDto>> CopyAsync(Guid id, CopyBoardDto copyBoardDto);
+    Task<ApiResponse<CopyJobDto>> CopyAsync(Guid id, CopyBoardWrite write);
 }
 
 public sealed class BoardCopyService : IBoardCopyService
@@ -20,11 +20,11 @@ public sealed class BoardCopyService : IBoardCopyService
         _signal = signal;
     }
 
-    public async Task<ApiResponse<CopyJobDto>> CopyAsync(Guid id, CopyBoardDto copyBoardDto)
+    public async Task<ApiResponse<CopyJobDto>> CopyAsync(Guid id, CopyBoardWrite write)
     {
-        ArgumentNullException.ThrowIfNull(copyBoardDto);
+        ArgumentNullException.ThrowIfNull(write);
 
-        var workspaceId = copyBoardDto.WorkspaceId!.Value;
+        var workspaceId = write.WorkspaceId;
 
         if (!await _context.Boards.AnyAsync(board => board.Id == id))
         {
@@ -36,7 +36,7 @@ public sealed class BoardCopyService : IBoardCopyService
             return ReferenceErrors.NotFound<CopyJobDto>("workspaceId", "Workspace", workspaceId);
         }
 
-        if (await CountedOverCapAsync(id, BoardCopyKeep.Of(copyBoardDto.Keep)) is { } capped)
+        if (await CountedOverCapAsync(id, BoardCopyKeep.Of(write.Keep)) is { } capped)
         {
             return ApiResponse<CopyJobDto>.ErrorResponse("This copy is too big", 409, capped);
         }
@@ -46,7 +46,7 @@ public sealed class BoardCopyService : IBoardCopyService
             Id = Guid.NewGuid(),
             Kind = CopyJobKind.Board,
             SourceId = id,
-            Request = CopyRequests.Of(copyBoardDto),
+            Request = CopyRequests.Of(write),
             Status = CopyJobStatus.Queued,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _actor.Id

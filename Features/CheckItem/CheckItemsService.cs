@@ -4,10 +4,10 @@ namespace DefaultNamespace;
 
 public interface ICheckItemService
 {
-    Task<ApiResponse<CheckItemDto>> CreateAsync(CreateCheckItemDto createCheckItemDto);
-    Task<ApiResponse<CheckItemDto>> UpdateAsync(Guid id, UpdateCheckItemDto updateCheckItemDto);
-    Task<ApiResponse<CheckItemDto>> MoveAsync(Guid id, MoveCheckItemDto moveCheckItemDto);
-    Task<ApiResponse<bool>> SetCheckedAsync(Guid id, CheckedDto checkedDto);
+    Task<ApiResponse<CheckItemDto>> CreateAsync(CreateCheckItemWrite write);
+    Task<ApiResponse<CheckItemDto>> UpdateAsync(Guid id, UpdateCheckItemWrite write);
+    Task<ApiResponse<CheckItemDto>> MoveAsync(Guid id, MoveCheckItemWrite write);
+    Task<ApiResponse<bool>> SetCheckedAsync(Guid id, CheckedWrite write);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
     Task<ApiResponse<CheckItemDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<List<CheckItemDto>>> GetAllAsync(CheckItemSearchDto searchDto);
@@ -41,9 +41,9 @@ public class CheckItemService : ICheckItemService
         _tree = tree;
     }
 
-    public async Task<ApiResponse<CheckItemDto>> CreateAsync(CreateCheckItemDto createCheckItemDto)
+    public async Task<ApiResponse<CheckItemDto>> CreateAsync(CreateCheckItemWrite write)
     {
-        var checklistId = createCheckItemDto.ChecklistId!.Value;
+        var checklistId = write.ChecklistId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         if (await CardOfChecklistAsync(checklistId) is not { } cardId)
@@ -52,7 +52,7 @@ public class CheckItemService : ICheckItemService
         }
 
         var watch = await _completion.WatchAsync(cardId);
-        var placed = await _placements.ResolveInChecklistAsync(checklistId, Placement.Of(createCheckItemDto));
+        var placed = await _placements.ResolveInChecklistAsync(checklistId, Placement.Of(write));
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<CheckItemDto>(placed.Errors);
@@ -68,7 +68,7 @@ public class CheckItemService : ICheckItemService
             return Full<CheckItemDto>();
         }
 
-        var checkItem = MapToEntity(createCheckItemDto, _actor.Id, placed.Position);
+        var checkItem = MapToEntity(write, _actor.Id, placed.Position);
 
         _context.CheckItems.Add(checkItem);
         var completion = watch.Change(
@@ -93,7 +93,7 @@ public class CheckItemService : ICheckItemService
             CheckItemView.Of(checkItem), "Check item created successfully", 201);
     }
 
-    public async Task<ApiResponse<CheckItemDto>> UpdateAsync(Guid id, UpdateCheckItemDto updateCheckItemDto)
+    public async Task<ApiResponse<CheckItemDto>> UpdateAsync(Guid id, UpdateCheckItemWrite write)
     {
         var checkItem = await _context.CheckItems.FindAsync(id);
         if (checkItem == null)
@@ -106,7 +106,7 @@ public class CheckItemService : ICheckItemService
             return ArchiveErrors.ReadOnly<CheckItemDto>(archived, TreeItem.CheckItem);
         }
 
-        checkItem.Name = updateCheckItemDto.Name!;
+        checkItem.Name = write.Name;
         _context.StampChange(checkItem, _actor);
 
         var tracked = _context.Entry(checkItem);
@@ -134,11 +134,11 @@ public class CheckItemService : ICheckItemService
             CheckItemView.Of(checkItem), "Check item updated successfully", 200);
     }
 
-    public async Task<ApiResponse<CheckItemDto>> MoveAsync(Guid id, MoveCheckItemDto moveCheckItemDto)
+    public async Task<ApiResponse<CheckItemDto>> MoveAsync(Guid id, MoveCheckItemWrite write)
     {
-        ArgumentNullException.ThrowIfNull(moveCheckItemDto);
+        ArgumentNullException.ThrowIfNull(write);
 
-        var checklistId = moveCheckItemDto.ChecklistId!.Value;
+        var checklistId = write.ChecklistId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         var checkItem = await _context.CheckItems.FindAsync(id);
@@ -170,7 +170,7 @@ public class CheckItemService : ICheckItemService
         if (destinationCardId is not null)
         {
             var placed = await _placements.ResolveMoveInChecklistAsync(
-                checkItem, checklistId, Placement.Of(moveCheckItemDto));
+                checkItem, checklistId, Placement.Of(write));
             errors.AddRange(placed.Errors);
             position = placed.Position;
         }
@@ -224,9 +224,9 @@ public class CheckItemService : ICheckItemService
             CheckItemView.Of(checkItem), "Check item moved successfully", 200);
     }
 
-    public async Task<ApiResponse<bool>> SetCheckedAsync(Guid id, CheckedDto checkedDto)
+    public async Task<ApiResponse<bool>> SetCheckedAsync(Guid id, CheckedWrite write)
     {
-        ArgumentNullException.ThrowIfNull(checkedDto);
+        ArgumentNullException.ThrowIfNull(write);
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -242,7 +242,7 @@ public class CheckItemService : ICheckItemService
         }
 
         var watch = await WatchCardAsync(checkItem);
-        var value = checkedDto.Value!.Value;
+        var value = write.Value;
         if (checkItem.IsChecked != value)
         {
             checkItem.IsChecked = value;
@@ -381,15 +381,15 @@ public class CheckItemService : ICheckItemService
                 $"A checklist holds at most {FieldLimits.CheckItemsPerChecklist} check items.")
         ]);
 
-    private static CheckItem MapToEntity(CreateCheckItemDto createCheckItemDto, Guid actorId, double position)
+    private static CheckItem MapToEntity(CreateCheckItemWrite write, Guid actorId, double position)
     {
         return new CheckItem
         {
             Id = Guid.NewGuid(),
-            Name = createCheckItemDto.Name!,
+            Name = write.Name,
             Position = position,
-            ChecklistId = createCheckItemDto.ChecklistId!.Value,
-            IsChecked = createCheckItemDto.IsChecked ?? false,
+            ChecklistId = write.ChecklistId,
+            IsChecked = write.IsChecked,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

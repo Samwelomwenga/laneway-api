@@ -6,10 +6,10 @@ public interface IBoardService
 {
     Task<ApiResponse<List<BoardDto>>> GetAllAsync(BoardSearchDto searchDto);
     Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id);
-    Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto);
-    Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardDto updateBoardDto);
-    Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardDto moveBoardDto);
-    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto);
+    Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardWrite write);
+    Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardWrite write);
+    Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardWrite write);
+    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 
@@ -92,15 +92,15 @@ public class BoardService : IBoardService
         return ApiResponse<BoardDto>.SuccessResponse(boardDto, "Board retrieved successfully", 200);
     }
 
-    public async Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto)
+    public async Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardWrite write)
     {
-        var workspaceId = createBoardDto.WorkspaceId!.Value;
+        var workspaceId = write.WorkspaceId;
         if (await _tree.FindWorkspaceAsync(workspaceId) is not { } workspace)
         {
             return WorkspaceNotFound(workspaceId);
         }
 
-        var boardEntity = MapToEntity(createBoardDto, _actor.Id);
+        var boardEntity = MapToEntity(write, _actor.Id);
         _context.Boards.Add(boardEntity);
         await _activity.AddAsync(
             ActivityType.CreateBoard,
@@ -111,7 +111,7 @@ public class BoardService : IBoardService
         return ApiResponse<BoardDto>.SuccessResponse(boardDto, "Board created successfully", 201);
     }
 
-    public async Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardDto updateBoardDto)
+    public async Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardWrite write)
     {
         var existingBoard = await _context.Boards
             .Include(b => b.Lists)
@@ -126,9 +126,9 @@ public class BoardService : IBoardService
             return ArchiveErrors.ReadOnly<BoardDto>(archived, TreeItem.Board);
         }
 
-        existingBoard.Name = updateBoardDto.Name!;
-        existingBoard.Description = updateBoardDto.Description ?? string.Empty;
-        existingBoard.Visibility = updateBoardDto.Visibility!.Value;
+        existingBoard.Name = write.Name;
+        existingBoard.Description = write.Description;
+        existingBoard.Visibility = write.Visibility;
         _context.StampChange(existingBoard, _actor);
 
         var tracked = _context.Entry(existingBoard);
@@ -147,9 +147,9 @@ public class BoardService : IBoardService
         return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
     }
 
-    public async Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardDto moveBoardDto)
+    public async Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardWrite write)
     {
-        ArgumentNullException.ThrowIfNull(moveBoardDto);
+        ArgumentNullException.ThrowIfNull(write);
 
         var board = await _context.Boards
             .Include(b => b.Lists)
@@ -164,7 +164,7 @@ public class BoardService : IBoardService
             return ArchiveErrors.ReadOnly<BoardDto>(archived, TreeItem.Board);
         }
 
-        var workspaceId = moveBoardDto.WorkspaceId!.Value;
+        var workspaceId = write.WorkspaceId;
         if (await _tree.FindWorkspaceAsync(workspaceId) is not { } workspace)
         {
             return WorkspaceNotFound(workspaceId);
@@ -189,7 +189,7 @@ public class BoardService : IBoardService
         return ApiResponse<BoardDto>.SuccessResponse(movedBoardDto, "Board moved successfully", 200);
     }
 
-    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived)
     {
         var board = await _context.Boards.FindAsync(id);
         if (board == null)
@@ -197,11 +197,11 @@ public class BoardService : IBoardService
             return ApiResponse<bool>.ErrorResponse("Board not found", 404);
         }
 
-        return await _context.SetArchivedAsync(board, _actor, archivedDto, "Board", async archived =>
+        return await _context.SetArchivedAsync(board, _actor, archived, "Board", async archiving =>
         {
             var workspace = await _tree.WorkspaceAsync(board.WorkspaceId);
             await _activity.AddAsync(
-                archived ? ActivityType.ArchiveBoard : ActivityType.RestoreBoard,
+                archiving ? ActivityType.ArchiveBoard : ActivityType.RestoreBoard,
                 new ActivityPlace(WorkspaceId: board.WorkspaceId, BoardId: board.Id),
                 actor => new ArchiveBoardData(actor, workspace, BoardRef.Of(board)));
         });
@@ -252,15 +252,15 @@ public class BoardService : IBoardService
         ApiResponse<BoardDto>.ErrorResponse("A referenced resource does not exist", 400,
             [new ApiError("workspaceId", ErrorCodes.NotFound, $"Workspace {workspaceId} does not exist.")]);
 
-    private static Board MapToEntity(CreateBoardDto createBoardDto, Guid actorId)
+    private static Board MapToEntity(CreateBoardWrite write, Guid actorId)
     {
         return new Board
         {
             Id = Guid.NewGuid(),
-            Name = createBoardDto.Name!,
-            Description = createBoardDto.Description ?? string.Empty,
-            WorkspaceId = createBoardDto.WorkspaceId!.Value,
-            Visibility = createBoardDto.Visibility!.Value,
+            Name = write.Name,
+            Description = write.Description,
+            WorkspaceId = write.WorkspaceId,
+            Visibility = write.Visibility,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

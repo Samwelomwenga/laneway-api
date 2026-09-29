@@ -32,7 +32,7 @@ public class ListsController: ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<ListDto>>> CreateList([FromBody] CreateListDto createListDto)
     {
-        var response = await _listService.CreateAsync(createListDto);
+        var response = await _listService.CreateAsync(CreateListWrite.Of(createListDto));
         if (!response.Success)
         {
             return ToActionResult(response);
@@ -43,7 +43,7 @@ public class ListsController: ApiControllerBase
     [HttpPost("{id}/copies")]
     public async Task<ActionResult<ApiResponse<CopyJobDto>>> CopyList(Guid id, [FromBody] CopyListDto copyListDto)
     {
-        var response = await _listCopyService.CopyAsync(id, copyListDto);
+        var response = await _listCopyService.CopyAsync(id, CopyListWrite.Of(copyListDto));
         if (!response.Success)
         {
             return ToActionResult(response);
@@ -55,21 +55,21 @@ public class ListsController: ApiControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<ListDto>>> UpdateList(Guid id, [FromBody] UpdateListDto updateListDto)
     {
-        var response = await _listService.UpdateAsync(id, updateListDto);
+        var response = await _listService.UpdateAsync(id, UpdateListWrite.Of(updateListDto));
         return ToActionResult(response);
     }
 
     [HttpPut("{id}/position")]
     public async Task<ActionResult<ApiResponse<ListDto>>> MoveList(Guid id, [FromBody] MoveListDto moveListDto)
     {
-        var response = await _listService.MoveAsync(id, moveListDto);
+        var response = await _listService.MoveAsync(id, MoveListWrite.Of(moveListDto));
         return ToActionResult(response);
     }
 
     [HttpPut("{id}/archived")]
     public async Task<ActionResult<ApiResponse<bool>>> SetListArchived(Guid id, [FromBody] ArchivedDto archivedDto)
     {
-        var response = await _listService.SetArchivedAsync(id, archivedDto);
+        var response = await _listService.SetArchivedAsync(id, ArchivedWrite.Of(archivedDto));
         return ToActionResult(response);
     }
 

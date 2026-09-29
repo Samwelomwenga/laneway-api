@@ -32,7 +32,7 @@ public class ChecklistsController: ApiControllerBase
     public async Task<ActionResult<ApiResponse<ChecklistDto>>> CreateChecklist(
         [FromBody] CreateChecklistDto createChecklistDto)
     {
-        var response = await _checklistService.CreateAsync(createChecklistDto);
+        var response = await _checklistService.CreateAsync(CreateChecklistWrite.Of(createChecklistDto));
         if (!response.Success)
         {
             return ToActionResult(response);
@@ -44,7 +44,7 @@ public class ChecklistsController: ApiControllerBase
     public async Task<ActionResult<ApiResponse<ChecklistDto>>> UpdateChecklist(
         Guid id, [FromBody] UpdateChecklistDto updateChecklistDto)
     {
-        var response = await _checklistService.UpdateAsync(id, updateChecklistDto);
+        var response = await _checklistService.UpdateAsync(id, UpdateChecklistWrite.Of(updateChecklistDto));
         return ToActionResult(response);
     }
 
@@ -60,7 +60,7 @@ public class ChecklistsController: ApiControllerBase
     public async Task<ActionResult<ApiResponse<bool>>> SetChecklistArchived(
         Guid id, [FromBody] ArchivedDto archivedDto)
     {
-        var response = await _checklistService.SetArchivedAsync(id, archivedDto);
+        var response = await _checklistService.SetArchivedAsync(id, ArchivedWrite.Of(archivedDto));
         return ToActionResult(response);
     }
 

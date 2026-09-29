@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 public interface ICardCopyService
 {
-    Task<ApiResponse<CardDto>> CopyAsync(Guid id, CopyCardDto copyCardDto);
+    Task<ApiResponse<CardDto>> CopyAsync(Guid id, CopyCardWrite write);
 }
 
 public sealed class CardCopyService : ICardCopyService
@@ -43,12 +43,12 @@ public sealed class CardCopyService : ICardCopyService
         _tree = tree;
     }
 
-    public async Task<ApiResponse<CardDto>> CopyAsync(Guid id, CopyCardDto copyCardDto)
+    public async Task<ApiResponse<CardDto>> CopyAsync(Guid id, CopyCardWrite write)
     {
-        ArgumentNullException.ThrowIfNull(copyCardDto);
+        ArgumentNullException.ThrowIfNull(write);
 
-        var listId = copyCardDto.ListId!.Value;
-        var placement = Placement.Of(copyCardDto);
+        var listId = write.ListId;
+        var placement = Placement.Of(write);
 
         if (!await _context.Cards.AnyAsync(card => card.Id == id))
         {
@@ -67,8 +67,8 @@ public sealed class CardCopyService : ICardCopyService
             return CardNotFound();
         }
 
-        var plan = CopyPlan.Of([], [snapshot], CopyKeep.Of(copyCardDto.Keep), DateTime.UtcNow);
-        var title = string.IsNullOrEmpty(copyCardDto.Title) ? snapshot.Card.Title : copyCardDto.Title;
+        var plan = CopyPlan.Of([], [snapshot], CopyKeep.Of(write.Keep), DateTime.UtcNow);
+        var title = string.IsNullOrEmpty(write.Title) ? snapshot.Card.Title : write.Title;
         var pending = await _objects.QueueAsync(plan.Objects);
         var copied = await _objects.CopyAsync(plan.Objects);
 
