@@ -2,7 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Net.Http.Headers;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public static class AttachmentForm
 {

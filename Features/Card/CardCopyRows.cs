@@ -1,4 +1,4 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed record CardRows(Card Card, List<Checklist> Checklists, List<Attachment> Attachments, Guid? CoverId);
 

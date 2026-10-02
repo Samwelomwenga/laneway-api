@@ -4,7 +4,7 @@ using Supabase.Storage;
 using Supabase.Storage.Exceptions;
 using Supabase.Storage.Interfaces;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed class AttachmentStorageOptions
 {

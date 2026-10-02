@@ -1,8 +1,7 @@
 using System.Net;
-using DefaultNamespace;
 using Xunit;
 
-namespace prodigy_board_API.Tests;
+namespace Laneway.Api.Tests;
 
 [Collection(ApiCollection.Name)]
 public class WorkspaceActivityTests : ApiTests

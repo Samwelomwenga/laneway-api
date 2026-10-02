@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 [ApiController]
 [Route("api/v1/[controller]")]

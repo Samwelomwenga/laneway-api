@@ -1,10 +1,9 @@
 using System.Net;
 using System.Text.Json;
-using DefaultNamespace;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace prodigy_board_API.Tests;
+namespace Laneway.Api.Tests;
 
 [Collection(ApiCollection.Name)]
 public class BoardCopyTests : ApiTests

@@ -2,7 +2,7 @@ using System.Linq.Expressions;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public interface IArchivable
 {

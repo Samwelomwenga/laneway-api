@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace prodigy_board_API.Tests;
+namespace Laneway.Api.Tests;
 
 internal sealed class ApiFactory : WebApplicationFactory<Program>
 {

@@ -1,4 +1,4 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed record CreateLinkAttachmentWrite(string Url, string? Name)
 {

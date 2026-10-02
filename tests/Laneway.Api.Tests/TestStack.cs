@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using DefaultNamespace;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
@@ -9,13 +8,13 @@ using Supabase.Storage.Interfaces;
 using Testcontainers.PostgreSql;
 using Xunit;
 
-namespace prodigy_board_API.Tests;
+namespace Laneway.Api.Tests;
 
 public sealed class TestStack : IAsyncLifetime
 {
     public const string BucketName = "attachments-test";
 
-    private const string TemplateDatabase = "prodigy_template";
+    private const string TemplateDatabase = "laneway_template";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:18")

@@ -1,4 +1,4 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public class Checklist : PlacedEntity, IArchivable
 {

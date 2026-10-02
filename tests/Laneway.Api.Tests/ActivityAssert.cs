@@ -1,7 +1,6 @@
-using DefaultNamespace;
 using Xunit;
 
-namespace prodigy_board_API.Tests;
+namespace Laneway.Api.Tests;
 
 public static class ActivityAssert
 {

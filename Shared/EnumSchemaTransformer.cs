@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed class EnumSchemaTransformer : IOpenApiSchemaTransformer
 {

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public interface IWorkSpaceService
 {

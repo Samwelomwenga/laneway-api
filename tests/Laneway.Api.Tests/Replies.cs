@@ -1,8 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using DefaultNamespace;
 
-namespace prodigy_board_API.Tests;
+namespace Laneway.Api.Tests;
 
 public sealed record ApiEnvelope<T>(bool Success, string Message, T? Data, int StatusCode, List<ApiError>? Errors);
 

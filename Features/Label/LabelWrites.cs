@@ -1,4 +1,4 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed record CreateLabelWrite(string Name, Guid BoardId, Color? Color)
 {

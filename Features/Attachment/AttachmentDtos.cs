@@ -1,4 +1,4 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed record AttachmentUpload(string Name, string FileName, string MimeType, byte[] Bytes);
 

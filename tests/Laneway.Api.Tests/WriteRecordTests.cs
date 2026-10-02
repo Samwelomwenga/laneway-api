@@ -1,8 +1,7 @@
 using System.Text.Json;
-using DefaultNamespace;
 using Xunit;
 
-namespace prodigy_board_API.Tests;
+namespace Laneway.Api.Tests;
 
 public class WriteRecordTests
 {

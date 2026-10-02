@@ -1,4 +1,4 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed record CreateWorkSpaceWrite(string Name, string Description, WorkspaceVisibility Visibility)
 {

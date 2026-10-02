@@ -1,12 +1,11 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
-using DefaultNamespace;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace prodigy_board_API.Tests;
+namespace Laneway.Api.Tests;
 
 public abstract class ApiTests : IAsyncLifetime
 {

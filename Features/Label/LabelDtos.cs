@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public record LabelDto
 (

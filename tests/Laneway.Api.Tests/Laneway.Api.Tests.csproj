@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <RootNamespace>prodigy_board_API.Tests</RootNamespace>
+        <RootNamespace>Laneway.Api.Tests</RootNamespace>
         <IsPackable>false</IsPackable>
         <UserSecretsId>0e838897-61eb-4e95-aa86-b5dad1c4e8e2</UserSecretsId>
         <AnalysisMode>All</AnalysisMode>
@@ -20,7 +20,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="../../prodigy-board-API.csproj" />
+        <ProjectReference Include="../../Laneway.Api.csproj" />
     </ItemGroup>
 
 </Project>

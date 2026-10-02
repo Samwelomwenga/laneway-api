@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ActionConstraints;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 // A request with no Content-Type passes every [Consumes] constraint, so two creates that share a route
 // come back as an ambiguous match, which is a 500. This keeps its action out of that race and leaves

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public class ApplicationDbContext : DbContext
 {

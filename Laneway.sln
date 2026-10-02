@@ -1,8 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "prodigy-board-API", "prodigy-board-API.csproj", "{342BAD1F-4CFF-4CE7-B9E7-29D624F2B395}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laneway.Api", "Laneway.Api.csproj", "{342BAD1F-4CFF-4CE7-B9E7-29D624F2B395}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "prodigy-board-API.Tests", "tests\prodigy-board-API.Tests\prodigy-board-API.Tests.csproj", "{D5AD48D1-948A-4A76-AF4E-0DF8BD53C06A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Laneway.Api.Tests", "tests\Laneway.Api.Tests\Laneway.Api.Tests.csproj", "{D5AD48D1-948A-4A76-AF4E-0DF8BD53C06A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

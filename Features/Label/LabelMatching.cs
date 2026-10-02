@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed record LabelMatch(Label From, Label To, bool Created);
 

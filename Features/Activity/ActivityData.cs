@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed record ActorRef(Guid Id, string Username, string FirstName, string LastName);
 

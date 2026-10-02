@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Scalar.AspNetCore;
-using DefaultNamespace;
+using Laneway.Api;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 

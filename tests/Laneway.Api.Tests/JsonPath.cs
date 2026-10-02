@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace prodigy_board_API.Tests;
+namespace Laneway.Api.Tests;
 
 public static class JsonPath
 {

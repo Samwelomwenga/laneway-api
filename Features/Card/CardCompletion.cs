@@ -1,7 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public readonly record struct CardTally(int CheckItemCount, int CheckedItemCount)
 {

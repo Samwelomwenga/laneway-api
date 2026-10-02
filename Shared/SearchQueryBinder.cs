@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public interface ISearchQuery<TSelf> where TSelf : ISearchQuery<TSelf>
 {

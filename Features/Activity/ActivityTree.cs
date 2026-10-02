@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed record BoardChain(WorkspaceRef Workspace, BoardRef Board)
 {
