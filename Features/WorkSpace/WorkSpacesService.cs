@@ -63,9 +63,9 @@ public class WorkSpaceService : IWorkSpaceService
             .FirstOrDefaultAsync();
         if (existingWorkSpace == null)
         {
-           return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
+            return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
         }
-        var workSpaceDto = MapToDto(existingWorkSpace,  existingWorkSpace.Boards.Select(b => b.Id).ToList());
+        var workSpaceDto = MapToDto(existingWorkSpace, existingWorkSpace.Boards.Select(b => b.Id).ToList());
         return ApiResponse<WorkSpaceDto>.SuccessResponse(workSpaceDto, "Workspace retrieved successfully", 200);
     }
 

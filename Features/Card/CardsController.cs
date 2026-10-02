@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class CardsController: ApiControllerBase
+public class CardsController : ApiControllerBase
 {
     private readonly ICardService _cardService;
     private readonly ICardCopyService _cardCopyService;

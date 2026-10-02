@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class BoardsController: ApiControllerBase
+public class BoardsController : ApiControllerBase
 {
     private readonly IBoardService _boardService;
     private readonly IBoardCopyService _boardCopyService;
@@ -33,7 +33,7 @@ public class BoardsController: ApiControllerBase
     public async Task<ActionResult<ApiResponse<BoardDto>>> CreateBoard([FromBody] CreateBoardDto createBoardDto)
     {
         var response = await _boardService.CreateAsync(CreateBoardWrite.Of(createBoardDto));
-        if(!response.Success)
+        if (!response.Success)
         {
             return ToActionResult(response);
         }

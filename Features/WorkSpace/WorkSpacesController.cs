@@ -6,7 +6,7 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class WorkSpacesController: ApiControllerBase
+public class WorkSpacesController : ApiControllerBase
 {
     private readonly IWorkSpaceService _workSpaceService;
 

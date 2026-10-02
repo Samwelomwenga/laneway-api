@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class ListsController: ApiControllerBase
+public class ListsController : ApiControllerBase
 {
     private readonly IListService _listService;
     private readonly IListCopyService _listCopyService;

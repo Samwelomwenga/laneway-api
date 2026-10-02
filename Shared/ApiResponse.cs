@@ -32,14 +32,14 @@ public class ApiResponse<T>
     }
 }
 
-public  class PagedResponse<T> : ApiResponse<List<T>>
+public class PagedResponse<T> : ApiResponse<List<T>>
 {
     public new List<T> Data { get; set; } = new();
     public int TotalCount { get; set; }
     public int PageSize { get; set; }
     public int CurrentPage { get; set; }
     public int TotalPages { get; set; }
-    
+
     public static PagedResponse<T> SuccessResponse(List<T> data, int totalCount, int pageSize, int currentPage, string message = "Request was successful", int statusCode = 200)
     {
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
@@ -55,7 +55,7 @@ public  class PagedResponse<T> : ApiResponse<List<T>>
             TotalPages = totalPages
         };
     }
-    
+
     public bool HasNextPage => CurrentPage < TotalPages;
     public bool HasPreviousPage => CurrentPage > 1;
 }

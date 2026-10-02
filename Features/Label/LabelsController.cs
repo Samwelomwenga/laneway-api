@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class LabelsController: ApiControllerBase
+public class LabelsController : ApiControllerBase
 {
     private readonly ILabelService _labelService;
     public LabelsController(ILabelService labelService)

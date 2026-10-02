@@ -15,7 +15,7 @@ public interface ICardService
     Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
-public class CardService: ICardService
+public class CardService : ICardService
 {
     private const int MoveAttempts = 3;
 

@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class ChecklistsController: ApiControllerBase
+public class ChecklistsController : ApiControllerBase
 {
     private readonly IChecklistService _checklistService;
 
