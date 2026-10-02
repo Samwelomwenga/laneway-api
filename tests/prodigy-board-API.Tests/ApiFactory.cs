@@ -30,10 +30,10 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.UseEnvironment("Development");
+        builder.UseSetting("ConnectionStrings:DefaultConnection", _connectionString);
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>(StringComparer.Ordinal)
             {
-                ["ConnectionStrings:DefaultConnection"] = _connectionString,
                 ["Supabase:BucketName"] = TestStack.BucketName
             }));
     }
