@@ -1,3 +1,4 @@
+#r "System.Linq"
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -317,3 +318,5 @@ public class ValidationResult
     public List<string> Warnings { get; } = new();
     public List<string> Suggestions { get; } = new();
 }
+
+return CommitLinter.Main(Args.ToArray());
