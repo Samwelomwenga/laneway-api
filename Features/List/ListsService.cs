@@ -6,6 +6,8 @@ public interface IListService
 {
     Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto);
     Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListDto updateListDto);
+    Task<ApiResponse<ListDto>> MoveAsync(Guid id, MoveListDto moveListDto);
+    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
     Task<ApiResponse<ListDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<List<ListDto>>> GetAllAsync(ListSearchDto searchDto);
@@ -16,12 +18,21 @@ public class ListService : IListService
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
     private readonly Placements _placements;
+    private readonly ArchiveGuard _archive;
+    private readonly LabelMatching _labelMatching;
 
-    public ListService(ApplicationDbContext context, Actor actor, Placements placements)
+    public ListService(
+        ApplicationDbContext context,
+        Actor actor,
+        Placements placements,
+        ArchiveGuard archive,
+        LabelMatching labelMatching)
     {
         _context = context;
         _actor = actor;
         _placements = placements;
+        _archive = archive;
+        _labelMatching = labelMatching;
     }
 
     public async Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto)
@@ -34,11 +45,15 @@ public class ListService : IListService
             return BoardNotFound(boardId);
         }
 
-        var placed = await _placements.ResolveOnBoardAsync(
-            boardId, new Placement(createListDto.Position, createListDto.Before, createListDto.After));
+        var placed = await _placements.ResolveOnBoardAsync(boardId, Placement.Of(createListDto));
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<ListDto>(placed.Errors);
+        }
+
+        if (await _archive.OnBoardAsync(boardId) is { } archived)
+        {
+            return ArchiveErrors.NoCreate<ListDto>(archived, "boardId", TreeItem.List);
         }
 
         var list = MapToEntity(createListDto, _actor.Id, placed.Position);
@@ -61,17 +76,13 @@ public class ListService : IListService
             return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
         }
 
-        var boardId = updateListDto.BoardId!.Value;
-        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
+        if (await _archive.OnListAsync(id) is { } archived)
         {
-            return BoardNotFound(boardId);
+            return ArchiveErrors.ReadOnly<ListDto>(archived, TreeItem.List);
         }
 
         list.Name = updateListDto.Name!;
-        list.Position = updateListDto.Position!.Value;
-        list.BoardId = boardId;
         list.Color = updateListDto.Color;
-        list.IsArchived = updateListDto.IsArchived!.Value;
         _context.StampChange(list, _actor);
 
         await _context.SaveChangesAsync();
@@ -80,12 +91,90 @@ public class ListService : IListService
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List updated successfully", 200);
     }
 
+    public async Task<ApiResponse<ListDto>> MoveAsync(Guid id, MoveListDto moveListDto)
+    {
+        ArgumentNullException.ThrowIfNull(moveListDto);
+
+        var boardId = moveListDto.BoardId!.Value;
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var list = await _context.Lists
+            .Include(l => l.Cards)
+            .FirstOrDefaultAsync(l => l.Id == id);
+        if (list == null)
+        {
+            return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
+        }
+
+        if (await _archive.OnListAsync(id) is { } readOnly)
+        {
+            return ArchiveErrors.ReadOnly<ListDto>(readOnly, TreeItem.List);
+        }
+
+        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
+        {
+            return BoardNotFound(boardId);
+        }
+
+        var crossesBoards = boardId != list.BoardId;
+        var placed = await _placements.ResolveMoveOnBoardAsync(list, boardId, Placement.Of(moveListDto));
+        if (placed.Errors.Count > 0)
+        {
+            return ReferenceErrors.Invalid<ListDto>(placed.Errors);
+        }
+
+        if (await _archive.OnBoardAsync(boardId) is { } archived)
+        {
+            return ArchiveErrors.NoCreate<ListDto>(archived, "boardId", TreeItem.List);
+        }
+
+        if (crossesBoards)
+        {
+            var cards = await _context.Cards
+                .Where(card => card.ListId == id)
+                .Include(card => card.Labels)
+                .ToListAsync();
+            await _labelMatching.CarryToBoardAsync(cards, boardId);
+        }
+
+        list.BoardId = boardId;
+        list.Position = placed.Position;
+        _context.StampChange(list, _actor);
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+        var listDto = MapToDto(list, list.Cards.InSortOrder().Select(c => c.Id).ToList());
+
+        return ApiResponse<ListDto>.SuccessResponse(listDto, "List moved successfully", 200);
+    }
+
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)
+    {
+        var list = await _context.Lists.FindAsync(id);
+        if (list == null)
+        {
+            return ApiResponse<bool>.ErrorResponse("List not found", 404);
+        }
+
+        if (await _archive.OnBoardAsync(list.BoardId) is { } archived)
+        {
+            return ArchiveErrors.RestoreFirst<bool>(archived, TreeItem.List);
+        }
+
+        return await _context.SetArchivedAsync(list, _actor, archivedDto, "List");
+    }
+
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
         var list = await _context.Lists.FindAsync(id);
         if (list == null)
         {
             return ApiResponse<bool>.ErrorResponse("List not found", 404);
+        }
+
+        if (!list.IsArchived)
+        {
+            return ArchiveErrors.NotArchived<bool>(TreeItem.List);
         }
 
         _context.Lists.Remove(list);
@@ -127,10 +216,7 @@ public class ListService : IListService
             query = query.Where(l => l.BoardId == boardId);
         }
 
-        if (searchDto.IsArchived is { } isArchived)
-        {
-            query = query.Where(l => l.IsArchived == isArchived);
-        }
+        query = ArchiveView.Lists(query, searchDto.Archived, _context);
 
         var (lists, totalCount) = await PagedQuery.ReadAsync(
             query.InSortOrder().Include(l => l.Cards),
@@ -178,7 +264,6 @@ public class ListService : IListService
             Position = position,
             BoardId = createListDto.BoardId!.Value,
             Color = createListDto.Color,
-            IsArchived = createListDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

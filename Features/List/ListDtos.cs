@@ -24,9 +24,8 @@ public record CreateListDto
     Guid? Before,
     Guid? After,
     Guid? BoardId,
-    Color? Color,
-    bool? IsArchived
-)
+    Color? Color
+) : IPlacing
 {
     public string? Name { get; init; } = Name?.Trim();
 }
@@ -34,14 +33,19 @@ public record CreateListDto
 public record UpdateListDto
 (
     string? Name,
-    double? Position,
-    Guid? BoardId,
-    Color? Color,
-    bool? IsArchived
+    Color? Color
 )
 {
     public string? Name { get; init; } = Name?.Trim();
 }
+
+public record MoveListDto
+(
+    Guid? BoardId,
+    PositionValue? Position,
+    Guid? Before,
+    Guid? After
+) : IPlacing;
 [ModelBinder(typeof(SearchQueryBinder<ListSearchDto>))]
 public record ListSearchDto
 (
@@ -49,7 +53,7 @@ public record ListSearchDto
     int PageSize,
     string? SearchTerm,
     Guid? BoardId,
-    bool? IsArchived
+    ArchiveFilter Archived
 ) : ISearchQuery<ListSearchDto>
 {
     public static ListSearchDto Read(QueryReader query) => new(
@@ -57,5 +61,5 @@ public record ListSearchDto
         query.PageSize(),
         query.Text("searchTerm"),
         query.Id("boardId"),
-        query.Flag("isArchived"));
+        query.EnumName<ArchiveFilter>("archived") ?? ArchiveFilter.Exclude);
 }

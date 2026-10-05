@@ -32,10 +32,6 @@ public class WorkSpaceService : IWorkSpaceService
             query = query.Where(ws => ws.Name.ToLower().Contains(term.ToLower()) ||
                                       ws.Description.ToLower().Contains(term.ToLower()));
         }
-        if (searchDto.IsArchived is { } isArchived)
-        {
-            query = query.Where(ws => ws.IsArchived == isArchived);
-        }
         if (searchDto.Visibility is { } visibility)
         {
             query = query.Where(ws => ws.Visibility == visibility);
@@ -92,7 +88,6 @@ public class WorkSpaceService : IWorkSpaceService
         existingWorkSpace.Name = updateWorkSpaceDto.Name!;
         existingWorkSpace.Description = updateWorkSpaceDto.Description ?? string.Empty;
         existingWorkSpace.Visibility = updateWorkSpaceDto.Visibility!.Value;
-        existingWorkSpace.IsArchived = updateWorkSpaceDto.IsArchived!.Value;
         _context.StampChange(existingWorkSpace, _actor);
 
         await _context.SaveChangesAsync();
@@ -108,6 +103,14 @@ public class WorkSpaceService : IWorkSpaceService
             return ApiResponse<bool>.ErrorResponse("Workspace not found", 404);
         }
 
+        var boardCount = await _context.Boards.CountAsync(b => b.WorkspaceId == id);
+        if (boardCount > 0)
+        {
+            return ApiResponse<bool>.ErrorResponse("Workspace still holds boards", 409,
+                [new ApiError(null, ErrorCodes.NotEmpty,
+                    $"Move or delete this workspace's {boardCount} {(boardCount == 1 ? "board" : "boards")} first.")]);
+        }
+
         _context.WorkSpaces.Remove(workSpace);
         await _context.SaveChangesAsync();
         return ApiResponse<bool>.SuccessResponse(true, "Workspace deleted successfully", 204);
@@ -121,7 +124,6 @@ public class WorkSpaceService : IWorkSpaceService
             workSpace.Name,
             workSpace.Description,
             workSpace.Visibility,
-            workSpace.IsArchived,
             workSpace.CreatedAt,
             workSpace.UpdatedAt,
             workSpace.CreatedBy,
@@ -138,7 +140,6 @@ public class WorkSpaceService : IWorkSpaceService
             Name = createWorkSpaceDto.Name!,
             Description = createWorkSpaceDto.Description ?? string.Empty,
             Visibility = createWorkSpaceDto.Visibility!.Value,
-            IsArchived = createWorkSpaceDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

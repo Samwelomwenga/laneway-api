@@ -8,6 +8,8 @@ public interface IBoardService
     Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto);
     Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardDto updateBoardDto);
+    Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardDto moveBoardDto);
+    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 
@@ -15,11 +17,13 @@ public class BoardService : IBoardService
 {
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
+    private readonly ArchiveGuard _archive;
 
-    public BoardService(ApplicationDbContext context, Actor actor)
+    public BoardService(ApplicationDbContext context, Actor actor, ArchiveGuard archive)
     {
         _context = context;
         _actor = actor;
+        _archive = archive;
     }
 
     public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(BoardSearchDto searchDto)
@@ -43,10 +47,7 @@ public class BoardService : IBoardService
             query = query.Where(b => b.WorkspaceId == workspaceId);
         }
 
-        if (searchDto.IsArchived is { } isArchived)
-        {
-            query = query.Where(b => b.IsArchived == isArchived);
-        }
+        query = ArchiveView.Boards(query, searchDto.Archived);
 
         if (searchDto.Visibility is { } visibility)
         {
@@ -107,22 +108,61 @@ public class BoardService : IBoardService
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
         }
 
-        var workspaceId = updateBoardDto.WorkspaceId!.Value;
-        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
+        if (await _archive.OnBoardAsync(id) is { } archived)
         {
-            return WorkspaceNotFound(workspaceId);
+            return ArchiveErrors.ReadOnly<BoardDto>(archived, TreeItem.Board);
         }
 
         existingBoard.Name = updateBoardDto.Name!;
         existingBoard.Description = updateBoardDto.Description ?? string.Empty;
-        existingBoard.WorkspaceId = workspaceId;
         existingBoard.Visibility = updateBoardDto.Visibility!.Value;
-        existingBoard.IsArchived = updateBoardDto.IsArchived!.Value;
         _context.StampChange(existingBoard, _actor);
 
         await _context.SaveChangesAsync();
         var updatedBoardDto = MapToDto(existingBoard, existingBoard.Lists.InSortOrder().Select(l => l.Id).ToList());
         return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
+    }
+
+    public async Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardDto moveBoardDto)
+    {
+        ArgumentNullException.ThrowIfNull(moveBoardDto);
+
+        var board = await _context.Boards
+            .Include(b => b.Lists)
+            .FirstOrDefaultAsync(b => b.Id == id);
+        if (board == null)
+        {
+            return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
+        }
+
+        if (await _archive.OnBoardAsync(id) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<BoardDto>(archived, TreeItem.Board);
+        }
+
+        var workspaceId = moveBoardDto.WorkspaceId!.Value;
+        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
+        {
+            return WorkspaceNotFound(workspaceId);
+        }
+
+        board.WorkspaceId = workspaceId;
+        _context.StampChange(board, _actor);
+
+        await _context.SaveChangesAsync();
+        var movedBoardDto = MapToDto(board, board.Lists.InSortOrder().Select(l => l.Id).ToList());
+        return ApiResponse<BoardDto>.SuccessResponse(movedBoardDto, "Board moved successfully", 200);
+    }
+
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)
+    {
+        var board = await _context.Boards.FindAsync(id);
+        if (board == null)
+        {
+            return ApiResponse<bool>.ErrorResponse("Board not found", 404);
+        }
+
+        return await _context.SetArchivedAsync(board, _actor, archivedDto, "Board");
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
@@ -131,6 +171,11 @@ public class BoardService : IBoardService
         if (existingBoard == null)
         {
             return ApiResponse<bool>.ErrorResponse("Board not found", 404);
+        }
+
+        if (!existingBoard.IsArchived)
+        {
+            return ArchiveErrors.NotArchived<bool>(TreeItem.Board);
         }
 
         _context.Boards.Remove(existingBoard);
@@ -169,7 +214,6 @@ public class BoardService : IBoardService
             Description = createBoardDto.Description ?? string.Empty,
             WorkspaceId = createBoardDto.WorkspaceId!.Value,
             Visibility = createBoardDto.Visibility!.Value,
-            IsArchived = createBoardDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

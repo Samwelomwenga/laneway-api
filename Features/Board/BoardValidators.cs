@@ -10,7 +10,6 @@ public sealed class CreateBoardDtoValidator : AbstractValidator<CreateBoardDto>
         RuleFor(x => x.Description).MaxLength(FieldLimits.BoardDescription);
         RuleFor(x => x.WorkspaceId).Required();
         RuleFor(x => x.Visibility).Required();
-        RuleFor(x => x.IsArchived).Required();
     }
 }
 
@@ -20,8 +19,14 @@ public sealed class UpdateBoardDtoValidator : AbstractValidator<UpdateBoardDto>
     {
         RuleFor(x => x.Name).Required().MaxLength(FieldLimits.BoardName);
         RuleFor(x => x.Description).MaxLength(FieldLimits.BoardDescription);
-        RuleFor(x => x.WorkspaceId).Required();
         RuleFor(x => x.Visibility).Required();
-        RuleFor(x => x.IsArchived).Required();
+    }
+}
+
+public sealed class MoveBoardDtoValidator : AbstractValidator<MoveBoardDto>
+{
+    public MoveBoardDtoValidator()
+    {
+        RuleFor(x => x.WorkspaceId).Required();
     }
 }

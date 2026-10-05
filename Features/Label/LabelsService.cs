@@ -15,11 +15,13 @@ public class LabelService : ILabelService
 {
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
+    private readonly ArchiveGuard _archive;
 
-    public LabelService(ApplicationDbContext context, Actor actor)
+    public LabelService(ApplicationDbContext context, Actor actor, ArchiveGuard archive)
     {
         _context = context;
         _actor = actor;
+        _archive = archive;
     }
 
     public async Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto)
@@ -73,9 +75,14 @@ public class LabelService : ILabelService
         var name = createLabelDto.Name ?? string.Empty;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        if (!await TryLockBoardAsync(boardId))
+        if (!await _context.TryLockBoardAsync(boardId))
         {
             return ReferenceErrors.NotFound<LabelDto>("boardId", "Board", boardId);
+        }
+
+        if (await _archive.OnBoardAsync(boardId) is { } archived)
+        {
+            return ArchiveErrors.NoCreate<LabelDto>(archived, "boardId", TreeItem.Label);
         }
 
         if (await FindDuplicateAsync(boardId, name, createLabelDto.Color, self: null) is { } duplicate)
@@ -102,7 +109,13 @@ public class LabelService : ILabelService
 
         var name = updateLabelDto.Name ?? string.Empty;
         await using var transaction = await _context.Database.BeginTransactionAsync();
-        await TryLockBoardAsync(existingLabel.BoardId);
+
+        await _context.TryLockBoardAsync(existingLabel.BoardId);
+
+        if (await _archive.OnBoardAsync(existingLabel.BoardId) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<LabelDto>(archived, TreeItem.Label);
+        }
 
         if (await FindDuplicateAsync(existingLabel.BoardId, name, updateLabelDto.Color, id) is { } duplicate)
         {
@@ -129,21 +142,19 @@ public class LabelService : ILabelService
         }
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
-        await TryLockBoardAsync(existingLabel.BoardId);
+
+        await _context.TryLockBoardAsync(existingLabel.BoardId);
+
+        if (await _archive.OnBoardAsync(existingLabel.BoardId) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.Label);
+        }
 
         _context.Labels.Remove(existingLabel);
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
         return ApiResponse<bool>.SuccessResponse(true, "Label deleted successfully", 204);
-    }
-
-    private async Task<bool> TryLockBoardAsync(Guid boardId)
-    {
-        var boards = await _context.Boards
-            .FromSql($"SELECT * FROM \"Boards\" WHERE \"Id\" = {boardId} FOR UPDATE")
-            .ToListAsync();
-        return boards.Count > 0;
     }
 
     private async Task<ApiResponse<LabelDto>?> FindDuplicateAsync(Guid boardId, string name, Color? color, Guid? self)

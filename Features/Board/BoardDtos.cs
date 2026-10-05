@@ -22,8 +22,7 @@ public record CreateBoardDto
     string? Name,
     string? Description,
     Guid? WorkspaceId,
-    BoardVisibility? Visibility,
-    bool? IsArchived
+    BoardVisibility? Visibility
 )
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -33,13 +32,16 @@ public record UpdateBoardDto
 (
     string? Name,
     string? Description,
-    Guid? WorkspaceId,
-    BoardVisibility? Visibility,
-    bool? IsArchived
+    BoardVisibility? Visibility
 )
 {
     public string? Name { get; init; } = Name?.Trim();
 }
+
+public record MoveBoardDto
+(
+    Guid? WorkspaceId
+);
 
 [ModelBinder(typeof(SearchQueryBinder<BoardSearchDto>))]
 public record BoardSearchDto
@@ -48,7 +50,7 @@ public record BoardSearchDto
     int PageSize,
     string? SearchTerm,
     Guid? WorkspaceId,
-    bool? IsArchived,
+    ArchiveFilter Archived,
     BoardVisibility? Visibility
 ) : ISearchQuery<BoardSearchDto>
 {
@@ -57,6 +59,6 @@ public record BoardSearchDto
         query.PageSize(),
         query.Text("searchTerm"),
         query.Id("workspaceId"),
-        query.Flag("isArchived"),
+        query.EnumName<ArchiveFilter>("archived") ?? ArchiveFilter.Exclude,
         query.EnumName<BoardVisibility>("visibility"));
 }

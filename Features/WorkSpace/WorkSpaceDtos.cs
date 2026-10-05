@@ -8,7 +8,6 @@ public record WorkSpaceDto
     string Name,
     string Description,
     WorkspaceVisibility Visibility,
-    bool IsArchived,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     Guid CreatedBy,
@@ -19,8 +18,7 @@ public record CreateWorkSpaceDto
 (
     string? Name,
     string? Description,
-    WorkspaceVisibility? Visibility,
-    bool? IsArchived
+    WorkspaceVisibility? Visibility
 )
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -29,8 +27,7 @@ public record UpdateWorkSpaceDto
 (
     string? Name,
     string? Description,
-    WorkspaceVisibility? Visibility,
-    bool? IsArchived
+    WorkspaceVisibility? Visibility
 )
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -41,7 +38,6 @@ public record WorkSpaceSearchDto
     int PageNumber,
     int PageSize,
     string? SearchTerm,
-    bool? IsArchived,
     WorkspaceVisibility? Visibility
 ) : ISearchQuery<WorkSpaceSearchDto>
 {
@@ -49,6 +45,5 @@ public record WorkSpaceSearchDto
         query.PageNumber(),
         query.PageSize(),
         query.Text("searchTerm"),
-        query.Flag("isArchived"),
         query.EnumName<WorkspaceVisibility>("visibility"));
 }

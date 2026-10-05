@@ -35,9 +35,8 @@ public record CreateCardDto
     string? Cover,
     DateTime? StartDate,
     int? DueReminderMinutes,
-    bool? IsArchived,
     List<Guid?>? LabelIds
-)
+) : IPlacing
 {
     public string? Title { get; init; } = Title?.Trim();
 }
@@ -47,18 +46,23 @@ public record UpdateCardDto
     string? Title,
     string? Description,
     DateTime? DueDate,
-    double? Position,
-    Guid? ListId,
     bool? IsDueComplete,
     string? Cover,
     DateTime? StartDate,
     int? DueReminderMinutes,
-    bool? IsArchived,
     List<Guid?>? LabelIds
 )
 {
     public string? Title { get; init; } = Title?.Trim();
 }
+
+public record MoveCardDto
+(
+    Guid? ListId,
+    PositionValue? Position,
+    Guid? Before,
+    Guid? After
+) : IPlacing;
 [ModelBinder(typeof(SearchQueryBinder<CardSearchDto>))]
 public record CardSearchDto
 (
@@ -66,7 +70,7 @@ public record CardSearchDto
     int PageSize,
     string? SearchTerm,
     Guid? ListId,
-    bool? IsArchived,
+    ArchiveFilter Archived,
     DateOnly? DueDate,
     DateTimeOffset? DueBefore,
     DateTimeOffset? StartFrom,
@@ -78,7 +82,7 @@ public record CardSearchDto
         query.PageSize(),
         query.Text("searchTerm"),
         query.Id("listId"),
-        query.Flag("isArchived"),
+        query.EnumName<ArchiveFilter>("archived") ?? ArchiveFilter.Exclude,
         query.Day("dueDate"),
         query.Timestamp("dueBefore"),
         query.Timestamp("startFrom"),

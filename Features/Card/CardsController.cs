@@ -45,6 +45,13 @@ public class CardsController: ApiControllerBase
         return ToActionResult(response);
     }
 
+    [HttpPut("{id}/position")]
+    public async Task<ActionResult<ApiResponse<CardDto>>> MoveCard(Guid id, [FromBody] MoveCardDto moveCardDto)
+    {
+        var response = await _cardService.MoveAsync(id, moveCardDto);
+        return ToActionResult(response);
+    }
+
     [HttpPost("{cardId}/labels/{labelId}")]
     public async Task<ActionResult<ApiResponse<bool>>> AddCardLabel(Guid cardId, Guid labelId)
     {
@@ -56,6 +63,13 @@ public class CardsController: ApiControllerBase
     public async Task<ActionResult<ApiResponse<bool>>> RemoveCardLabel(Guid cardId, Guid labelId)
     {
         var response = await _cardService.RemoveLabelAsync(cardId, labelId);
+        return ToActionResult(response);
+    }
+
+    [HttpPut("{id}/archived")]
+    public async Task<ActionResult<ApiResponse<bool>>> SetCardArchived(Guid id, [FromBody] ArchivedDto archivedDto)
+    {
+        var response = await _cardService.SetArchivedAsync(id, archivedDto);
         return ToActionResult(response);
     }
 

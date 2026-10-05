@@ -7,10 +7,8 @@ public sealed class CreateListDtoValidator : AbstractValidator<CreateListDto>
     public CreateListDtoValidator()
     {
         RuleFor(x => x.Name).Required().MaxLength(FieldLimits.ListName);
-        RuleFor(x => x.Position).ValidPosition();
-        RuleFor(x => x).OnePlacement(x => new Placement(x.Position, x.Before, x.After));
+        this.ValidPlacement();
         RuleFor(x => x.BoardId).Required();
-        RuleFor(x => x.IsArchived).Required();
     }
 }
 
@@ -19,8 +17,14 @@ public sealed class UpdateListDtoValidator : AbstractValidator<UpdateListDto>
     public UpdateListDtoValidator()
     {
         RuleFor(x => x.Name).Required().MaxLength(FieldLimits.ListName);
-        RuleFor(x => x.Position).Required();
+    }
+}
+
+public sealed class MoveListDtoValidator : AbstractValidator<MoveListDto>
+{
+    public MoveListDtoValidator()
+    {
         RuleFor(x => x.BoardId).Required();
-        RuleFor(x => x.IsArchived).Required();
+        this.ValidPlacement();
     }
 }

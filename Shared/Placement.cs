@@ -7,9 +7,23 @@ public class PlacedEntity : BaseEntity
     public double Position { get; set; }
 }
 
+public interface IPlacing
+{
+    PositionValue? Position { get; }
+    Guid? Before { get; }
+    Guid? After { get; }
+}
+
 public sealed record Placement(PositionValue? Position, Guid? Before, Guid? After)
 {
+    public static Placement Of(IPlacing request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return new Placement(request.Position, request.Before, request.After);
+    }
+
     public bool HasAnchor => Before is not null || After is not null;
+    public bool IsEmpty => Position is null && !HasAnchor;
 }
 
 public sealed record PlacementResult(double Position, List<ApiError> Errors);
@@ -34,11 +48,16 @@ public static class PlacementRules
             .WithErrorCode(ErrorCodes.OutOfRange)
             .WithMessage("'{PropertyName}' must be above 0.");
 
-    public static IRuleBuilderOptions<T, T> OnePlacement<T>(
-        this IRuleBuilder<T, T> rule, Func<T, Placement> placement) =>
-        rule.Must(request => placement(request) is { Position: null } or { HasAnchor: false })
+    public static void ValidPlacement<T>(this AbstractValidator<T> validator) where T : IPlacing
+    {
+        ArgumentNullException.ThrowIfNull(validator);
+
+        validator.RuleFor(request => request.Position).ValidPosition();
+        validator.RuleFor(request => request)
+            .Must(request => Placement.Of(request) is { Position: null } or { HasAnchor: false })
             .WithErrorCode(ErrorCodes.MutuallyExclusive)
-            .WithMessage(request => $"'position' can't be sent with {Anchors(placement(request))}.");
+            .WithMessage(request => $"'position' can't be sent with {Anchors(Placement.Of(request))}.");
+    }
 
     private static string Anchors(Placement placement) => placement switch
     {

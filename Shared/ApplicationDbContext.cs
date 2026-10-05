@@ -115,6 +115,10 @@ public class ApplicationDbContext : DbContext
         {
             entity.Property(b => b.Name).HasColumnType($"varchar({FieldLimits.BoardName})");
             entity.Property(b => b.Description).HasColumnType($"varchar({FieldLimits.BoardDescription})");
+            entity.HasOne<WorkSpace>()
+                .WithMany(ws => ws.Boards)
+                .HasForeignKey(b => b.WorkspaceId)
+                .OnDelete(DeleteBehavior.Restrict);
             ActorKeys(entity);
         });
 

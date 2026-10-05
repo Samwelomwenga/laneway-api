@@ -15,33 +15,67 @@ public sealed class Placements
 
     public async Task<PlacementResult> ResolveInListAsync(Guid listId, Placement placement)
     {
-        await _context.Lists.FromSql($"SELECT * FROM \"Lists\" WHERE \"Id\" = {listId} FOR UPDATE").ToListAsync();
+        await _context.LockListsAsync(listId);
+        return await InListAsync(listId, placement, moving: null);
+    }
 
-        var cards = await _context.Cards.Where(card => card.ListId == listId).InSortOrder().ToListAsync();
-        var siblings = cards.ConvertAll(card => new Sibling(card, card.IsArchived));
+    public async Task<PlacementResult> ResolveMoveInListAsync(Card card, Guid listId, Placement placement)
+    {
+        ArgumentNullException.ThrowIfNull(card);
 
-        return await ResolveAsync(siblings, placement, "Card", "list",
-            id => _context.Cards.AnyAsync(card => card.Id == id));
+        await _context.LockListsAsync(card.ListId, listId);
+        return await InListAsync(listId, placement, card);
     }
 
     public async Task<PlacementResult> ResolveOnBoardAsync(Guid boardId, Placement placement)
     {
-        await _context.Boards.FromSql($"SELECT * FROM \"Boards\" WHERE \"Id\" = {boardId} FOR UPDATE").ToListAsync();
+        await _context.LockBoardsAsync(boardId);
+        return await OnBoardAsync(boardId, placement, moving: null);
+    }
 
+    public async Task<PlacementResult> ResolveMoveOnBoardAsync(List list, Guid boardId, Placement placement)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+
+        await _context.LockBoardsAsync(list.BoardId, boardId);
+        return await OnBoardAsync(boardId, placement, list);
+    }
+
+    private async Task<PlacementResult> OnBoardAsync(Guid boardId, Placement placement, List? moving)
+    {
         var lists = await _context.Lists.Where(list => list.BoardId == boardId).InSortOrder().ToListAsync();
         var siblings = lists.ConvertAll(list => new Sibling(list, list.IsArchived));
 
-        return await ResolveAsync(siblings, placement, "List", "board",
+        return await ResolveAsync(siblings, placement, moving, "List", "board",
             id => _context.Lists.AnyAsync(list => list.Id == id));
+    }
+
+    private async Task<PlacementResult> InListAsync(Guid listId, Placement placement, Card? moving)
+    {
+        var cards = await _context.Cards.Where(card => card.ListId == listId).InSortOrder().ToListAsync();
+        var siblings = cards.ConvertAll(card => new Sibling(card, card.IsArchived));
+
+        return await ResolveAsync(siblings, placement, moving, "Card", "list",
+            id => _context.Cards.AnyAsync(card => card.Id == id));
     }
 
     private static async Task<PlacementResult> ResolveAsync(
         List<Sibling> siblings,
         Placement placement,
+        PlacedEntity? moving,
         string resource,
         string container,
         Func<Guid, Task<bool>> existsAsync)
     {
+        if (moving is not null)
+        {
+            var staying = siblings.RemoveAll(sibling => sibling.Id == moving.Id) > 0;
+            if (staying && placement.IsEmpty)
+            {
+                return new PlacementResult(moving.Position, []);
+            }
+        }
+
         var errors = new List<ApiError>();
         var after = await AnchorAsync(placement.After, "after", siblings, resource, container, existsAsync, errors);
         var before = await AnchorAsync(placement.Before, "before", siblings, resource, container, existsAsync, errors);
