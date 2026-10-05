@@ -8,11 +8,9 @@ public sealed class ApiExceptionHandler : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        // Kestrel compares Content-Length with its body-size limit on the first read, inside the
-        // attachment form reader, so its 413 arrives here as an exception and keeps its own shape.
-        if (exception is BadHttpRequestException { StatusCode: 413 } framework)
+        if (IsKestrelBodyTooLarge(exception))
         {
-            httpContext.Response.StatusCode = framework.StatusCode;
+            httpContext.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
             return true;
         }
 
@@ -31,4 +29,7 @@ public sealed class ApiExceptionHandler : IExceptionHandler
         await httpContext.Response.WriteAsJsonAsync(response, cancellationToken);
         return true;
     }
+
+    private static bool IsKestrelBodyTooLarge(Exception exception) =>
+        exception is BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge };
 }
