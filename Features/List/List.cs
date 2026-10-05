@@ -1,9 +1,8 @@
 namespace DefaultNamespace;
 
-public class List: BaseEntity
+public class List: PlacedEntity
 {
     public required string Name { get; set; }
-    public int Position { get; set; }
     public required Guid BoardId { get; set; }
     public Color? Color { get; set; }
     public bool IsArchived { get; set; }

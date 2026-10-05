@@ -3,6 +3,7 @@ using System;
 using DefaultNamespace;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace prodigy_board_API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260916133344_Positions")]
+    partial class Positions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -189,9 +192,6 @@ namespace prodigy_board_API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("BoardId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Color")
                         .HasColumnType("text");
 
@@ -212,8 +212,6 @@ namespace prodigy_board_API.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("BoardId");
 
                     b.HasIndex("CreatedBy");
 
@@ -475,12 +473,6 @@ namespace prodigy_board_API.Migrations
 
             modelBuilder.Entity("DefaultNamespace.Label", b =>
                 {
-                    b.HasOne("DefaultNamespace.Board", null)
-                        .WithMany()
-                        .HasForeignKey("BoardId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("DefaultNamespace.User", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")

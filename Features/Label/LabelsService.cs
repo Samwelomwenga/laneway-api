@@ -24,14 +24,24 @@ public class LabelService : ILabelService
 
     public async Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto)
     {
+        if (searchDto.BoardId is { } filterBoardId && !await _context.Boards.AnyAsync(b => b.Id == filterBoardId))
+        {
+            return ReferenceErrors.NotFound<List<LabelDto>>("boardId", "Board", filterBoardId);
+        }
+
         var query = _context.Labels.AsQueryable();
         if (searchDto.SearchTerm is { } term)
         {
             query = query.Where(l => l.Name.ToLower().Contains(term.ToLower()));
         }
 
+        if (searchDto.BoardId is { } boardId)
+        {
+            query = query.Where(l => l.BoardId == boardId);
+        }
+
         var (labels, totalCount) = await PagedQuery.ReadAsync(
-            query.OrderBy(l => l.Name),
+            query.OrderBy(l => l.Name).ThenBy(l => l.Color).ThenBy(l => l.CreatedAt).ThenBy(l => l.Id),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
@@ -59,16 +69,25 @@ public class LabelService : ILabelService
 
     public async Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelDto createLabelDto)
     {
-        var existingLabel = await _context.Labels
-            .FirstOrDefaultAsync(l => l.Name.ToLower() == createLabelDto.Name!.ToLower());
-        if (existingLabel != null)
+        var boardId = createLabelDto.BoardId!.Value;
+        var name = createLabelDto.Name ?? string.Empty;
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        if (!await TryLockBoardAsync(boardId))
         {
-            return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
-                [new ApiError("name", ErrorCodes.Duplicate, "A label with this name already exists.")]);
+            return ReferenceErrors.NotFound<LabelDto>("boardId", "Board", boardId);
         }
-        var newLabel = MapToEntity(createLabelDto, _actor.Id);
+
+        if (await FindDuplicateAsync(boardId, name, createLabelDto.Color, self: null) is { } duplicate)
+        {
+            return duplicate;
+        }
+
+        var newLabel = MapToEntity(createLabelDto, name, _actor.Id);
         _context.Labels.Add(newLabel);
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
         var labelDto = MapToDto(newLabel);
         return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label created successfully", 201);
     }
@@ -81,19 +100,21 @@ public class LabelService : ILabelService
             return ApiResponse<LabelDto>.ErrorResponse("Label not found", 404);
         }
 
-        var nameTaken = await _context.Labels
-            .AnyAsync(l => l.Id != id && l.Name.ToLower() == updateLabelDto.Name!.ToLower());
-        if (nameTaken)
+        var name = updateLabelDto.Name ?? string.Empty;
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await TryLockBoardAsync(existingLabel.BoardId);
+
+        if (await FindDuplicateAsync(existingLabel.BoardId, name, updateLabelDto.Color, id) is { } duplicate)
         {
-            return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
-                [new ApiError("name", ErrorCodes.Duplicate, "A label with this name already exists.")]);
+            return duplicate;
         }
 
-        existingLabel.Name = updateLabelDto.Name!;
+        existingLabel.Name = name;
         existingLabel.Color = updateLabelDto.Color;
         _context.StampChange(existingLabel, _actor);
 
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         var labelDto = MapToDto(existingLabel);
         return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label updated successfully", 200);
@@ -107,9 +128,44 @@ public class LabelService : ILabelService
             return ApiResponse<bool>.ErrorResponse("Label not found", 404);
         }
 
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await TryLockBoardAsync(existingLabel.BoardId);
+
         _context.Labels.Remove(existingLabel);
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
         return ApiResponse<bool>.SuccessResponse(true, "Label deleted successfully", 204);
+    }
+
+    private async Task<bool> TryLockBoardAsync(Guid boardId)
+    {
+        var boards = await _context.Boards
+            .FromSql($"SELECT * FROM \"Boards\" WHERE \"Id\" = {boardId} FOR UPDATE")
+            .ToListAsync();
+        return boards.Count > 0;
+    }
+
+    private async Task<ApiResponse<LabelDto>?> FindDuplicateAsync(Guid boardId, string name, Color? color, Guid? self)
+    {
+        var others = _context.Labels.Where(l => l.BoardId == boardId);
+        if (self is { } id)
+        {
+            others = others.Where(l => l.Id != id);
+        }
+
+        if (name.Length > 0)
+        {
+            return await others.AnyAsync(l => l.Name.ToLower() == name.ToLower())
+                ? ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
+                    [new ApiError("name", ErrorCodes.Duplicate, "This board already has a label with this name.")])
+                : null;
+        }
+
+        return await others.AnyAsync(l => l.Name == string.Empty && l.Color == color)
+            ? ApiResponse<LabelDto>.ErrorResponse("Label with the same color already exists", 409,
+                [new ApiError("color", ErrorCodes.Duplicate, "This board already has an unnamed label in this color.")])
+            : null;
     }
 
     private static LabelDto MapToDto(Label label)
@@ -118,6 +174,7 @@ public class LabelService : ILabelService
         (
             label.Id,
             label.Name,
+            label.BoardId,
             label.Color,
             label.CreatedAt,
             label.UpdatedAt,
@@ -126,12 +183,13 @@ public class LabelService : ILabelService
         );
     }
 
-    private static Label MapToEntity(CreateLabelDto createDto, Guid actorId)
+    private static Label MapToEntity(CreateLabelDto createDto, string name, Guid actorId)
     {
         return new Label
         {
             Id = Guid.NewGuid(),
-            Name = createDto.Name!,
+            Name = name,
+            BoardId = createDto.BoardId!.Value,
             Color = createDto.Color,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId

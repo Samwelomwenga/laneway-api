@@ -45,6 +45,20 @@ public class CardsController: ApiControllerBase
         return ToActionResult(response);
     }
 
+    [HttpPost("{cardId}/labels/{labelId}")]
+    public async Task<ActionResult<ApiResponse<bool>>> AddCardLabel(Guid cardId, Guid labelId)
+    {
+        var response = await _cardService.AddLabelAsync(cardId, labelId);
+        return ToActionResult(response);
+    }
+
+    [HttpDelete("{cardId}/labels/{labelId}")]
+    public async Task<ActionResult<ApiResponse<bool>>> RemoveCardLabel(Guid cardId, Guid labelId)
+    {
+        var response = await _cardService.RemoveLabelAsync(cardId, labelId);
+        return ToActionResult(response);
+    }
+
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteCard(Guid id)
     {

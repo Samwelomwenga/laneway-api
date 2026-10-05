@@ -15,25 +15,37 @@ public class ListService : IListService
 {
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
+    private readonly Placements _placements;
 
-    public ListService(ApplicationDbContext context, Actor actor)
+    public ListService(ApplicationDbContext context, Actor actor, Placements placements)
     {
         _context = context;
         _actor = actor;
+        _placements = placements;
     }
 
     public async Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto)
     {
         var boardId = createListDto.BoardId!.Value;
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
         if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
         {
             return BoardNotFound(boardId);
         }
 
-        var list = MapToEntity(createListDto, _actor.Id);
+        var placed = await _placements.ResolveOnBoardAsync(
+            boardId, new Placement(createListDto.Position, createListDto.Before, createListDto.After));
+        if (placed.Errors.Count > 0)
+        {
+            return ReferenceErrors.Invalid<ListDto>(placed.Errors);
+        }
+
+        var list = MapToEntity(createListDto, _actor.Id, placed.Position);
 
         _context.Lists.Add(list);
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
         var listDto = MapToDto(list);
 
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List created successfully", 201);
@@ -63,7 +75,7 @@ public class ListService : IListService
         _context.StampChange(list, _actor);
 
         await _context.SaveChangesAsync();
-        var listDto = MapToDto(list, list.Cards.Select(c => c.Id).ToList());
+        var listDto = MapToDto(list, list.Cards.InSortOrder().Select(c => c.Id).ToList());
 
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List updated successfully", 200);
     }
@@ -92,7 +104,7 @@ public class ListService : IListService
             return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
         }
 
-        var listDto = MapToDto(list, list.Cards.Select(c => c.Id).ToList());
+        var listDto = MapToDto(list, list.Cards.InSortOrder().Select(c => c.Id).ToList());
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List retrieved successfully", 200);
     }
 
@@ -121,11 +133,11 @@ public class ListService : IListService
         }
 
         var (lists, totalCount) = await PagedQuery.ReadAsync(
-            query.OrderBy(l => l.Position).Include(l => l.Cards),
+            query.InSortOrder().Include(l => l.Cards),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var listDtos = lists.Select(l => MapToDto(l, l.Cards.Select(c => c.Id).ToList())).ToList();
+        var listDtos = lists.Select(l => MapToDto(l, l.Cards.InSortOrder().Select(c => c.Id).ToList())).ToList();
 
         return PagedResponse<ListDto>.SuccessResponse(
             listDtos,
@@ -157,13 +169,13 @@ public class ListService : IListService
         ApiResponse<ListDto>.ErrorResponse("A referenced resource does not exist", 400,
             [new ApiError("boardId", ErrorCodes.NotFound, $"Board {boardId} does not exist.")]);
 
-    private static List MapToEntity(CreateListDto createListDto, Guid actorId)
+    private static List MapToEntity(CreateListDto createListDto, Guid actorId, double position)
     {
         return new List
         {
             Id = Guid.NewGuid(),
             Name = createListDto.Name!,
-            Position = createListDto.Position!.Value,
+            Position = position,
             BoardId = createListDto.BoardId!.Value,
             Color = createListDto.Color,
             IsArchived = createListDto.IsArchived!.Value,

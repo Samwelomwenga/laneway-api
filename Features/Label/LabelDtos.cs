@@ -6,6 +6,7 @@ public record LabelDto
 (
     Guid Id,
     string Name,
+    Guid BoardId,
     Color? Color,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
@@ -16,6 +17,7 @@ public record LabelDto
 public record CreateLabelDto
 (
     string? Name,
+    Guid? BoardId,
     Color? Color
 )
 {
@@ -36,11 +38,13 @@ public record LabelSearchDto
 (
     int PageNumber,
     int PageSize,
-    string? SearchTerm
+    string? SearchTerm,
+    Guid? BoardId
 ) : ISearchQuery<LabelSearchDto>
 {
     public static LabelSearchDto Read(QueryReader query) => new(
         query.PageNumber(),
         query.PageSize(),
-        query.Text("searchTerm"));
+        query.Text("searchTerm"),
+        query.Id("boardId"));
 }

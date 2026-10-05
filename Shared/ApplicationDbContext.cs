@@ -121,6 +121,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<List>(entity =>
         {
             entity.Property(l => l.Name).HasColumnType($"varchar({FieldLimits.ListName})");
+            entity.HasIndex(l => new { l.BoardId, l.Position });
             ActorKeys(entity);
         });
 
@@ -128,6 +129,7 @@ public class ApplicationDbContext : DbContext
         {
             entity.Property(c => c.Title).HasColumnType($"varchar({FieldLimits.CardTitle})");
             entity.Property(c => c.Description).HasColumnType($"varchar({FieldLimits.CardDescription})");
+            entity.HasIndex(c => new { c.ListId, c.Position });
             entity.HasMany(c => c.Labels)
                 .WithMany(l => l.Cards)
                 .UsingEntity(j => j.ToTable("CardLabels"));
@@ -137,6 +139,10 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Label>(entity =>
         {
             entity.Property(l => l.Name).HasColumnType($"varchar({FieldLimits.LabelName})");
+            entity.HasOne<Board>()
+                .WithMany()
+                .HasForeignKey(l => l.BoardId)
+                .OnDelete(DeleteBehavior.Cascade);
             ActorKeys(entity);
         });
     }
