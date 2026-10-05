@@ -1,6 +1,6 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
-public class List: PlacedEntity, IArchivable
+public class List : PlacedEntity, IArchivable
 {
     public required string Name { get; set; }
     public required Guid BoardId { get; set; }

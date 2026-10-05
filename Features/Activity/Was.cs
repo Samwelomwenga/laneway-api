@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed record Was<T>(T? Value);
 

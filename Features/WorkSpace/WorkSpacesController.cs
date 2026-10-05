@@ -2,11 +2,11 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class WorkSpacesController: ApiControllerBase
+public class WorkSpacesController : ApiControllerBase
 {
     private readonly IWorkSpaceService _workSpaceService;
 
@@ -32,7 +32,7 @@ public class WorkSpacesController: ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<WorkSpaceDto>>> CreateWorkSpace([FromBody] CreateWorkSpaceDto createWorkSpaceDto)
     {
-        var response = await _workSpaceService.CreateAsync(createWorkSpaceDto);
+        var response = await _workSpaceService.CreateAsync(CreateWorkSpaceWrite.Of(createWorkSpaceDto));
         if (!response.Success)
         {
             return ToActionResult(response);
@@ -43,7 +43,7 @@ public class WorkSpacesController: ApiControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<WorkSpaceDto>>> UpdateWorkSpace(Guid id, [FromBody] UpdateWorkSpaceDto updateWorkSpaceDto)
     {
-        var response = await _workSpaceService.UpdateAsync(id, updateWorkSpaceDto);
+        var response = await _workSpaceService.UpdateAsync(id, UpdateWorkSpaceWrite.Of(updateWorkSpaceDto));
         return ToActionResult(response);
     }
 

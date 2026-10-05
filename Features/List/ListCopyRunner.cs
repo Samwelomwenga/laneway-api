@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed class ListCopyRunner : ICopyJobRunner
 {
@@ -13,6 +13,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
     private readonly ObjectCopies _objects;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly ILogger<ListCopyRunner> _logger;
 
     public ListCopyRunner(
         ApplicationDbContext context,
@@ -23,7 +24,8 @@ public sealed class ListCopyRunner : ICopyJobRunner
         ListSnapshots snapshots,
         ObjectCopies objects,
         ActivityWriter activity,
-        ActivityTree tree)
+        ActivityTree tree,
+        ILogger<ListCopyRunner> logger)
     {
         _context = context;
         _actor = actor;
@@ -34,6 +36,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
         _objects = objects;
         _activity = activity;
         _tree = tree;
+        _logger = logger;
     }
 
     public CopyJobKind Kind => CopyJobKind.List;
@@ -42,7 +45,17 @@ public sealed class ListCopyRunner : ICopyJobRunner
     {
         ArgumentNullException.ThrowIfNull(job);
 
-        var request = CopyRequests.In<CopyListDto>(job.Request);
+        CopyListWrite request;
+        try
+        {
+            request = CopyListWrite.Of(CopyRequests.In<CopyListDto>(job.Request));
+        }
+        catch (MissingWriteFieldException missing)
+        {
+            _logger.LogError(missing, "Copy job {JobId} stored a body this runner can't read.", job.Id);
+            return CopyRunResult.Refused([CopyJobEnd.InternalError]);
+        }
+
         var keep = CopyKeep.Of(request.Keep);
 
         if (await _snapshots.ReadAsync(job.SourceId) is not { } snapshot)
@@ -81,7 +94,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
     private async Task<CopyRunResult> WriteAsync(ListCopy copy, CancellationToken token)
     {
         var (job, attempt, request, snapshot, plan, copied, pending) = copy;
-        var boardId = request.BoardId!.Value;
+        var boardId = request.BoardId;
 
         await using var transaction = await _context.Database.BeginTransactionAsync(token);
 
@@ -253,7 +266,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
     private sealed record ListCopy(
         CopyJob Job,
         int Attempt,
-        CopyListDto Request,
+        CopyListWrite Request,
         ListSnapshot Snapshot,
         CopyPlan Plan,
         HashSet<string> Copied,

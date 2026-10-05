@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Scalar.AspNetCore;
-using DefaultNamespace;
+using Laneway.Api;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
@@ -71,11 +71,16 @@ builder.Services.AddProblemDetails();
 builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = FieldLimits.AttachmentBytes + (1024 * 1024));
 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        $"ConnectionStrings:DefaultConnection is missing. Run the app through `doppler run --` or set the CONNECTIONSTRINGS__DEFAULTCONNECTION environment variable.");
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")
-    ));
-    
+    options.UseNpgsql(connectionString));
+
 
 var app = builder.Build();
 

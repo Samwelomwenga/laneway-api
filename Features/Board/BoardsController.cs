@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class BoardsController: ApiControllerBase
+public class BoardsController : ApiControllerBase
 {
     private readonly IBoardService _boardService;
     private readonly IBoardCopyService _boardCopyService;
@@ -32,8 +32,8 @@ public class BoardsController: ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<BoardDto>>> CreateBoard([FromBody] CreateBoardDto createBoardDto)
     {
-        var response = await _boardService.CreateAsync(createBoardDto);
-        if(!response.Success)
+        var response = await _boardService.CreateAsync(CreateBoardWrite.Of(createBoardDto));
+        if (!response.Success)
         {
             return ToActionResult(response);
         }
@@ -45,7 +45,7 @@ public class BoardsController: ApiControllerBase
     public async Task<ActionResult<ApiResponse<CopyJobDto>>> CopyBoard(
         Guid id, [FromBody] CopyBoardDto copyBoardDto)
     {
-        var response = await _boardCopyService.CopyAsync(id, copyBoardDto);
+        var response = await _boardCopyService.CopyAsync(id, CopyBoardWrite.Of(copyBoardDto));
         if (!response.Success)
         {
             return ToActionResult(response);
@@ -57,21 +57,21 @@ public class BoardsController: ApiControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<BoardDto>>> UpdateBoard(Guid id, [FromBody] UpdateBoardDto updateBoardDto)
     {
-        var response = await _boardService.UpdateAsync(id, updateBoardDto);
+        var response = await _boardService.UpdateAsync(id, UpdateBoardWrite.Of(updateBoardDto));
         return ToActionResult(response);
     }
 
     [HttpPut("{id}/workspace")]
     public async Task<ActionResult<ApiResponse<BoardDto>>> MoveBoard(Guid id, [FromBody] MoveBoardDto moveBoardDto)
     {
-        var response = await _boardService.MoveAsync(id, moveBoardDto);
+        var response = await _boardService.MoveAsync(id, MoveBoardWrite.Of(moveBoardDto));
         return ToActionResult(response);
     }
 
     [HttpPut("{id}/archived")]
     public async Task<ActionResult<ApiResponse<bool>>> SetBoardArchived(Guid id, [FromBody] ArchivedDto archivedDto)
     {
-        var response = await _boardService.SetArchivedAsync(id, archivedDto);
+        var response = await _boardService.SetArchivedAsync(id, ArchivedWrite.Of(archivedDto));
         return ToActionResult(response);
     }
 

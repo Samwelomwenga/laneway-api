@@ -1,14 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public interface IWorkSpaceService
 {
     Task<ApiResponse<List<WorkSpaceDto>>> GetAllAsync(WorkSpaceSearchDto searchDto);
     Task<ApiResponse<WorkSpaceDto>> GetByIdAsync(Guid id);
-    Task<ApiResponse<WorkSpaceDto>> CreateAsync(CreateWorkSpaceDto createWorkSpaceDto);
-    Task<ApiResponse<WorkSpaceDto>> UpdateAsync(Guid id, UpdateWorkSpaceDto updateWorkSpaceDto);
+    Task<ApiResponse<WorkSpaceDto>> CreateAsync(CreateWorkSpaceWrite write);
+    Task<ApiResponse<WorkSpaceDto>> UpdateAsync(Guid id, UpdateWorkSpaceWrite write);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 
@@ -63,15 +63,15 @@ public class WorkSpaceService : IWorkSpaceService
             .FirstOrDefaultAsync();
         if (existingWorkSpace == null)
         {
-           return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
+            return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
         }
-        var workSpaceDto = MapToDto(existingWorkSpace,  existingWorkSpace.Boards.Select(b => b.Id).ToList());
+        var workSpaceDto = MapToDto(existingWorkSpace, existingWorkSpace.Boards.Select(b => b.Id).ToList());
         return ApiResponse<WorkSpaceDto>.SuccessResponse(workSpaceDto, "Workspace retrieved successfully", 200);
     }
 
-    public async Task<ApiResponse<WorkSpaceDto>> CreateAsync(CreateWorkSpaceDto createWorkSpaceDto)
+    public async Task<ApiResponse<WorkSpaceDto>> CreateAsync(CreateWorkSpaceWrite write)
     {
-        var newWorkSpace = MapToEntity(createWorkSpaceDto, _actor.Id);
+        var newWorkSpace = MapToEntity(write, _actor.Id);
         _context.WorkSpaces.Add(newWorkSpace);
         await _activity.AddAsync(
             ActivityType.CreateWorkspace,
@@ -81,7 +81,7 @@ public class WorkSpaceService : IWorkSpaceService
         return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(newWorkSpace), "Workspace created successfully", 201);
     }
 
-    public async Task<ApiResponse<WorkSpaceDto>> UpdateAsync(Guid id, UpdateWorkSpaceDto updateWorkSpaceDto)
+    public async Task<ApiResponse<WorkSpaceDto>> UpdateAsync(Guid id, UpdateWorkSpaceWrite write)
     {
         var existingWorkSpace = await _context.WorkSpaces
             .Include(ws => ws.Boards)
@@ -91,9 +91,9 @@ public class WorkSpaceService : IWorkSpaceService
             return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
         }
 
-        existingWorkSpace.Name = updateWorkSpaceDto.Name!;
-        existingWorkSpace.Description = updateWorkSpaceDto.Description ?? string.Empty;
-        existingWorkSpace.Visibility = updateWorkSpaceDto.Visibility!.Value;
+        existingWorkSpace.Name = write.Name;
+        existingWorkSpace.Description = write.Description;
+        existingWorkSpace.Visibility = write.Visibility;
         _context.StampChange(existingWorkSpace, _actor);
 
         var tracked = _context.Entry(existingWorkSpace);
@@ -152,14 +152,14 @@ public class WorkSpaceService : IWorkSpaceService
         );
     }
 
-    private static WorkSpace MapToEntity(CreateWorkSpaceDto createWorkSpaceDto, Guid actorId)
+    private static WorkSpace MapToEntity(CreateWorkSpaceWrite write, Guid actorId)
     {
         return new WorkSpace
         {
             Id = Guid.NewGuid(),
-            Name = createWorkSpaceDto.Name!,
-            Description = createWorkSpaceDto.Description ?? string.Empty,
-            Visibility = createWorkSpaceDto.Visibility!.Value,
+            Name = write.Name,
+            Description = write.Description,
+            Visibility = write.Visibility,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

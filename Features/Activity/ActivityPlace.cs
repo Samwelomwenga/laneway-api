@@ -1,4 +1,4 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public readonly record struct ActivityPlace(
     Guid? WorkspaceId = null,

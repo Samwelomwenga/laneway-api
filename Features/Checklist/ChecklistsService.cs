@@ -1,13 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public interface IChecklistService
 {
-    Task<ApiResponse<ChecklistDto>> CreateAsync(CreateChecklistDto createChecklistDto);
-    Task<ApiResponse<ChecklistDto>> UpdateAsync(Guid id, UpdateChecklistDto updateChecklistDto);
+    Task<ApiResponse<ChecklistDto>> CreateAsync(CreateChecklistWrite write);
+    Task<ApiResponse<ChecklistDto>> UpdateAsync(Guid id, UpdateChecklistWrite write);
     Task<ApiResponse<ChecklistDto>> ReorderAsync(Guid id, ReorderChecklistDto reorderChecklistDto);
-    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto);
+    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
     Task<ApiResponse<ChecklistDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<List<ChecklistDto>>> GetAllAsync(ChecklistSearchDto searchDto);
@@ -41,9 +41,9 @@ public class ChecklistService : IChecklistService
         _tree = tree;
     }
 
-    public async Task<ApiResponse<ChecklistDto>> CreateAsync(CreateChecklistDto createChecklistDto)
+    public async Task<ApiResponse<ChecklistDto>> CreateAsync(CreateChecklistWrite write)
     {
-        var cardId = createChecklistDto.CardId!.Value;
+        var cardId = write.CardId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         if (!await _context.Cards.AnyAsync(c => c.Id == cardId))
@@ -51,7 +51,7 @@ public class ChecklistService : IChecklistService
             return ReferenceErrors.NotFound<ChecklistDto>("cardId", "Card", cardId);
         }
 
-        var placed = await _placements.ResolveOnCardAsync(cardId, Placement.Of(createChecklistDto));
+        var placed = await _placements.ResolveOnCardAsync(cardId, Placement.Of(write));
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<ChecklistDto>(placed.Errors);
@@ -62,7 +62,7 @@ public class ChecklistService : IChecklistService
             return ArchiveErrors.NoCreate<ChecklistDto>(archived, "cardId", TreeItem.Checklist);
         }
 
-        var checklist = MapToEntity(createChecklistDto, _actor.Id, placed.Position);
+        var checklist = MapToEntity(write, _actor.Id, placed.Position);
 
         _context.Checklists.Add(checklist);
         var chain = await _tree.CardAsync(cardId);
@@ -78,7 +78,7 @@ public class ChecklistService : IChecklistService
         return ApiResponse<ChecklistDto>.SuccessResponse(checklistDto, "Checklist created successfully", 201);
     }
 
-    public async Task<ApiResponse<ChecklistDto>> UpdateAsync(Guid id, UpdateChecklistDto updateChecklistDto)
+    public async Task<ApiResponse<ChecklistDto>> UpdateAsync(Guid id, UpdateChecklistWrite write)
     {
         var checklist = await WithCheckItemsAsync(id);
         if (checklist == null)
@@ -91,7 +91,7 @@ public class ChecklistService : IChecklistService
             return ArchiveErrors.ReadOnly<ChecklistDto>(archived, TreeItem.Checklist);
         }
 
-        checklist.Name = updateChecklistDto.Name!;
+        checklist.Name = write.Name;
         _context.StampChange(checklist, _actor);
 
         var tracked = _context.Entry(checklist);
@@ -168,9 +168,9 @@ public class ChecklistService : IChecklistService
         return ApiResponse<ChecklistDto>.SuccessResponse(checklistDto, "Checklist moved successfully", 200);
     }
 
-    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived)
     {
-        ArgumentNullException.ThrowIfNull(archivedDto);
+        ArgumentNullException.ThrowIfNull(archived);
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -180,9 +180,9 @@ public class ChecklistService : IChecklistService
             return ApiResponse<bool>.ErrorResponse("Checklist not found", 404);
         }
 
-        if (await _archive.OnCardAsync(checklist.CardId) is { } archived)
+        if (await _archive.OnCardAsync(checklist.CardId) is { } holder)
         {
-            return ArchiveErrors.RestoreFirst<bool>(archived, TreeItem.Checklist);
+            return ArchiveErrors.RestoreFirst<bool>(holder, TreeItem.Checklist);
         }
 
         var watch = await _completion.WatchAsync(checklist.CardId);
@@ -190,8 +190,8 @@ public class ChecklistService : IChecklistService
         await _context.Entry(checklist).ReloadAsync();
 
         var response = await _context.SetArchivedAsync(
-            checklist, _actor, archivedDto, "Checklist",
-            archived => RecordArchivedAsync(checklist, archived, watch));
+            checklist, _actor, archived, "Checklist",
+            archiving => RecordArchivedAsync(checklist, archiving, watch));
         await transaction.CommitAsync();
 
         return response;
@@ -315,14 +315,14 @@ public class ChecklistService : IChecklistService
         );
     }
 
-    private static Checklist MapToEntity(CreateChecklistDto createChecklistDto, Guid actorId, double position)
+    private static Checklist MapToEntity(CreateChecklistWrite write, Guid actorId, double position)
     {
         return new Checklist
         {
             Id = Guid.NewGuid(),
-            Name = createChecklistDto.Name!,
+            Name = write.Name,
             Position = position,
-            CardId = createChecklistDto.CardId!.Value,
+            CardId = write.CardId,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace prodigy_board_API.Migrations
+namespace Laneway.Api.Migrations
 {
     /// <inheritdoc />
     public partial class CardLabelsManyToMany : Migration

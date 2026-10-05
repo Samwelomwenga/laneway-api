@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public class ApplicationDbContext : DbContext
 {
@@ -59,9 +59,9 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(u => u.Id);
             entity.Property(u => u.Id)
                 .IsRequired();
-                entity.Property(u => u.FirstName)
-                    .HasColumnType("varchar(50)")
-                     .IsRequired();
+            entity.Property(u => u.FirstName)
+                .HasColumnType("varchar(50)")
+                 .IsRequired();
             entity.Property(u => u.LastName)
                 .HasColumnType("varchar(50)")
                 .IsRequired();
@@ -84,9 +84,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(u => u.Bio)
                 .HasColumnType("varchar(500)")
                 .HasDefaultValue(string.Empty);
-          entity.Property(u => u.Language)
-              .HasColumnType("varchar(10)")
-             .HasDefaultValue("en-US");
+            entity.Property(u => u.Language)
+                .HasColumnType("varchar(10)")
+               .HasDefaultValue("en-US");
             entity.Property(u => u.TimeZone)
                 .HasColumnType("varchar(50)")
                 .HasDefaultValue("UTC");

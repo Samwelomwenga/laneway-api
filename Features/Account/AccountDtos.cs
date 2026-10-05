@@ -1,13 +1,13 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public record AccountDto(
     Guid Id,
     string Name,
+    Guid UserId,
     Guid CreatedBy,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
-    Guid? UpdatedBy,
-    UserDto User
+    Guid? UpdatedBy
 );
 
 public record CreateAccountDto(

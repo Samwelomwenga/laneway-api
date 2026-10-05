@@ -1,21 +1,21 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public interface ICardService
 {
-    Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto);
-    Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardDto updateCardDto);
-    Task<ApiResponse<CardDto>> MoveAsync(Guid id, MoveCardDto moveCardDto);
+    Task<ApiResponse<CardDto>> CreateAsync(CreateCardWrite write);
+    Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardWrite write);
+    Task<ApiResponse<CardDto>> MoveAsync(Guid id, MoveCardWrite write);
     Task<ApiResponse<CardDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<List<CardDto>>> GetAllAsync(CardSearchDto searchDto);
     Task<ApiResponse<bool>> AddLabelAsync(Guid cardId, Guid labelId);
     Task<ApiResponse<bool>> RemoveLabelAsync(Guid cardId, Guid labelId);
     Task<ApiResponse<bool>> SetCoverAsync(Guid id, CoverDto coverDto);
-    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto);
+    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
-public class CardService: ICardService
+public class CardService : ICardService
 {
     private const int MoveAttempts = 3;
 
@@ -54,16 +54,16 @@ public class CardService: ICardService
         _tree = tree;
     }
 
-    public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
+    public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardWrite write)
     {
-        var listId = createCardDto.ListId!.Value;
+        var listId = write.ListId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var (labels, listExists, errors) = await ResolveReferencesAsync(listId, createCardDto.LabelIds);
+        var (labels, listExists, errors) = await ResolveReferencesAsync(listId, write.LabelIds);
         var position = 0d;
         if (listExists)
         {
-            var placed = await _placements.ResolveInListAsync(listId, Placement.Of(createCardDto));
+            var placed = await _placements.ResolveInListAsync(listId, Placement.Of(write));
             errors.AddRange(placed.Errors);
             position = placed.Position;
         }
@@ -78,7 +78,7 @@ public class CardService: ICardService
             return ArchiveErrors.NoCreate<CardDto>(archived, "listId", TreeItem.Card);
         }
 
-        var card = MapToEntity(createCardDto, _actor.Id, position);
+        var card = MapToEntity(write, _actor.Id, position);
         card.Labels.AddRange(labels);
 
         _context.Cards.Add(card);
@@ -101,7 +101,7 @@ public class CardService: ICardService
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card created successfully", 201);
     }
 
-    public async Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardDto updateCardDto)
+    public async Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardWrite write)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -118,20 +118,20 @@ public class CardService: ICardService
             return ArchiveErrors.ReadOnly<CardDto>(archived, TreeItem.Card);
         }
 
-        var (labels, _, referenceErrors) = await ResolveReferencesAsync(card.ListId, updateCardDto.LabelIds);
+        var (labels, _, referenceErrors) = await ResolveReferencesAsync(card.ListId, write.LabelIds);
         if (referenceErrors.Count > 0)
         {
             return ReferenceErrors.Invalid<CardDto>(referenceErrors);
         }
 
-        var watch = TouchesCompletion(card, updateCardDto) ? await _completion.WatchAsync(id) : null;
+        var watch = TouchesCompletion(card, write) ? await _completion.WatchAsync(id) : null;
 
-        card.Title = updateCardDto.Title!;
-        card.Description = updateCardDto.Description ?? string.Empty;
-        card.DueDate = updateCardDto.DueDate;
-        card.IsDueComplete = updateCardDto.IsDueComplete!.Value;
-        card.StartDate = updateCardDto.StartDate;
-        card.DueReminderMinutes = updateCardDto.DueReminderMinutes;
+        card.Title = write.Title;
+        card.Description = write.Description;
+        card.DueDate = write.DueDate;
+        card.IsDueComplete = write.IsDueComplete;
+        card.StartDate = write.StartDate;
+        card.DueReminderMinutes = write.DueReminderMinutes;
 
         var labelsChanged = !card.Labels.Select(label => label.Id).ToHashSet().SetEquals(labels.Select(label => label.Id));
         var oldLabels = labelsChanged ? LabelRefs(card.Labels) : null;
@@ -170,12 +170,12 @@ public class CardService: ICardService
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card updated successfully");
     }
 
-    public async Task<ApiResponse<CardDto>> MoveAsync(Guid id, MoveCardDto moveCardDto)
+    public async Task<ApiResponse<CardDto>> MoveAsync(Guid id, MoveCardWrite write)
     {
-        ArgumentNullException.ThrowIfNull(moveCardDto);
+        ArgumentNullException.ThrowIfNull(write);
 
-        var listId = moveCardDto.ListId!.Value;
-        var placement = Placement.Of(moveCardDto);
+        var listId = write.ListId;
+        var placement = Placement.Of(write);
 
         for (var attempt = 1; attempt <= MoveAttempts; attempt++)
         {
@@ -521,7 +521,7 @@ public class CardService: ICardService
                 $"A cover has to be a file of one of these types: {AttachmentFileTypes.ImageExtensions}.");
     }
 
-    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived)
     {
         var card = await _context.Cards.FindAsync(id);
         if (card == null)
@@ -529,16 +529,16 @@ public class CardService: ICardService
             return ApiResponse<bool>.ErrorResponse("Card not found", 404);
         }
 
-        if (await _archive.OnListAsync(card.ListId) is { } archived)
+        if (await _archive.OnListAsync(card.ListId) is { } holder)
         {
-            return ArchiveErrors.RestoreFirst<bool>(archived, TreeItem.Card);
+            return ArchiveErrors.RestoreFirst<bool>(holder, TreeItem.Card);
         }
 
-        return await _context.SetArchivedAsync(card, _actor, archivedDto, "Card", async archived =>
+        return await _context.SetArchivedAsync(card, _actor, archived, "Card", async archiving =>
         {
             var chain = await _tree.ListAsync(card.ListId);
             await _activity.AddAsync(
-                archived ? ActivityType.ArchiveCard : ActivityType.RestoreCard,
+                archiving ? ActivityType.ArchiveCard : ActivityType.RestoreCard,
                 chain.PlaceOn(card.Id),
                 actor => new ArchiveCardData(
                     actor, chain.Workspace, chain.Board, chain.List, CardRef.Of(card)));
@@ -569,13 +569,13 @@ public class CardService: ICardService
         return ApiResponse<bool>.SuccessResponse(true, "Card deleted successfully", 204);
     }
 
-    private static bool TouchesCompletion(Card card, UpdateCardDto updateCardDto) =>
-        card.DueDate != updateCardDto.DueDate || card.IsDueComplete != updateCardDto.IsDueComplete!.Value;
+    private static bool TouchesCompletion(Card card, UpdateCardWrite write) =>
+        card.DueDate != write.DueDate || card.IsDueComplete != write.IsDueComplete;
 
     private static IReadOnlyList<LabelRef> LabelRefs(List<Label> labels) => labels.ConvertAll(LabelRef.Of);
 
     private async Task<(List<Label> Labels, bool ListExists, List<ApiError> Errors)> ResolveReferencesAsync(
-        Guid listId, List<Guid?>? labelIds)
+        Guid listId, List<Guid>? labelIds)
     {
         var errors = new List<ApiError>();
         var boardId = await _context.BoardOfListAsync(listId);
@@ -584,7 +584,7 @@ public class CardService: ICardService
             errors.Add(new ApiError("listId", ErrorCodes.NotFound, $"List {listId} does not exist."));
         }
 
-        var ids = labelIds?.Select(id => id!.Value).ToList() ?? [];
+        var ids = labelIds ?? [];
         var labels = await _context.Labels.Where(l => ids.Contains(l.Id)).ToListAsync();
         var seen = new HashSet<Guid>();
         for (var index = 0; index < ids.Count; index++)
@@ -612,19 +612,19 @@ public class CardService: ICardService
 
     private static ApiError NotOnBoard(string field, Guid labelId, Guid boardId) =>
         new(field, ErrorCodes.NotOnBoard, $"Label {labelId} isn't on board {boardId}.");
-    private static Card MapToEntity(CreateCardDto createCardDto, Guid actorId, double position)
+    private static Card MapToEntity(CreateCardWrite write, Guid actorId, double position)
     {
         return new Card
         {
             Id = Guid.NewGuid(),
-            Title = createCardDto.Title!,
-            Description = createCardDto.Description ?? string.Empty,
-            DueDate = createCardDto.DueDate,
+            Title = write.Title,
+            Description = write.Description,
+            DueDate = write.DueDate,
             Position = position,
-            ListId = createCardDto.ListId!.Value,
-            IsDueComplete = createCardDto.IsDueComplete!.Value,
-            StartDate = createCardDto.StartDate,
-            DueReminderMinutes = createCardDto.DueReminderMinutes,
+            ListId = write.ListId,
+            IsDueComplete = write.IsDueComplete,
+            StartDate = write.StartDate,
+            DueReminderMinutes = write.DueReminderMinutes,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

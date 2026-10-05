@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 [ApiController]
 [Route("api/v1/cards/{cardId}/comments")]
@@ -17,7 +17,7 @@ public class CommentsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<ActivityEntryDto>>> CreateComment(
         Guid cardId, [FromBody] CommentTextDto commentTextDto)
     {
-        var response = await _commentService.CreateAsync(cardId, commentTextDto);
+        var response = await _commentService.CreateAsync(cardId, CommentTextWrite.Of(commentTextDto));
         return ToActionResult(response);
     }
 
@@ -25,7 +25,7 @@ public class CommentsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<ActivityEntryDto>>> UpdateComment(
         Guid cardId, Guid id, [FromBody] CommentTextDto commentTextDto)
     {
-        var response = await _commentService.UpdateAsync(cardId, id, commentTextDto);
+        var response = await _commentService.UpdateAsync(cardId, id, CommentTextWrite.Of(commentTextDto));
         return ToActionResult(response);
     }
 

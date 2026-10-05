@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public class PlacedEntity : BaseEntity
 {

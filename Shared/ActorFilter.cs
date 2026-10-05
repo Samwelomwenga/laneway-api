@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class NoActorAttribute : Attribute;

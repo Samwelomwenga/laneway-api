@@ -1,13 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public interface IListService
 {
-    Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto);
-    Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListDto updateListDto);
-    Task<ApiResponse<ListDto>> MoveAsync(Guid id, MoveListDto moveListDto);
-    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto);
+    Task<ApiResponse<ListDto>> CreateAsync(CreateListWrite write);
+    Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListWrite write);
+    Task<ApiResponse<ListDto>> MoveAsync(Guid id, MoveListWrite write);
+    Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
     Task<ApiResponse<ListDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<List<ListDto>>> GetAllAsync(ListSearchDto searchDto);
@@ -41,9 +41,9 @@ public class ListService : IListService
         _tree = tree;
     }
 
-    public async Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto)
+    public async Task<ApiResponse<ListDto>> CreateAsync(CreateListWrite write)
     {
-        var boardId = createListDto.BoardId!.Value;
+        var boardId = write.BoardId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
@@ -51,7 +51,7 @@ public class ListService : IListService
             return BoardNotFound(boardId);
         }
 
-        var placed = await _placements.ResolveOnBoardAsync(boardId, Placement.Of(createListDto));
+        var placed = await _placements.ResolveOnBoardAsync(boardId, Placement.Of(write));
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<ListDto>(placed.Errors);
@@ -62,7 +62,7 @@ public class ListService : IListService
             return ArchiveErrors.NoCreate<ListDto>(archived, "boardId", TreeItem.List);
         }
 
-        var list = MapToEntity(createListDto, _actor.Id, placed.Position);
+        var list = MapToEntity(write, _actor.Id, placed.Position);
 
         _context.Lists.Add(list);
         var chain = await _tree.BoardAsync(boardId);
@@ -77,7 +77,7 @@ public class ListService : IListService
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List created successfully", 201);
     }
 
-    public async Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListDto updateListDto)
+    public async Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListWrite write)
     {
         var list = await _context.Lists
             .Include(l => l.Cards)
@@ -92,8 +92,8 @@ public class ListService : IListService
             return ArchiveErrors.ReadOnly<ListDto>(archived, TreeItem.List);
         }
 
-        list.Name = updateListDto.Name!;
-        list.Color = updateListDto.Color;
+        list.Name = write.Name;
+        list.Color = write.Color;
         _context.StampChange(list, _actor);
 
         var tracked = _context.Entry(list);
@@ -113,11 +113,11 @@ public class ListService : IListService
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List updated successfully", 200);
     }
 
-    public async Task<ApiResponse<ListDto>> MoveAsync(Guid id, MoveListDto moveListDto)
+    public async Task<ApiResponse<ListDto>> MoveAsync(Guid id, MoveListWrite write)
     {
-        ArgumentNullException.ThrowIfNull(moveListDto);
+        ArgumentNullException.ThrowIfNull(write);
 
-        var boardId = moveListDto.BoardId!.Value;
+        var boardId = write.BoardId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         var list = await _context.Lists
@@ -139,7 +139,7 @@ public class ListService : IListService
         }
 
         var crossesBoards = boardId != list.BoardId;
-        var placed = await _placements.ResolveMoveOnBoardAsync(list, boardId, Placement.Of(moveListDto));
+        var placed = await _placements.ResolveMoveOnBoardAsync(list, boardId, Placement.Of(write));
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<ListDto>(placed.Errors);
@@ -196,7 +196,7 @@ public class ListService : IListService
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List moved successfully", 200);
     }
 
-    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)
+    public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived)
     {
         var list = await _context.Lists.FindAsync(id);
         if (list == null)
@@ -204,16 +204,16 @@ public class ListService : IListService
             return ApiResponse<bool>.ErrorResponse("List not found", 404);
         }
 
-        if (await _archive.OnBoardAsync(list.BoardId) is { } archived)
+        if (await _archive.OnBoardAsync(list.BoardId) is { } holder)
         {
-            return ArchiveErrors.RestoreFirst<bool>(archived, TreeItem.List);
+            return ArchiveErrors.RestoreFirst<bool>(holder, TreeItem.List);
         }
 
-        return await _context.SetArchivedAsync(list, _actor, archivedDto, "List", async archived =>
+        return await _context.SetArchivedAsync(list, _actor, archived, "List", async archiving =>
         {
             var chain = await _tree.BoardAsync(list.BoardId);
             await _activity.AddAsync(
-                archived ? ActivityType.ArchiveList : ActivityType.RestoreList,
+                archiving ? ActivityType.ArchiveList : ActivityType.RestoreList,
                 chain.PlaceOn(list.Id),
                 actor => new ArchiveListData(actor, chain.Workspace, chain.Board, ListRef.Of(list)));
         });
@@ -315,15 +315,15 @@ public class ListService : IListService
         ApiResponse<ListDto>.ErrorResponse("A referenced resource does not exist", 400,
             [new ApiError("boardId", ErrorCodes.NotFound, $"Board {boardId} does not exist.")]);
 
-    private static List MapToEntity(CreateListDto createListDto, Guid actorId, double position)
+    private static List MapToEntity(CreateListWrite write, Guid actorId, double position)
     {
         return new List
         {
             Id = Guid.NewGuid(),
-            Name = createListDto.Name!,
+            Name = write.Name,
             Position = position,
-            BoardId = createListDto.BoardId!.Value,
-            Color = createListDto.Color,
+            BoardId = write.BoardId,
+            Color = write.Color,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

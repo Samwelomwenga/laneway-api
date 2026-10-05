@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace
+namespace Laneway.Api
 {
     public interface IUserService
     {
@@ -71,19 +71,7 @@ namespace DefaultNamespace
 
         public async Task<ApiResponse<UserDto>> CreateAsync(CreateUserDto createUserDto)
         {
-            var takenUsers = await _context.Users
-                .Where(u => u.Username == createUserDto.Username || u.Email == createUserDto.Email)
-                .Select(u => new { u.Username, u.Email })
-                .ToListAsync();
-            List<ApiError> errors = [];
-            if (takenUsers.Any(u => u.Username == createUserDto.Username))
-            {
-                errors.Add(new ApiError("username", ErrorCodes.Duplicate, "A user with this username already exists."));
-            }
-            if (takenUsers.Any(u => u.Email == createUserDto.Email))
-            {
-                errors.Add(new ApiError("email", ErrorCodes.Duplicate, "A user with this email already exists."));
-            }
+            var errors = await TakenAsync(createUserDto.Username, createUserDto.Email, exceptId: null);
             if (errors.Count > 0)
             {
                 return ApiResponse<UserDto>.ErrorResponse("User already exists", 409, errors);
@@ -106,10 +94,18 @@ namespace DefaultNamespace
 
         public async Task<ApiResponse<UserDto>> UpdateAsync(Guid id, UpdateUserDto updateUserDto)
         {
-            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
+            var existingUser = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == id);
             if (existingUser is null)
             {
                 return ApiResponse<UserDto>.ErrorResponse("User not found", 404);
+            }
+
+            var errors = await TakenAsync(updateUserDto.Username, updateUserDto.Email, exceptId: id);
+            if (errors.Count > 0)
+            {
+                return ApiResponse<UserDto>.ErrorResponse("User already exists", 409, errors);
             }
 
             existingUser.Username = updateUserDto.Username;
@@ -147,9 +143,26 @@ namespace DefaultNamespace
             return ApiResponse<bool>.SuccessResponse(exists, "Username existence checked successfully", 200);
         }
 
+        private async Task<List<ApiError>> TakenAsync(string username, string email, Guid? exceptId)
+        {
+            var takenUsers = await _context.Users
+                .Where(u => u.Id != exceptId && (u.Username == username || u.Email == email))
+                .Select(u => new { u.Username, u.Email })
+                .ToListAsync();
+            List<ApiError> errors = [];
+            if (takenUsers.Any(u => u.Username == username))
+            {
+                errors.Add(new ApiError("username", ErrorCodes.Duplicate, "A user with this username already exists."));
+            }
+            if (takenUsers.Any(u => u.Email == email))
+            {
+                errors.Add(new ApiError("email", ErrorCodes.Duplicate, "A user with this email already exists."));
+            }
+            return errors;
+        }
+
         private static UserDto MapToDto(User user)
         {
-            var accounts = user.Accounts?.Select(a => new AccountDto(a.Id, a.Name, a.CreatedBy, a.CreatedAt, a.UpdatedAt, a.UpdatedBy, null!)).ToList() ?? [];
             return new UserDto
             (
                 user.Id,
@@ -163,7 +176,7 @@ namespace DefaultNamespace
                 user.TimeZone,
                 user.Location,
                 user.ProfilePictureUrl,
-                accounts,
+                user.Accounts?.Select(AccountView.Of).ToList() ?? [],
                 user.CreatedAt,
                 user.UpdatedAt,
                 user.CreatedBy,

@@ -1,12 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public interface IAttachmentService
 {
     Task<ApiResponse<AttachmentDto>> CreateFileAsync(Guid cardId, AttachmentUpload upload, CancellationToken token);
-    Task<ApiResponse<AttachmentDto>> CreateLinkAsync(Guid cardId, CreateLinkAttachmentDto createLinkAttachmentDto);
-    Task<ApiResponse<AttachmentDto>> UpdateAsync(Guid cardId, Guid id, UpdateAttachmentDto updateAttachmentDto);
+    Task<ApiResponse<AttachmentDto>> CreateLinkAsync(Guid cardId, CreateLinkAttachmentWrite write);
+    Task<ApiResponse<AttachmentDto>> UpdateAsync(Guid cardId, Guid id, UpdateAttachmentWrite write);
     Task<ApiResponse<bool>> DeleteAsync(Guid cardId, Guid id);
     Task<ApiResponse<AttachmentDto>> GetByIdAsync(Guid cardId, Guid id);
     Task<ApiResponse<List<AttachmentDto>>> GetAllAsync(Guid cardId);
@@ -117,9 +117,9 @@ public class AttachmentService : IAttachmentService
     }
 
     public async Task<ApiResponse<AttachmentDto>> CreateLinkAsync(
-        Guid cardId, CreateLinkAttachmentDto createLinkAttachmentDto)
+        Guid cardId, CreateLinkAttachmentWrite write)
     {
-        ArgumentNullException.ThrowIfNull(createLinkAttachmentDto);
+        ArgumentNullException.ThrowIfNull(write);
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -133,7 +133,7 @@ public class AttachmentService : IAttachmentService
             return refused;
         }
 
-        var attachment = MapLinkToEntity(cardId, createLinkAttachmentDto);
+        var attachment = MapLinkToEntity(cardId, write);
         _context.Attachments.Add(attachment);
         await RecordAddedAsync(attachment);
 
@@ -145,9 +145,9 @@ public class AttachmentService : IAttachmentService
     }
 
     public async Task<ApiResponse<AttachmentDto>> UpdateAsync(
-        Guid cardId, Guid id, UpdateAttachmentDto updateAttachmentDto)
+        Guid cardId, Guid id, UpdateAttachmentWrite write)
     {
-        ArgumentNullException.ThrowIfNull(updateAttachmentDto);
+        ArgumentNullException.ThrowIfNull(write);
 
         var attachment = await FindAsync(cardId, id);
         if (attachment == null)
@@ -160,7 +160,7 @@ public class AttachmentService : IAttachmentService
             return ArchiveErrors.ReadOnly<AttachmentDto>(archived, TreeItem.Attachment);
         }
 
-        attachment.Name = updateAttachmentDto.Name!;
+        attachment.Name = write.Name;
         _context.StampChange(attachment, _actor);
 
         var tracked = _context.Entry(attachment);
@@ -353,18 +353,18 @@ public class AttachmentService : IAttachmentService
         };
     }
 
-    private Attachment MapLinkToEntity(Guid cardId, CreateLinkAttachmentDto createLinkAttachmentDto)
+    private Attachment MapLinkToEntity(Guid cardId, CreateLinkAttachmentWrite write)
     {
-        var url = createLinkAttachmentDto.Url!;
+        var url = write.Url;
 
         return new Attachment
         {
             Id = Guid.NewGuid(),
             CardId = cardId,
             Kind = AttachmentKind.Link,
-            Name = string.IsNullOrEmpty(createLinkAttachmentDto.Name)
+            Name = string.IsNullOrEmpty(write.Name)
                 ? url[..Math.Min(url.Length, FieldLimits.AttachmentName)]
-                : createLinkAttachmentDto.Name,
+                : write.Name,
             Url = url,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _actor.Id

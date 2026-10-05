@@ -1,5 +1,5 @@
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public class Account : BaseEntity
 {

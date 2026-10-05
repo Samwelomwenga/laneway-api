@@ -5,11 +5,12 @@
        "name": "dotnet-format",
        "group": "pre-commit",
        "command": "dotnet",
-       "args": ["dotnet-format", "--include", "${staged}"],
+       "args": ["format", "whitespace", "--folder", "--verify-no-changes", "--include", "${staged}"],
        "include": ["**/*.cs"]
      },
      {
        "name": "commit-message-linter",
+       "group": "commit-msg",
        "command": "dotnet",
        "args": [
          "husky",

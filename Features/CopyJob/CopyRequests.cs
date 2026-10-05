@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public static class CopyRequests
 {

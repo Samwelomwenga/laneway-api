@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 [ApiController]
 [Route("api/v1/cards/{cardId}/attachments")]
@@ -68,7 +68,7 @@ public class AttachmentsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<AttachmentDto>>> CreateLinkAttachment(
         Guid cardId, [FromBody] CreateLinkAttachmentDto createLinkAttachmentDto)
     {
-        var response = await _attachmentService.CreateLinkAsync(cardId, createLinkAttachmentDto);
+        var response = await _attachmentService.CreateLinkAsync(cardId, CreateLinkAttachmentWrite.Of(createLinkAttachmentDto));
         if (!response.Success)
         {
             return ToActionResult(response);
@@ -81,7 +81,7 @@ public class AttachmentsController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<AttachmentDto>>> UpdateAttachment(
         Guid cardId, Guid id, [FromBody] UpdateAttachmentDto updateAttachmentDto)
     {
-        var response = await _attachmentService.UpdateAsync(cardId, id, updateAttachmentDto);
+        var response = await _attachmentService.UpdateAsync(cardId, id, UpdateAttachmentWrite.Of(updateAttachmentDto));
         return ToActionResult(response);
     }
 

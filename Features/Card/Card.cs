@@ -1,6 +1,6 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
-public class Card: PlacedEntity, IArchivable
+public class Card : PlacedEntity, IArchivable
 {
     public required string Title { get; set; }
     public string Description { get; set; } = string.Empty;

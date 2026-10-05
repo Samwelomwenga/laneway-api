@@ -3,7 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed class ValidationFilter : IAsyncActionFilter
 {

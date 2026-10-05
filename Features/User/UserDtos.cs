@@ -1,4 +1,4 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public record UserDto
 (
@@ -8,7 +8,7 @@ public record UserDto
     string FirstName,
     string LastName,
     string? PhoneNumber,
-    string? Bio ,
+    string? Bio,
     string? Language,
     string TimeZone,
     string Location,
@@ -27,7 +27,7 @@ public record CreateUserDto
     string FirstName,
     string LastName,
     string? PhoneNumber,
-    string? Bio ,
+    string? Bio,
     string Language,
     string TimeZone,
     string Location,
@@ -41,7 +41,7 @@ public record UpdateUserDto
     string FirstName,
     string LastName,
     string? PhoneNumber,
-    string? Bio ,
+    string? Bio,
     string Language,
     string TimeZone,
     string Location,

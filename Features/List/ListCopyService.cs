@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public interface IListCopyService
 {
-    Task<ApiResponse<CopyJobDto>> CopyAsync(Guid id, CopyListDto copyListDto);
+    Task<ApiResponse<CopyJobDto>> CopyAsync(Guid id, CopyListWrite write);
 }
 
 public sealed class ListCopyService : IListCopyService
@@ -29,18 +29,18 @@ public sealed class ListCopyService : IListCopyService
         _signal = signal;
     }
 
-    public async Task<ApiResponse<CopyJobDto>> CopyAsync(Guid id, CopyListDto copyListDto)
+    public async Task<ApiResponse<CopyJobDto>> CopyAsync(Guid id, CopyListWrite write)
     {
-        ArgumentNullException.ThrowIfNull(copyListDto);
+        ArgumentNullException.ThrowIfNull(write);
 
-        var boardId = copyListDto.BoardId!.Value;
+        var boardId = write.BoardId;
 
         if (!await _context.Lists.AnyAsync(list => list.Id == id))
         {
             return ApiResponse<CopyJobDto>.ErrorResponse("List not found", 404);
         }
 
-        if (await RefusesAsync(id, boardId, Placement.Of(copyListDto), CopyKeep.Of(copyListDto.Keep)) is { } refused)
+        if (await RefusesAsync(id, boardId, Placement.Of(write), CopyKeep.Of(write.Keep)) is { } refused)
         {
             return refused;
         }
@@ -50,7 +50,7 @@ public sealed class ListCopyService : IListCopyService
             Id = Guid.NewGuid(),
             Kind = CopyJobKind.List,
             SourceId = id,
-            Request = CopyRequests.Of(copyListDto),
+            Request = CopyRequests.Of(write),
             Status = CopyJobStatus.Queued,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _actor.Id

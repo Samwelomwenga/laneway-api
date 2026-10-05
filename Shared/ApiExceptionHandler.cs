@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed class ApiExceptionHandler : IExceptionHandler
 {

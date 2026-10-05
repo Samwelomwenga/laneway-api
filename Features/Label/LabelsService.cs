@@ -1,13 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public interface ILabelService
 {
     Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto);
     Task<ApiResponse<LabelDto>> GetByIdAsync(Guid id);
-    Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelDto createLabelDto);
-    Task<ApiResponse<LabelDto>> UpdateAsync(Guid id, UpdateLabelDto updateLabelDto);
+    Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelWrite write);
+    Task<ApiResponse<LabelDto>> UpdateAsync(Guid id, UpdateLabelWrite write);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 
@@ -78,10 +78,9 @@ public class LabelService : ILabelService
         return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label retrieved successfully", 200);
     }
 
-    public async Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelDto createLabelDto)
+    public async Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelWrite write)
     {
-        var boardId = createLabelDto.BoardId!.Value;
-        var name = createLabelDto.Name ?? string.Empty;
+        var boardId = write.BoardId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         if (!await _context.TryLockBoardAsync(boardId))
@@ -94,12 +93,12 @@ public class LabelService : ILabelService
             return ArchiveErrors.NoCreate<LabelDto>(archived, "boardId", TreeItem.Label);
         }
 
-        if (await FindDuplicateAsync(boardId, name, createLabelDto.Color, self: null) is { } duplicate)
+        if (await FindDuplicateAsync(boardId, write.Name, write.Color, self: null) is { } duplicate)
         {
             return duplicate;
         }
 
-        var newLabel = MapToEntity(createLabelDto, name, _actor.Id);
+        var newLabel = MapToEntity(write, _actor.Id);
         _context.Labels.Add(newLabel);
         var chain = await _tree.BoardAsync(boardId);
         await _activity.AddAsync(
@@ -113,7 +112,7 @@ public class LabelService : ILabelService
         return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label created successfully", 201);
     }
 
-    public async Task<ApiResponse<LabelDto>> UpdateAsync(Guid id, UpdateLabelDto updateLabelDto)
+    public async Task<ApiResponse<LabelDto>> UpdateAsync(Guid id, UpdateLabelWrite write)
     {
         var existingLabel = await _context.Labels.FindAsync(id);
         if (existingLabel == null)
@@ -121,7 +120,6 @@ public class LabelService : ILabelService
             return ApiResponse<LabelDto>.ErrorResponse("Label not found", 404);
         }
 
-        var name = updateLabelDto.Name ?? string.Empty;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         await _context.TryLockBoardAsync(existingLabel.BoardId);
@@ -131,13 +129,13 @@ public class LabelService : ILabelService
             return ArchiveErrors.ReadOnly<LabelDto>(archived, TreeItem.Label);
         }
 
-        if (await FindDuplicateAsync(existingLabel.BoardId, name, updateLabelDto.Color, id) is { } duplicate)
+        if (await FindDuplicateAsync(existingLabel.BoardId, write.Name, write.Color, id) is { } duplicate)
         {
             return duplicate;
         }
 
-        existingLabel.Name = name;
-        existingLabel.Color = updateLabelDto.Color;
+        existingLabel.Name = write.Name;
+        existingLabel.Color = write.Color;
         _context.StampChange(existingLabel, _actor);
 
         var tracked = _context.Entry(existingLabel);
@@ -225,14 +223,14 @@ public class LabelService : ILabelService
         );
     }
 
-    private static Label MapToEntity(CreateLabelDto createDto, string name, Guid actorId)
+    private static Label MapToEntity(CreateLabelWrite write, Guid actorId)
     {
         return new Label
         {
             Id = Guid.NewGuid(),
-            Name = name,
-            BoardId = createDto.BoardId!.Value,
-            Color = createDto.Color,
+            Name = write.Name,
+            BoardId = write.BoardId,
+            Color = write.Color,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

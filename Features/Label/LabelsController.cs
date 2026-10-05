@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class LabelsController: ApiControllerBase
+public class LabelsController : ApiControllerBase
 {
     private readonly ILabelService _labelService;
     public LabelsController(ILabelService labelService)
@@ -29,7 +29,7 @@ public class LabelsController: ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<LabelDto>>> CreateLabel([FromBody] CreateLabelDto createLabelDto)
     {
-        var response = await _labelService.CreateAsync(createLabelDto);
+        var response = await _labelService.CreateAsync(CreateLabelWrite.Of(createLabelDto));
         if (!response.Success)
         {
             return ToActionResult(response);
@@ -40,7 +40,7 @@ public class LabelsController: ApiControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<LabelDto>>> UpdateLabel(Guid id, [FromBody] UpdateLabelDto updateLabelDto)
     {
-        var response = await _labelService.UpdateAsync(id, updateLabelDto);
+        var response = await _labelService.UpdateAsync(id, UpdateLabelWrite.Of(updateLabelDto));
         return ToActionResult(response);
     }
 

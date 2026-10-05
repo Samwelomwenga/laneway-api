@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public interface ICommentService
 {
-    Task<ApiResponse<ActivityEntryDto>> CreateAsync(Guid cardId, CommentTextDto commentTextDto);
-    Task<ApiResponse<ActivityEntryDto>> UpdateAsync(Guid cardId, Guid id, CommentTextDto commentTextDto);
+    Task<ApiResponse<ActivityEntryDto>> CreateAsync(Guid cardId, CommentTextWrite write);
+    Task<ApiResponse<ActivityEntryDto>> UpdateAsync(Guid cardId, Guid id, CommentTextWrite write);
     Task<ApiResponse<bool>> DeleteAsync(Guid cardId, Guid id);
 }
 
@@ -31,9 +31,9 @@ public class CommentService : ICommentService
         _tree = tree;
     }
 
-    public async Task<ApiResponse<ActivityEntryDto>> CreateAsync(Guid cardId, CommentTextDto commentTextDto)
+    public async Task<ApiResponse<ActivityEntryDto>> CreateAsync(Guid cardId, CommentTextWrite write)
     {
-        ArgumentNullException.ThrowIfNull(commentTextDto);
+        ArgumentNullException.ThrowIfNull(write);
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -52,7 +52,7 @@ public class CommentService : ICommentService
             ActivityType.Comment,
             chain.Place,
             actor => new CommentData(actor, chain.Workspace, chain.Board, chain.List, chain.Card));
-        entry.Text = commentTextDto.Text;
+        entry.Text = write.Text;
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -62,9 +62,9 @@ public class CommentService : ICommentService
     }
 
     public async Task<ApiResponse<ActivityEntryDto>> UpdateAsync(
-        Guid cardId, Guid id, CommentTextDto commentTextDto)
+        Guid cardId, Guid id, CommentTextWrite write)
     {
-        ArgumentNullException.ThrowIfNull(commentTextDto);
+        ArgumentNullException.ThrowIfNull(write);
 
         var found = await FindAsync<ActivityEntryDto>(cardId, id);
         if (found.Refused is { } refused)
@@ -73,9 +73,9 @@ public class CommentService : ICommentService
         }
 
         var comment = found.Comment!;
-        if (comment.Text != commentTextDto.Text)
+        if (comment.Text != write.Text)
         {
-            comment.Text = commentTextDto.Text;
+            comment.Text = write.Text;
             comment.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
         }

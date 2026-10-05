@@ -2,7 +2,7 @@ using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public static class ChangedFields
 {

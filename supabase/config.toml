@@ -1,4 +1,4 @@
-project_id = "prodigy-board-API"
+project_id = "laneway-api"
 
 [api]
 enabled = true

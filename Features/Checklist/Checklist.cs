@@ -1,6 +1,6 @@
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
-public class Checklist: PlacedEntity, IArchivable
+public class Checklist : PlacedEntity, IArchivable
 {
     public required string Name { get; set; }
     public required Guid CardId { get; set; }

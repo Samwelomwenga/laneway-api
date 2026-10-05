@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Options;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public static partial class InvalidModelStateResponse
 {

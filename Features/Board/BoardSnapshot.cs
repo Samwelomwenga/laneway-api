@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public sealed record BoardSnapshot(Board Board, List<List> Lists, List<CardSnapshot> Cards, List<Label> Labels)
 {

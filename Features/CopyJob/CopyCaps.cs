@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public static class CopyCaps
 {

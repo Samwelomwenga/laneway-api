@@ -1,28 +1,28 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace DefaultNamespace;
+namespace Laneway.Api;
 
 public record CardDto
 (
      Guid Id,
      string Title,
-     string Description ,
-     DateTime? DueDate ,
-     double Position ,
-     Guid ListId ,
-     bool IsDueComplete ,
+     string Description,
+     DateTime? DueDate,
+     double Position,
+     Guid ListId,
+     bool IsDueComplete,
      DateTime? StartDate,
-     int? DueReminderMinutes ,
-     bool IsArchived ,
+     int? DueReminderMinutes,
+     bool IsArchived,
      List<Guid> LabelIds,
      int CheckItemCount,
      int CheckedItemCount,
      int AttachmentCount,
      int CommentCount,
      CardCoverDto? Cover,
-      DateTime CreatedAt ,
-     DateTime? UpdatedAt ,
-     Guid CreatedBy ,
+      DateTime CreatedAt,
+     DateTime? UpdatedAt,
+     Guid CreatedBy,
      Guid? UpdatedBy
 );
 
