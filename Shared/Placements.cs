@@ -41,6 +41,35 @@ public sealed class Placements
         return await OnBoardAsync(boardId, placement, list);
     }
 
+    public async Task<PlacementResult> ResolveOnCardAsync(Guid cardId, Placement placement)
+    {
+        await _context.LockCardsAsync(cardId);
+        return await OnCardAsync(cardId, placement, moving: null);
+    }
+
+    public async Task<PlacementResult> ResolveReorderOnCardAsync(Checklist checklist, Placement placement)
+    {
+        ArgumentNullException.ThrowIfNull(checklist);
+
+        await _context.LockCardsAsync(checklist.CardId);
+        return await OnCardAsync(checklist.CardId, placement, checklist);
+    }
+
+    public async Task<PlacementResult> ResolveInChecklistAsync(Guid checklistId, Placement placement)
+    {
+        await _context.LockChecklistsAsync(checklistId);
+        return await InChecklistAsync(checklistId, placement, moving: null);
+    }
+
+    public async Task<PlacementResult> ResolveMoveInChecklistAsync(
+        CheckItem checkItem, Guid checklistId, Placement placement)
+    {
+        ArgumentNullException.ThrowIfNull(checkItem);
+
+        await _context.LockChecklistsAsync(checkItem.ChecklistId, checklistId);
+        return await InChecklistAsync(checklistId, placement, checkItem);
+    }
+
     private async Task<PlacementResult> OnBoardAsync(Guid boardId, Placement placement, List? moving)
     {
         var lists = await _context.Lists.Where(list => list.BoardId == boardId).InSortOrder().ToListAsync();
@@ -57,6 +86,26 @@ public sealed class Placements
 
         return await ResolveAsync(siblings, placement, moving, "Card", "list",
             id => _context.Cards.AnyAsync(card => card.Id == id));
+    }
+
+    private async Task<PlacementResult> OnCardAsync(Guid cardId, Placement placement, Checklist? moving)
+    {
+        var checklists = await _context.Checklists
+            .Where(checklist => checklist.CardId == cardId).InSortOrder().ToListAsync();
+        var siblings = checklists.ConvertAll(checklist => new Sibling(checklist, checklist.IsArchived));
+
+        return await ResolveAsync(siblings, placement, moving, "Checklist", "card",
+            id => _context.Checklists.AnyAsync(checklist => checklist.Id == id));
+    }
+
+    private async Task<PlacementResult> InChecklistAsync(Guid checklistId, Placement placement, CheckItem? moving)
+    {
+        var checkItems = await _context.CheckItems
+            .Where(checkItem => checkItem.ChecklistId == checklistId).InSortOrder().ToListAsync();
+        var siblings = checkItems.ConvertAll(checkItem => new Sibling(checkItem, IsArchived: false));
+
+        return await ResolveAsync(siblings, placement, moving, "Check item", "checklist",
+            id => _context.CheckItems.AnyAsync(checkItem => checkItem.Id == id));
     }
 
     private static async Task<PlacementResult> ResolveAsync(

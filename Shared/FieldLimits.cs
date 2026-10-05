@@ -10,4 +10,7 @@ public static class FieldLimits
     public const int LabelName = 50;
     public const int CardTitle = 500;
     public const int CardDescription = 10000;
+    public const int ChecklistName = 100;
+    public const int CheckItemName = 500;
+    public const int CheckItemsPerChecklist = 200;
 }

@@ -37,4 +37,30 @@ public static class RowLocks
                 .ToListAsync();
         }
     }
+
+    public static async Task LockCardsAsync(this ApplicationDbContext context, params Guid[] cardIds)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(cardIds);
+
+        foreach (var cardId in cardIds.Distinct().Order())
+        {
+            await context.Cards
+                .FromSql($"SELECT * FROM \"Cards\" WHERE \"Id\" = {cardId} FOR UPDATE")
+                .ToListAsync();
+        }
+    }
+
+    public static async Task LockChecklistsAsync(this ApplicationDbContext context, params Guid[] checklistIds)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(checklistIds);
+
+        foreach (var checklistId in checklistIds.Distinct().Order())
+        {
+            await context.Checklists
+                .FromSql($"SELECT * FROM \"Checklists\" WHERE \"Id\" = {checklistId} FOR UPDATE")
+                .ToListAsync();
+        }
+    }
 }
