@@ -57,3 +57,13 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
+
+# JetBrains Rider
+.idea/
+*.user
+
+managed_context/
+
+qodana.yaml
+
+test_suite_analysis/

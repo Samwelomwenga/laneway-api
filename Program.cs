@@ -1,33 +1,42 @@
-using Microsoft.AspNetCore.Authentication.Negotiate;
+using Scalar.AspNetCore;
+using DefaultNamespace;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+
 builder.Services.AddOpenApi();
 
-builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
-   .AddNegotiate();
+builder.Services.AddScoped<IBoardService, BoardService>();
+builder.Services.AddScoped<ICardService, CardService>();
+builder.Services.AddScoped<ILabelService, LabelService>();
+builder.Services.AddScoped<IListService, ListService>();
+builder.Services.AddScoped<IWorkSpaceService, WorkSpaceService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddProblemDetails();
 
-builder.Services.AddAuthorization(options =>
-{
-    // By default, all incoming requests will be authorized according to the default policy.
-    options.FallbackPolicy = options.DefaultPolicy;
-});
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+    ));
+    
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();
 
-app.UseAuthorization();
+app.MapGet("/", () => Results.Redirect("/scalar/v1"));
 
 app.MapControllers();
 
