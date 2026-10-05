@@ -79,7 +79,7 @@ Content-Type: application/json
   "isArchived": false
 }
 
-### Create a label with the "Lime" color. Label names are unique across all boards for now, so the name gets a random suffix.
+### Create a label with the "Lime" color.
 POST {{prodigy_board_API_HostAddress}}/api/v1/labels
 Content-Type: application/json
 
@@ -721,7 +721,7 @@ Content-Type: application/json
 
 > {% client.global.set("secondUserId", response.body.data.id); %}
 
-### Give the second user the first user's email. User update has no duplicate check, so the unique index on Email fails and the exception handler returns 409 duplicate with a null field.
+### Give the second user the first user's email. 409 duplicate with a null field.
 PUT {{prodigy_board_API_HostAddress}}/api/v1/users/{{secondUserId}}
 Content-Type: application/json
 
@@ -900,7 +900,7 @@ GET {{prodigy_board_API_HostAddress}}/api/v1/cards?searchTerm=%20bug%20
 ### Search for 50%_off. EF escapes % and _, so only "50%_off sale" comes back, not "50Xoff".
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards?searchTerm=50%25_off
 
-### Search boards in the wrong case. Board search now ignores case too.
+### Search boards in the wrong case.
 GET {{prodigy_board_API_HostAddress}}/api/v1/boards?searchTerm=PAGING
 
 ### Search cards due on a UTC day. Only "50%_off sale" comes back.
@@ -939,22 +939,22 @@ GET {{prodigy_board_API_HostAddress}}/api/v1/cards?startFrom=2026-09-30T00:00:00
 ### Search incomplete cards. Only cards that have a due date and aren't complete come back, so "Bug report" doesn't.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards?isDueComplete=false
 
-### Filter cards by position. The key is gone, so it's 400 unknownField on position.
+### Filter cards by position. 400 unknownField on position.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards?position=1
 
 ### Filter cards by status. 400 unknownField on status.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards?status=open
 
-### Filter cards by endDate. The key is dueBefore now, so it's 400 unknownField on endDate.
+### Filter cards by endDate. 400 unknownField on endDate.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards?endDate=2026-10-02T00:00:00Z
 
 ### Filter cards by reminderDate. 400 unknownField on reminderDate.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards?reminderDate=2026-10-02T00:00:00Z
 
-### Filter labels by board. 400 unknownField on boardId until ticket 07 adds the filter.
+### Filter labels by board. 400 unknownField on boardId.
 GET {{prodigy_board_API_HostAddress}}/api/v1/labels?boardId={{pagingBoardId}}
 
-### Read the second page of two. Card search returns the paged shape with no second ApiResponse around it.
+### Read the second page of two. Card search returns the paged shape.
 GET {{prodigy_board_API_HostAddress}}/api/v1/cards?listId={{pagingListId}}&pageSize=2&pageNumber=2
 
 ### Send an unknown key to user search. 200, because user and account search are unchanged.
