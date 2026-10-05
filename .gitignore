@@ -58,7 +58,6 @@ obj/
 riderModule.iml
 /_ReSharper.Caches/
 
-# JetBrains Rider
 .idea/
 *.user
 

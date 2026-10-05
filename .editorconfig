@@ -7,7 +7,6 @@ insert_final_newline = true
 indent_style = space
 indent_size = 4
 
-# Microsoft .NET properties
 csharp_new_line_before_members_in_object_initializers = false
 csharp_preferred_modifier_order = public, private, protected, internal, file, new, static, abstract, virtual, sealed, readonly, override, extern, unsafe, volatile, async, required:suggestion
 csharp_style_prefer_utf8_string_literals = true:suggestion
@@ -40,7 +39,6 @@ csharp_style_pattern_matching_over_as_with_null_check = true:error
 csharp_style_pattern_matching_over_is_with_cast_check = true:error
 csharp_style_prefer_switch_expression = true:error
 
-# ReSharper properties
 resharper_autodetect_indent_settings = true
 resharper_formatter_off_tag = @formatter:off
 resharper_formatter_on_tag = @formatter:on
@@ -48,7 +46,6 @@ resharper_formatter_tags_enabled = true
 resharper_show_autodetect_configure_formatting_tip = false
 resharper_use_indent_from_vs = true
 
-# ReSharper inspection severities
 resharper_arrange_redundant_parentheses_highlighting = hint
 resharper_arrange_this_qualifier_highlighting = hint
 resharper_arrange_type_member_modifiers_highlighting = hint
