@@ -370,3 +370,6 @@ public sealed record UpdateCardCoverData(
     CardRef Card,
     CoverRef? Cover,
     CoverRef? Old);
+
+public sealed record CommentData(
+    ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, ListRef List, CardRef Card);

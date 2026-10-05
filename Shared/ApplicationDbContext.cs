@@ -197,6 +197,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
             entity.Property(e => e.UpdatedAt).HasColumnType("timestamp with time zone");
             entity.Property(e => e.Data).HasColumnType("jsonb");
+            entity.Property(e => e.Text).HasColumnType($"varchar({FieldLimits.CommentText})");
             entity.HasOne<User>()
                 .WithMany()
                 .HasForeignKey(e => e.CreatedBy)
@@ -206,6 +207,9 @@ public class ApplicationDbContext : DbContext
                 entity.HasIndex(place, nameof(ActivityEntry.CreatedAt), nameof(ActivityEntry.Id))
                     .IsDescending(false, true, true);
             }
+            entity.HasIndex(e => e.CardId)
+                .HasDatabaseName("IX_ActivityEntries_CardId_Comment")
+                .HasFilter($"\"Type\" = '{nameof(ActivityType.Comment)}'");
         });
 
         modelBuilder.Entity<Label>(entity =>

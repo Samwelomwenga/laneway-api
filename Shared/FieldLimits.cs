@@ -20,4 +20,5 @@ public static class FieldLimits
     public const int AttachmentObjectKey = 512;
     public const int AttachmentBytes = 10 * 1024 * 1024;
     public const int AttachmentsPerCard = 100;
+    public const int CommentText = 10000;
 }
