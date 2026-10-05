@@ -14,10 +14,10 @@ public class CardsController: ApiControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<PagedResponse<CardDto>>>> GetCards([FromQuery] CardSearchDto searchDto)
+    public async Task<ActionResult<PagedResponse<CardDto>>> GetCards([FromQuery] CardSearchDto searchDto)
     {
         var response = await _cardService.GetAllAsync(searchDto);
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpGet("{id}")]
@@ -30,15 +30,6 @@ public class CardsController: ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<CardDto>>> CreateCard([FromBody] CreateCardDto createCardDto)
     {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<CardDto>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _cardService.CreateAsync(createCardDto);
         if (!response.Success)
         {
@@ -50,15 +41,6 @@ public class CardsController: ApiControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<CardDto>>> UpdateCard(Guid id, [FromBody] UpdateCardDto updateCardDto)
     {
-        if (!ModelState.IsValid)
-        {
-           var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-           var errorResponse = ApiResponse<CardDto>.ErrorResponse("Invalid data", 400, errors);
-              return BadRequest(errorResponse);
-        }
         var response = await _cardService.UpdateAsync(id, updateCardDto);
         return ToActionResult(response);
     }

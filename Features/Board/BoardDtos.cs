@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc;
+
 namespace DefaultNamespace;
 
 public record BoardDto
@@ -5,10 +7,8 @@ public record BoardDto
     Guid Id,
     string Name,
     string Description,
-    string? Title,
     Guid WorkspaceId,
-    Guid OwnerId,
-    string Visibility,
+    BoardVisibility Visibility,
     bool IsArchived,
     List<Guid> ListIds,
     DateTime CreatedAt,
@@ -19,32 +19,44 @@ public record BoardDto
 
 public record CreateBoardDto
 (
-    string Name,
-    string Description,
-    string? Title,
-    Guid WorkspaceId,
-    Guid OwnerId,
-    string Visibility,
-    bool IsArchived
-);
+    string? Name,
+    string? Description,
+    Guid? WorkspaceId,
+    BoardVisibility? Visibility,
+    bool? IsArchived
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 
 public record UpdateBoardDto
 (
-    string Name,
-    string Description,
-    string? Title,
-    Guid WorkspaceId,
-    Guid OwnerId,
-    string Visibility,
-    bool IsArchived
-);
+    string? Name,
+    string? Description,
+    Guid? WorkspaceId,
+    BoardVisibility? Visibility,
+    bool? IsArchived
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 
+[ModelBinder(typeof(SearchQueryBinder<BoardSearchDto>))]
 public record BoardSearchDto
 (
-    int PageNumber = 1,
-    int PageSize = 10,
-    string? SearchTerm = null,
-    Guid? WorkspaceId = null,
-    bool? IsArchived = null,
-    string? Visibility = null
-);
+    int PageNumber,
+    int PageSize,
+    string? SearchTerm,
+    Guid? WorkspaceId,
+    bool? IsArchived,
+    BoardVisibility? Visibility
+) : ISearchQuery<BoardSearchDto>
+{
+    public static BoardSearchDto Read(QueryReader query) => new(
+        query.PageNumber(),
+        query.PageSize(),
+        query.Text("searchTerm"),
+        query.Id("workspaceId"),
+        query.Flag("isArchived"),
+        query.EnumName<BoardVisibility>("visibility"));
+}

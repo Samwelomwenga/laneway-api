@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 public interface ILabelService
 {
-    Task<PagedResponse<LabelDto>> GetAllAsync(LabelSearchDto searchDto);
+    Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto);
     Task<ApiResponse<LabelDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelDto createLabelDto);
     Task<ApiResponse<LabelDto>> UpdateAsync(Guid id, UpdateLabelDto updateLabelDto);
@@ -20,29 +20,27 @@ public class LabelService : ILabelService
         _context = context;
     }
 
-    public async Task<PagedResponse<LabelDto>> GetAllAsync(LabelSearchDto searchDto)
+    public async Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto)
     {
         var query = _context.Labels.AsQueryable();
-        if (!string.IsNullOrEmpty(searchDto.SearchTerm))
+        if (searchDto.SearchTerm is { } term)
         {
-            query = query.Where(l => l.Name.ToLower().Contains(searchDto.SearchTerm.ToLower()));
+            query = query.Where(l => l.Name.ToLower().Contains(term.ToLower()));
         }
 
-        var totalCount = await query.CountAsync();
-        var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
-        var labels = await query
-            .OrderBy(l => l.Name)
-            .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
-            .ToListAsync();
+        var (labels, totalCount) = await PagedQuery.ReadAsync(
+            query.OrderBy(l => l.Name),
+            pageNumber: searchDto.PageNumber,
+            pageSize: searchDto.PageSize);
+
         var labelDtos = labels.Select(MapToDto).ToList();
 
         return PagedResponse<LabelDto>.SuccessResponse(
             labelDtos,
             totalCount,
-            searchDto.PageSize,
-            searchDto.PageNumber,
-            "Labels retrieved successfully"
+            pageSize: searchDto.PageSize,
+            currentPage: searchDto.PageNumber,
+            message: "Labels retrieved successfully"
         );
     }
 
@@ -60,11 +58,11 @@ public class LabelService : ILabelService
     public async Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelDto createLabelDto)
     {
         var existingLabel = await _context.Labels
-            .FirstOrDefaultAsync(l => l.Name.ToLower() == createLabelDto.Name.ToLower());
+            .FirstOrDefaultAsync(l => l.Name.ToLower() == createLabelDto.Name!.ToLower());
         if (existingLabel != null)
         {
             return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
-                new List<string> { "A label with this name already exists." });
+                [new ApiError("name", ErrorCodes.Duplicate, "A label with this name already exists.")]);
         }
         var newLabel = MapToEntity(createLabelDto);
         _context.Labels.Add(newLabel);
@@ -82,14 +80,14 @@ public class LabelService : ILabelService
         }
 
         var nameTaken = await _context.Labels
-            .AnyAsync(l => l.Id != id && l.Name.ToLower() == updateLabelDto.Name.ToLower());
+            .AnyAsync(l => l.Id != id && l.Name.ToLower() == updateLabelDto.Name!.ToLower());
         if (nameTaken)
         {
             return ApiResponse<LabelDto>.ErrorResponse("Label with the same name already exists", 409,
-                new List<string> { "A label with this name already exists." });
+                [new ApiError("name", ErrorCodes.Duplicate, "A label with this name already exists.")]);
         }
 
-        existingLabel.Name = updateLabelDto.Name;
+        existingLabel.Name = updateLabelDto.Name!;
         existingLabel.Color = updateLabelDto.Color;
         existingLabel.UpdatedAt = DateTime.UtcNow;
         existingLabel.UpdatedBy = Guid.NewGuid();
@@ -133,7 +131,7 @@ public class LabelService : ILabelService
         return new Label
         {
             Id = Guid.NewGuid(),
-            Name = createDto.Name,
+            Name = createDto.Name!,
             Color = createDto.Color,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()

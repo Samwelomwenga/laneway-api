@@ -7,7 +7,7 @@ public interface ICardService
     Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto);
     Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardDto updateCardDto);
     Task<ApiResponse<CardDto>> GetByIdAsync(Guid id);
-    Task<ApiResponse<PagedResponse<CardDto>>> GetAllAsync(CardSearchDto searchDto);
+    Task<ApiResponse<List<CardDto>>> GetAllAsync(CardSearchDto searchDto);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 public class CardService: ICardService
@@ -21,10 +21,10 @@ public class CardService: ICardService
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
     {
-        var (labels, missingLabelIds) = await FindLabelsAsync(createCardDto.LabelIds);
-        if (missingLabelIds.Count > 0)
+        var (labels, referenceErrors) = await ResolveReferencesAsync(createCardDto.ListId!.Value, createCardDto.LabelIds);
+        if (referenceErrors.Count > 0)
         {
-            return ApiResponse<CardDto>.ErrorResponse("Label not found", 400, missingLabelIds);
+            return ApiResponse<CardDto>.ErrorResponse("A referenced resource does not exist", 400, referenceErrors);
         }
 
         var card = MapToEntity(createCardDto);
@@ -48,23 +48,22 @@ public class CardService: ICardService
             return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
         }
 
-        var (labels, missingLabelIds) = await FindLabelsAsync(updateCardDto.LabelIds);
-        if (missingLabelIds.Count > 0)
+        var (labels, referenceErrors) = await ResolveReferencesAsync(updateCardDto.ListId!.Value, updateCardDto.LabelIds);
+        if (referenceErrors.Count > 0)
         {
-            return ApiResponse<CardDto>.ErrorResponse("Label not found", 400, missingLabelIds);
+            return ApiResponse<CardDto>.ErrorResponse("A referenced resource does not exist", 400, referenceErrors);
         }
 
-        card.Title = updateCardDto.Title;
-        card.Description = updateCardDto.Description;
+        card.Title = updateCardDto.Title!;
+        card.Description = updateCardDto.Description ?? string.Empty;
         card.DueDate = updateCardDto.DueDate;
-        card.Position = updateCardDto.Position;
-        card.ListId = updateCardDto.ListId;
-        card.Status = updateCardDto.Status;
+        card.Position = updateCardDto.Position!.Value;
+        card.ListId = updateCardDto.ListId.Value;
+        card.IsDueComplete = updateCardDto.IsDueComplete!.Value;
         card.Cover = updateCardDto.Cover;
         card.StartDate = updateCardDto.StartDate;
-        card.EndDate = updateCardDto.EndDate;
-        card.ReminderDate = updateCardDto.ReminderDate;
-        card.IsArchived = updateCardDto.IsArchived;
+        card.DueReminderMinutes = updateCardDto.DueReminderMinutes;
+        card.IsArchived = updateCardDto.IsArchived!.Value;
         card.UpdatedAt = DateTime.UtcNow;
         card.Labels.Clear();
         card.Labels.AddRange(labels);
@@ -89,66 +88,67 @@ public class CardService: ICardService
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card retrieved successfully");
     }
-    public async Task<ApiResponse<PagedResponse<CardDto>>> GetAllAsync(CardSearchDto searchDto)
+    public async Task<ApiResponse<List<CardDto>>> GetAllAsync(CardSearchDto searchDto)
     {
+        if (searchDto.ListId is { } filterListId && !await _context.Lists.AnyAsync(l => l.Id == filterListId))
+        {
+            return ReferenceErrors.NotFound<List<CardDto>>("listId", "List", filterListId);
+        }
+
         var query = _context.Cards.AsQueryable();
 
-        if (!string.IsNullOrEmpty(searchDto.searchTerm))
+        if (searchDto.SearchTerm is { } term)
         {
-            query = query.Where(c => c.Title.Contains(searchDto.searchTerm) || c.Description.Contains(searchDto.searchTerm));
+            query = query.Where(c => c.Title.ToLower().Contains(term.ToLower()) ||
+                                     c.Description.ToLower().Contains(term.ToLower()));
         }
 
-        if (searchDto.DueDate.HasValue)
+        if (searchDto.ListId is { } listId)
         {
-            query = query.Where(c => c.DueDate.Date == searchDto.DueDate.Value.Date);
+            query = query.Where(c => c.ListId == listId);
         }
 
-        if (searchDto.Position.HasValue)
+        if (searchDto.IsArchived is { } isArchived)
         {
-            query = query.Where(c => c.Position == searchDto.Position.Value);
+            query = query.Where(c => c.IsArchived == isArchived);
         }
 
-        if (searchDto.ListId.HasValue)
+        if (searchDto.DueDate is { } dueDate)
         {
-            query = query.Where(c => c.ListId == searchDto.ListId.Value);
+            var dayStart = DateTime.SpecifyKind(dueDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            var dayEnd = dayStart.AddDays(1);
+            query = query.Where(c => c.DueDate >= dayStart && c.DueDate < dayEnd);
         }
 
-        if (searchDto.Status.HasValue)
+        if (searchDto.DueBefore is { } dueBefore)
         {
-            query = query.Where(c => c.Status == searchDto.Status.Value);
+            var before = dueBefore.UtcDateTime;
+            query = query.Where(c => c.DueDate < before);
         }
 
-        if (searchDto.StartDate.HasValue)
+        if (searchDto.StartFrom is { } startFrom)
         {
-            query = query.Where(c => c.StartDate >= searchDto.StartDate.Value);
+            var from = startFrom.UtcDateTime;
+            query = query.Where(c => c.StartDate >= from);
         }
 
-        if (searchDto.EndDate.HasValue)
+        if (searchDto.IsDueComplete is { } isDueComplete)
         {
-            query = query.Where(c => c.EndDate <= searchDto.EndDate.Value);
+            query = query.Where(c => c.DueDate != null && c.IsDueComplete == isDueComplete);
         }
 
-        var totalCount = await query.CountAsync();
-        var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
+        var (cards, totalCount) = await PagedQuery.ReadAsync(
+            query.OrderBy(c => c.Position).Include(c => c.Labels),
+            pageNumber: searchDto.PageNumber,
+            pageSize: searchDto.PageSize);
 
-        var cards = await query
-            .OrderBy(c => c.Position)
-            .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
-            .Include(c => c.Labels)
-            .ToListAsync();
-
-        var cardDtos = cards.Select(MapToDto).ToList();
-
-        var pagedResponse = PagedResponse<CardDto>.SuccessResponse(
-            cardDtos,
+        return PagedResponse<CardDto>.SuccessResponse(
+            cards.Select(MapToDto).ToList(),
             totalCount,
-            searchDto.PageSize,
-            searchDto.PageNumber,
-            "Cards retrieved successfully"
+            pageSize: searchDto.PageSize,
+            currentPage: searchDto.PageNumber,
+            message: "Cards retrieved successfully"
         );
-
-        return ApiResponse<PagedResponse<CardDto>>.SuccessResponse(pagedResponse, "Cards retrieved successfully");
     }
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
@@ -163,12 +163,23 @@ public class CardService: ICardService
 
         return ApiResponse<bool>.SuccessResponse(true, "Card deleted successfully", 204);
     }
-    private async Task<(List<Label> Labels, List<string> MissingIds)> FindLabelsAsync(List<Guid>? labelIds)
+    private async Task<(List<Label> Labels, List<ApiError> Errors)> ResolveReferencesAsync(Guid listId, List<Guid?>? labelIds)
     {
-        var ids = labelIds?.Distinct().ToList() ?? [];
+        var errors = new List<ApiError>();
+        if (!await _context.Lists.AnyAsync(l => l.Id == listId))
+        {
+            errors.Add(new ApiError("listId", ErrorCodes.NotFound, $"List {listId} does not exist."));
+        }
+
+        var ids = labelIds?.Select(id => id!.Value).ToList() ?? [];
         var labels = await _context.Labels.Where(l => ids.Contains(l.Id)).ToListAsync();
-        var missingIds = ids.Except(labels.Select(l => l.Id)).Select(id => id.ToString()).ToList();
-        return (labels, missingIds);
+        var foundIds = labels.Select(l => l.Id).ToHashSet();
+        errors.AddRange(ids
+            .Select((id, index) => (Id: id, Index: index))
+            .Where(entry => !foundIds.Contains(entry.Id))
+            .DistinctBy(entry => entry.Id)
+            .Select(entry => new ApiError($"labelIds[{entry.Index}]", ErrorCodes.NotFound, $"Label {entry.Id} does not exist.")));
+        return (labels, errors);
     }
     private static CardDto MapToDto(Card card)
     {
@@ -180,11 +191,10 @@ public class CardService: ICardService
             card.DueDate,
             card.Position,
             card.ListId,
-            card.Status,
+            card.IsDueComplete,
             card.Cover,
             card.StartDate,
-            card.EndDate,
-            card.ReminderDate,
+            card.DueReminderMinutes,
             card.IsArchived,
             card.Labels.Select(l => l.Id).ToList(),
             card.CreatedAt,
@@ -198,17 +208,16 @@ public class CardService: ICardService
         return new Card
         {
             Id = Guid.NewGuid(),
-            Title = createCardDto.Title,
-            Description = createCardDto.Description,
+            Title = createCardDto.Title!,
+            Description = createCardDto.Description ?? string.Empty,
             DueDate = createCardDto.DueDate,
-            Position = createCardDto.Position,
-            ListId = createCardDto.ListId,
-            Status = createCardDto.Status,
+            Position = createCardDto.Position!.Value,
+            ListId = createCardDto.ListId!.Value,
+            IsDueComplete = createCardDto.IsDueComplete!.Value,
             Cover = createCardDto.Cover,
             StartDate = createCardDto.StartDate,
-            EndDate = createCardDto.EndDate,
-            ReminderDate = createCardDto.ReminderDate,
-            IsArchived = createCardDto.IsArchived,
+            DueReminderMinutes = createCardDto.DueReminderMinutes,
+            IsArchived = createCardDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()
         };

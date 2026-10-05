@@ -7,7 +7,7 @@ public class ApiResponse<T>
     public string Message { get; set; } = string.Empty;
     public T? Data { get; set; }
     public int StatusCode { get; set; }
-    public List<string> Errors { get; set; } = new();
+    public List<ApiError> Errors { get; set; } = new();
 
     public static ApiResponse<T> SuccessResponse(T data, string message = "Request was successful", int statusCode = 200)
     {
@@ -20,14 +20,14 @@ public class ApiResponse<T>
         };
     }
 
-    public static ApiResponse<T> ErrorResponse(string message, int statusCode = 400, List<string>? errors = null)
+    public static ApiResponse<T> ErrorResponse(string message, int statusCode = 400, List<ApiError>? errors = null)
     {
         return new ApiResponse<T>
         {
             Success = false,
             Message = message,
             StatusCode = statusCode,
-            Errors = errors ?? new List<string>()
+            Errors = errors ?? new List<ApiError>()
         };
     }
 }
@@ -53,22 +53,6 @@ public  class PagedResponse<T> : ApiResponse<List<T>>
             PageSize = pageSize,
             CurrentPage = currentPage,
             TotalPages = totalPages
-        };
-    }
-    
-    public static new PagedResponse<T> ErrorResponse(string message, int statusCode = 400, List<string>? errors = null)
-    {
-        return new PagedResponse<T>
-        {
-            Success = false,
-            Message = message,
-            StatusCode = statusCode,
-            Errors = errors ?? new List<string>(),
-            Data = new List<T>(),
-            TotalCount = 0,
-            PageSize = 0,
-            CurrentPage = 0,
-            TotalPages = 0
         };
     }
     

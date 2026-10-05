@@ -68,7 +68,7 @@ namespace DefaultNamespace
                 .FirstOrDefaultAsync();
             if (existingUser is null)
             {
-                return ApiResponse<UserDto>.ErrorResponse("User not found", 404, ["User with the specified ID does not exist."]);
+                return ApiResponse<UserDto>.ErrorResponse("User not found", 404);
             }
             var userDto = MapToDto(existingUser);
             return ApiResponse<UserDto>.SuccessResponse(userDto, "User retrieved successfully", 200);
@@ -76,10 +76,22 @@ namespace DefaultNamespace
 
         public async Task<ApiResponse<UserDto>> CreateAsync(CreateUserDto createUserDto)
         {
-            var exists = await _context.Users.AnyAsync(u => u.Username == createUserDto.Username || u.Email == createUserDto.Email);
-            if (exists)
+            var takenUsers = await _context.Users
+                .Where(u => u.Username == createUserDto.Username || u.Email == createUserDto.Email)
+                .Select(u => new { u.Username, u.Email })
+                .ToListAsync();
+            List<ApiError> errors = [];
+            if (takenUsers.Any(u => u.Username == createUserDto.Username))
             {
-                return ApiResponse<UserDto>.ErrorResponse("User already exists", 409, ["A user with the same username or email already exists."]);
+                errors.Add(new ApiError("username", ErrorCodes.Duplicate, "A user with this username already exists."));
+            }
+            if (takenUsers.Any(u => u.Email == createUserDto.Email))
+            {
+                errors.Add(new ApiError("email", ErrorCodes.Duplicate, "A user with this email already exists."));
+            }
+            if (errors.Count > 0)
+            {
+                return ApiResponse<UserDto>.ErrorResponse("User already exists", 409, errors);
             }
             var newUser = MapToEntity(createUserDto);
             _context.Users.Add(newUser);
@@ -102,7 +114,7 @@ namespace DefaultNamespace
             var existingUser = await _context.Users.FindAsync(id);
             if (existingUser is null)
             {
-                return ApiResponse<UserDto>.ErrorResponse("User not found", 404, ["User with the specified ID does not exist."]);
+                return ApiResponse<UserDto>.ErrorResponse("User not found", 404);
             }
 
             existingUser.Username = updateUserDto.Username;
@@ -130,7 +142,7 @@ namespace DefaultNamespace
             var user = await _context.Users.FindAsync(id);
             if (user == null)
             {
-                return ApiResponse<bool>.ErrorResponse("User not found", 404, ["User with the specified ID does not exist."]);
+                return ApiResponse<bool>.ErrorResponse("User not found", 404);
             }
 
             _context.Users.Remove(user);

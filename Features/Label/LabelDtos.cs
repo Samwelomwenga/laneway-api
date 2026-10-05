@@ -1,10 +1,12 @@
+using Microsoft.AspNetCore.Mvc;
+
 namespace DefaultNamespace;
 
 public record LabelDto
 (
     Guid Id,
     string Name,
-    string Color,
+    Color? Color,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     Guid CreatedBy,
@@ -13,19 +15,32 @@ public record LabelDto
 
 public record CreateLabelDto
 (
-    string Name,
-    string Color
-);
+    string? Name,
+    Color? Color
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 
 public record UpdateLabelDto
 (
-    string Name,
-    string Color
-);
+    string? Name,
+    Color? Color
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
 
+[ModelBinder(typeof(SearchQueryBinder<LabelSearchDto>))]
 public record LabelSearchDto
 (
-    int PageNumber = 1,
-    int PageSize = 10,
-    string? SearchTerm = null
-);
+    int PageNumber,
+    int PageSize,
+    string? SearchTerm
+) : ISearchQuery<LabelSearchDto>
+{
+    public static LabelSearchDto Read(QueryReader query) => new(
+        query.PageNumber(),
+        query.PageSize(),
+        query.Text("searchTerm"));
+}

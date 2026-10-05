@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc;
+
 namespace DefaultNamespace;
 
 public record CardDto
@@ -5,14 +7,13 @@ public record CardDto
      Guid Id,
      string Title,
      string Description ,
-     DateTime DueDate ,
+     DateTime? DueDate ,
      int Position ,
      Guid ListId ,
-     bool Status ,
+     bool IsDueComplete ,
      string? Cover,
      DateTime? StartDate,
-     DateTime? EndDate,
-     DateTime? ReminderDate ,
+     int? DueReminderMinutes ,
      bool IsArchived ,
      List<Guid> LabelIds,
       DateTime CreatedAt ,
@@ -23,46 +24,61 @@ public record CardDto
 
 public record CreateCardDto
 (
-    string Title,
-    string Description,
-    DateTime DueDate,
-    int Position,
-    Guid ListId,
-    bool Status,
+    string? Title,
+    string? Description,
+    DateTime? DueDate,
+    int? Position,
+    Guid? ListId,
+    bool? IsDueComplete,
     string? Cover,
     DateTime? StartDate,
-    DateTime? EndDate,
-    DateTime? ReminderDate,
-    bool IsArchived,
-    List<Guid>? LabelIds
-);
+    int? DueReminderMinutes,
+    bool? IsArchived,
+    List<Guid?>? LabelIds
+)
+{
+    public string? Title { get; init; } = Title?.Trim();
+}
 
 public record UpdateCardDto
 (
-    string Title,
-    string Description,
-    DateTime DueDate,
-    int Position,
-    Guid ListId,
-    bool Status,
+    string? Title,
+    string? Description,
+    DateTime? DueDate,
+    int? Position,
+    Guid? ListId,
+    bool? IsDueComplete,
     string? Cover,
     DateTime? StartDate,
-    DateTime? EndDate,
-    DateTime? ReminderDate,
-    bool IsArchived,
-    List<Guid>? LabelIds
-);
+    int? DueReminderMinutes,
+    bool? IsArchived,
+    List<Guid?>? LabelIds
+)
+{
+    public string? Title { get; init; } = Title?.Trim();
+}
+[ModelBinder(typeof(SearchQueryBinder<CardSearchDto>))]
 public record CardSearchDto
 (
-    int PageNumber = 1,
-    int PageSize = 10,
-    string? searchTerm = null,
-    DateTime? DueDate = null,
-    int? Position = null,
-    Guid? ListId = null,
-    bool? Status = null,
-    DateTime? StartDate = null,
-    DateTime? EndDate = null,
-    DateTime? ReminderDate = null,
-    bool? IsArchived = null
-);
+    int PageNumber,
+    int PageSize,
+    string? SearchTerm,
+    Guid? ListId,
+    bool? IsArchived,
+    DateOnly? DueDate,
+    DateTimeOffset? DueBefore,
+    DateTimeOffset? StartFrom,
+    bool? IsDueComplete
+) : ISearchQuery<CardSearchDto>
+{
+    public static CardSearchDto Read(QueryReader query) => new(
+        query.PageNumber(),
+        query.PageSize(),
+        query.Text("searchTerm"),
+        query.Id("listId"),
+        query.Flag("isArchived"),
+        query.Day("dueDate"),
+        query.Timestamp("dueBefore"),
+        query.Timestamp("startFrom"),
+        query.Flag("isDueComplete"));
+}

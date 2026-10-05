@@ -31,15 +31,6 @@ public class UsersController : ApiControllerBase
     [HttpGet("username-exists")]
     public async Task<ActionResult<ApiResponse<bool>>> CheckUserNameExists([FromQuery][Required] string username)
     {
-        if(!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<bool>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _userService.UserNameExistsAsync(username);
         return Ok(response);
     }
@@ -47,15 +38,6 @@ public class UsersController : ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<UserDto>>> CreateUser([FromBody] CreateUserDto createUserDto)
     {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<UserDto>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _userService.CreateAsync(createUserDto);
         if (!response.Success)
         {
@@ -67,15 +49,6 @@ public class UsersController : ApiControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<UserDto>>> UpdateUser(Guid id, [FromBody] UpdateUserDto updateUserDto)
     {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<UserDto>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _userService.UpdateAsync(id, updateUserDto);
         return ToActionResult(response);
     }

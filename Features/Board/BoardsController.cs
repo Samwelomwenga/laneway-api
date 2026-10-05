@@ -17,7 +17,7 @@ public class BoardsController: ApiControllerBase
     public async Task<ActionResult<PagedResponse<BoardDto>>> GetBoards([FromQuery] BoardSearchDto searchDto)
     {
         var boards = await _boardService.GetAllAsync(searchDto);
-        return Ok(boards);
+        return ToActionResult(boards);
     }
 
     [HttpGet("{id}")]
@@ -30,15 +30,6 @@ public class BoardsController: ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<BoardDto>>> CreateBoard([FromBody] CreateBoardDto createBoardDto)
     {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<BoardDto>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _boardService.CreateAsync(createBoardDto);
         if(!response.Success)
         {
@@ -51,15 +42,6 @@ public class BoardsController: ApiControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<BoardDto>>> UpdateBoard(Guid id, [FromBody] UpdateBoardDto updateBoardDto)
     {
-        if(!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<BoardDto>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _boardService.UpdateAsync(id, updateBoardDto);
         return ToActionResult(response);
     }

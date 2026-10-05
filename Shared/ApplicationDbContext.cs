@@ -16,6 +16,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<Account> Accounts { get; set; }
 
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.Properties<Enum>().HaveConversion<string>();
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -92,9 +97,35 @@ public class ApplicationDbContext : DbContext
                 .IsRequired(false);
         });
 
-        modelBuilder.Entity<Card>()
-            .HasMany(c => c.Labels)
-            .WithMany(l => l.Cards)
-            .UsingEntity(j => j.ToTable("CardLabels"));
+        modelBuilder.Entity<WorkSpace>(entity =>
+        {
+            entity.Property(ws => ws.Name).HasColumnType($"varchar({FieldLimits.WorkspaceName})");
+            entity.Property(ws => ws.Description).HasColumnType($"varchar({FieldLimits.WorkspaceDescription})");
+        });
+
+        modelBuilder.Entity<Board>(entity =>
+        {
+            entity.Property(b => b.Name).HasColumnType($"varchar({FieldLimits.BoardName})");
+            entity.Property(b => b.Description).HasColumnType($"varchar({FieldLimits.BoardDescription})");
+        });
+
+        modelBuilder.Entity<List>(entity =>
+        {
+            entity.Property(l => l.Name).HasColumnType($"varchar({FieldLimits.ListName})");
+        });
+
+        modelBuilder.Entity<Card>(entity =>
+        {
+            entity.Property(c => c.Title).HasColumnType($"varchar({FieldLimits.CardTitle})");
+            entity.Property(c => c.Description).HasColumnType($"varchar({FieldLimits.CardDescription})");
+            entity.HasMany(c => c.Labels)
+                .WithMany(l => l.Cards)
+                .UsingEntity(j => j.ToTable("CardLabels"));
+        });
+
+        modelBuilder.Entity<Label>(entity =>
+        {
+            entity.Property(l => l.Name).HasColumnType($"varchar({FieldLimits.LabelName})");
+        });
     }
 }

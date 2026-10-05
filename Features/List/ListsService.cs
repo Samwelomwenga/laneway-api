@@ -8,7 +8,7 @@ public interface IListService
     Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListDto updateListDto);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
     Task<ApiResponse<ListDto>> GetByIdAsync(Guid id);
-    Task<PagedResponse<ListDto>> GetAllAsync(ListSearchDto searchDto);
+    Task<ApiResponse<List<ListDto>>> GetAllAsync(ListSearchDto searchDto);
 }
 
 public class ListService : IListService
@@ -22,6 +22,12 @@ public class ListService : IListService
 
     public async Task<ApiResponse<ListDto>> CreateAsync(CreateListDto createListDto)
     {
+        var boardId = createListDto.BoardId!.Value;
+        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
+        {
+            return BoardNotFound(boardId);
+        }
+
         var list = MapToEntity(createListDto);
 
         _context.Lists.Add(list);
@@ -41,11 +47,17 @@ public class ListService : IListService
             return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
         }
 
-        list.Name = updateListDto.Name;
-        list.Position = updateListDto.Position;
-        list.BoardId = updateListDto.BoardId;
+        var boardId = updateListDto.BoardId!.Value;
+        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
+        {
+            return BoardNotFound(boardId);
+        }
+
+        list.Name = updateListDto.Name!;
+        list.Position = updateListDto.Position!.Value;
+        list.BoardId = boardId;
         list.Color = updateListDto.Color;
-        list.IsArchived = updateListDto.IsArchived;
+        list.IsArchived = updateListDto.IsArchived!.Value;
         list.UpdatedAt = DateTime.UtcNow;
         list.UpdatedBy = Guid.NewGuid();
 
@@ -83,42 +95,43 @@ public class ListService : IListService
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List retrieved successfully", 200);
     }
 
-    public async Task<PagedResponse<ListDto>> GetAllAsync(ListSearchDto searchDto)
+    public async Task<ApiResponse<List<ListDto>>> GetAllAsync(ListSearchDto searchDto)
     {
+        if (searchDto.BoardId is { } filterBoardId && !await _context.Boards.AnyAsync(b => b.Id == filterBoardId))
+        {
+            return ReferenceErrors.NotFound<List<ListDto>>("boardId", "Board", filterBoardId);
+        }
+
         var query = _context.Lists.AsQueryable();
 
-        if (searchDto.BoardId.HasValue)
+        if (searchDto.SearchTerm is { } term)
         {
-            query = query.Where(l => l.BoardId == searchDto.BoardId.Value);
+            query = query.Where(l => l.Name.ToLower().Contains(term.ToLower()));
         }
 
-        if (searchDto.IsArchived.HasValue)
+        if (searchDto.BoardId is { } boardId)
         {
-            query = query.Where(l => l.IsArchived == searchDto.IsArchived.Value);
+            query = query.Where(l => l.BoardId == boardId);
         }
 
-        if (!string.IsNullOrEmpty(searchDto.SearchTerm))
+        if (searchDto.IsArchived is { } isArchived)
         {
-            query = query.Where(l => l.Name.Contains(searchDto.SearchTerm));
+            query = query.Where(l => l.IsArchived == isArchived);
         }
 
-        var totalCount = await query.CountAsync();
-        var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
-        var lists = await query
-            .OrderBy(l => l.Position)
-            .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
-            .Include(l => l.Cards)
-            .ToListAsync();
+        var (lists, totalCount) = await PagedQuery.ReadAsync(
+            query.OrderBy(l => l.Position).Include(l => l.Cards),
+            pageNumber: searchDto.PageNumber,
+            pageSize: searchDto.PageSize);
 
         var listDtos = lists.Select(l => MapToDto(l, l.Cards.Select(c => c.Id).ToList())).ToList();
 
         return PagedResponse<ListDto>.SuccessResponse(
             listDtos,
             totalCount,
-            searchDto.PageSize,
-            searchDto.PageNumber,
-            "Lists retrieved successfully"
+            pageSize: searchDto.PageSize,
+            currentPage: searchDto.PageNumber,
+            message: "Lists retrieved successfully"
         );
     }
 
@@ -139,16 +152,20 @@ public class ListService : IListService
         );
     }
 
+    private static ApiResponse<ListDto> BoardNotFound(Guid boardId) =>
+        ApiResponse<ListDto>.ErrorResponse("A referenced resource does not exist", 400,
+            [new ApiError("boardId", ErrorCodes.NotFound, $"Board {boardId} does not exist.")]);
+
     private static List MapToEntity(CreateListDto createListDto)
     {
         return new List
         {
             Id = Guid.NewGuid(),
-            Name = createListDto.Name,
-            Position = createListDto.Position,
-            BoardId = createListDto.BoardId,
+            Name = createListDto.Name!,
+            Position = createListDto.Position!.Value,
+            BoardId = createListDto.BoardId!.Value,
             Color = createListDto.Color,
-            IsArchived = createListDto.IsArchived,
+            IsArchived = createListDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()
         };

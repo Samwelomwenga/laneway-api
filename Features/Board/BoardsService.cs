@@ -4,7 +4,7 @@ namespace DefaultNamespace;
 
 public interface IBoardService
 {
-    Task<PagedResponse<BoardDto>> GetAllAsync(BoardSearchDto searchDto);
+    Task<ApiResponse<List<BoardDto>>> GetAllAsync(BoardSearchDto searchDto);
     Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto);
     Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardDto updateBoardDto);
@@ -20,47 +20,50 @@ public class BoardService : IBoardService
         _context = context;
     }
 
-    public async Task<PagedResponse<BoardDto>> GetAllAsync(BoardSearchDto searchDto)
+    public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(BoardSearchDto searchDto)
     {
+        if (searchDto.WorkspaceId is { } filterWorkspaceId
+            && !await _context.WorkSpaces.AnyAsync(ws => ws.Id == filterWorkspaceId))
+        {
+            return ReferenceErrors.NotFound<List<BoardDto>>("workspaceId", "Workspace", filterWorkspaceId);
+        }
+
         var query = _context.Boards.AsQueryable();
 
-        if (!string.IsNullOrEmpty(searchDto.SearchTerm))
+        if (searchDto.SearchTerm is { } term)
         {
-            query = query.Where(b => b.Name.Contains(searchDto.SearchTerm) ||
-                                     (b.Title != null && b.Title.Contains(searchDto.SearchTerm)) ||
-                                     (b.Description != null && b.Description.Contains(searchDto.SearchTerm)));
-        }
-        if (searchDto.IsArchived.HasValue)
-        {
-            query = query.Where(b => b.IsArchived == searchDto.IsArchived.Value);
+            query = query.Where(b => b.Name.ToLower().Contains(term.ToLower()) ||
+                                     b.Description.ToLower().Contains(term.ToLower()));
         }
 
-        if (searchDto.WorkspaceId.HasValue)
+        if (searchDto.WorkspaceId is { } workspaceId)
         {
-            query = query.Where(b => b.WorkspaceId == searchDto.WorkspaceId.Value);
+            query = query.Where(b => b.WorkspaceId == workspaceId);
         }
 
-        if (!string.IsNullOrEmpty(searchDto.Visibility))
+        if (searchDto.IsArchived is { } isArchived)
         {
-            query = query.Where(b => b.Visibility == searchDto.Visibility);
+            query = query.Where(b => b.IsArchived == isArchived);
         }
 
-        var totalCount = await query.CountAsync();
-        var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
-        var boards = await query
-            .OrderBy(b => b.CreatedAt)
-            .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
-            .Include(b => b.Lists)
-            .ToListAsync();
+        if (searchDto.Visibility is { } visibility)
+        {
+            query = query.Where(b => b.Visibility == visibility);
+        }
+
+        var (boards, totalCount) = await PagedQuery.ReadAsync(
+            query.OrderBy(b => b.CreatedAt).Include(b => b.Lists),
+            pageNumber: searchDto.PageNumber,
+            pageSize: searchDto.PageSize);
+
         var boardDtos = boards.Select(b => MapToDto(b, b.Lists.Select(l => l.Id).ToList())).ToList();
 
         return PagedResponse<BoardDto>.SuccessResponse(
             boardDtos,
             totalCount,
-            searchDto.PageSize,
-            searchDto.PageNumber,
-            "Boards retrieved successfully"
+            pageSize: searchDto.PageSize,
+            currentPage: searchDto.PageNumber,
+            message: "Boards retrieved successfully"
         );
     }
 
@@ -79,6 +82,12 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardDto createBoardDto)
     {
+        var workspaceId = createBoardDto.WorkspaceId!.Value;
+        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
+        {
+            return WorkspaceNotFound(workspaceId);
+        }
+
         var boardEntity = MapToEntity(createBoardDto);
         _context.Boards.Add(boardEntity);
         await _context.SaveChangesAsync();
@@ -96,13 +105,17 @@ public class BoardService : IBoardService
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
         }
 
-        existingBoard.Name = updateBoardDto.Name;
-        existingBoard.Description = updateBoardDto.Description;
-        existingBoard.Title = updateBoardDto.Title;
-        existingBoard.WorkspaceId = updateBoardDto.WorkspaceId;
-        existingBoard.OwnerId = updateBoardDto.OwnerId;
-        existingBoard.Visibility = updateBoardDto.Visibility;
-        existingBoard.IsArchived = updateBoardDto.IsArchived;
+        var workspaceId = updateBoardDto.WorkspaceId!.Value;
+        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
+        {
+            return WorkspaceNotFound(workspaceId);
+        }
+
+        existingBoard.Name = updateBoardDto.Name!;
+        existingBoard.Description = updateBoardDto.Description ?? string.Empty;
+        existingBoard.WorkspaceId = workspaceId;
+        existingBoard.Visibility = updateBoardDto.Visibility!.Value;
+        existingBoard.IsArchived = updateBoardDto.IsArchived!.Value;
         existingBoard.UpdatedAt = DateTime.UtcNow;
         existingBoard.UpdatedBy = Guid.NewGuid();
 
@@ -130,10 +143,8 @@ public class BoardService : IBoardService
         (
             board.Id,
             board.Name,
-            board.Description ?? string.Empty,
-            board.Title,
+            board.Description,
             board.WorkspaceId,
-            board.OwnerId,
             board.Visibility,
             board.IsArchived,
             listIds ?? new List<Guid>(),
@@ -144,18 +155,20 @@ public class BoardService : IBoardService
         );
     }
 
+    private static ApiResponse<BoardDto> WorkspaceNotFound(Guid workspaceId) =>
+        ApiResponse<BoardDto>.ErrorResponse("A referenced resource does not exist", 400,
+            [new ApiError("workspaceId", ErrorCodes.NotFound, $"Workspace {workspaceId} does not exist.")]);
+
     private static Board MapToEntity(CreateBoardDto createBoardDto)
     {
         return new Board
         {
             Id = Guid.NewGuid(),
-            Name = createBoardDto.Name,
-            Description = createBoardDto.Description,
-            Title = createBoardDto.Title,
-            WorkspaceId = createBoardDto.WorkspaceId,
-            OwnerId = createBoardDto.OwnerId,
-            Visibility = createBoardDto.Visibility,
-            IsArchived = createBoardDto.IsArchived,
+            Name = createBoardDto.Name!,
+            Description = createBoardDto.Description ?? string.Empty,
+            WorkspaceId = createBoardDto.WorkspaceId!.Value,
+            Visibility = createBoardDto.Visibility!.Value,
+            IsArchived = createBoardDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = Guid.NewGuid()
         };

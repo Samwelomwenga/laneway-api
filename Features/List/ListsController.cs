@@ -17,7 +17,7 @@ public class ListsController: ApiControllerBase
     public async Task<ActionResult<PagedResponse<ListDto>>> GetLists([FromQuery] ListSearchDto searchDto)
     {
         var response = await _listService.GetAllAsync(searchDto);
-        return Ok(response);
+        return ToActionResult(response);
     }
 
     [HttpGet("{id}")]
@@ -30,15 +30,6 @@ public class ListsController: ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<ListDto>>> CreateList([FromBody] CreateListDto createListDto)
     {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<ListDto>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _listService.CreateAsync(createListDto);
         if (!response.Success)
         {
@@ -50,15 +41,6 @@ public class ListsController: ApiControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<ListDto>>> UpdateList(Guid id, [FromBody] UpdateListDto updateListDto)
     {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-            var errorResponse = ApiResponse<ListDto>.ErrorResponse("Invalid data", 400, errors);
-            return BadRequest(errorResponse);
-        }
         var response = await _listService.UpdateAsync(id, updateListDto);
         return ToActionResult(response);
     }

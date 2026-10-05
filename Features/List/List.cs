@@ -5,7 +5,7 @@ public class List: BaseEntity
     public required string Name { get; set; }
     public int Position { get; set; }
     public required Guid BoardId { get; set; }
-    public required string Color { get; set; }
+    public Color? Color { get; set; }
     public bool IsArchived { get; set; }
     public List<Card> Cards { get; set; } = new List<Card>();
 }
