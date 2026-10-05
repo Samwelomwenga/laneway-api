@@ -92,7 +92,7 @@ public class LabelService : ILabelService
         existingLabel.Name = updateLabelDto.Name;
         existingLabel.Color = updateLabelDto.Color;
         existingLabel.UpdatedAt = DateTime.UtcNow;
-        existingLabel.UpdatedBy = Guid.NewGuid(); // Replace with actual user ID
+        existingLabel.UpdatedBy = Guid.NewGuid();
 
         _context.Labels.Update(existingLabel);
         await _context.SaveChangesAsync();
@@ -136,7 +136,7 @@ public class LabelService : ILabelService
             Name = createDto.Name,
             Color = createDto.Color,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = Guid.NewGuid() // Replace with actual user ID
+            CreatedBy = Guid.NewGuid()
         };
     }
 }

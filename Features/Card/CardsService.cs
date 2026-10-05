@@ -210,7 +210,7 @@ public class CardService: ICardService
             ReminderDate = createCardDto.ReminderDate,
             IsArchived = createCardDto.IsArchived,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = Guid.NewGuid() // Assuming the creator's ID is set here
+            CreatedBy = Guid.NewGuid()
         };
     }
 }

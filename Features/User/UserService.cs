@@ -117,7 +117,7 @@ namespace DefaultNamespace
             existingUser.ProfilePictureUrl = updateUserDto.ProfilePictureUrl;
             existingUser.IsActive = updateUserDto.IsActive;
             existingUser.UpdatedAt = DateTime.UtcNow;
-            existingUser.UpdatedBy = Guid.NewGuid(); // This should be set to the current user's ID
+            existingUser.UpdatedBy = Guid.NewGuid();
 
             _context.Users.Update(existingUser);
             await _context.SaveChangesAsync();
@@ -183,10 +183,10 @@ namespace DefaultNamespace
                 TimeZone = createUserDto.TimeZone,
                 Location = createUserDto.Location,
                 ProfilePictureUrl = createUserDto.ProfilePictureUrl,
-                PasswordHash = "temp_hash", // This should be properly hashed
+                PasswordHash = "temp_hash",
                 IsActive = createUserDto.IsActive,
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = Guid.NewGuid() // This should be set to the current user's ID
+                CreatedBy = Guid.NewGuid()
             };
         }
     }

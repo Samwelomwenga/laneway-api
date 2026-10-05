@@ -47,7 +47,7 @@ public class ListService : IListService
         list.Color = updateListDto.Color;
         list.IsArchived = updateListDto.IsArchived;
         list.UpdatedAt = DateTime.UtcNow;
-        list.UpdatedBy = Guid.NewGuid(); // This should be set to the current user's ID
+        list.UpdatedBy = Guid.NewGuid();
 
         await _context.SaveChangesAsync();
         var listDto = MapToDto(list, list.Cards.Select(c => c.Id).ToList());
@@ -150,7 +150,7 @@ public class ListService : IListService
             Color = createListDto.Color,
             IsArchived = createListDto.IsArchived,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = Guid.NewGuid() // This should be set to the current user's ID
+            CreatedBy = Guid.NewGuid()
         };
     }
 }

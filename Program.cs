@@ -4,13 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllers();
 
-// Add OpenAPI/Swagger services
 builder.Services.AddOpenApi();
 
-// Register application services
 builder.Services.AddScoped<IBoardService, BoardService>();
 builder.Services.AddScoped<ICardService, CardService>();
 builder.Services.AddScoped<ILabelService, LabelService>();

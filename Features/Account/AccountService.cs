@@ -110,7 +110,7 @@ namespace DefaultNamespace
                 account.User.Location,
                 account.User.ProfilePictureUrl,
                 account.User.IsActive,
-                new List<AccountDto>(), // Prevent circular reference
+                new List<AccountDto>(),
                 account.User.CreatedAt,
                 account.User.UpdatedAt,
                 account.User.CreatedBy,

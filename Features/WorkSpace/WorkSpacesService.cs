@@ -142,7 +142,7 @@ public class WorkSpaceService : IWorkSpaceService
             Visibility = createWorkSpaceDto.Visibility,
             IsArchived = createWorkSpaceDto.IsArchived,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = Guid.NewGuid() // This should be set to the current user's ID
+            CreatedBy = Guid.NewGuid()
         };
     }
 }

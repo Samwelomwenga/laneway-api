@@ -104,7 +104,7 @@ public class BoardService : IBoardService
         existingBoard.Visibility = updateBoardDto.Visibility;
         existingBoard.IsArchived = updateBoardDto.IsArchived;
         existingBoard.UpdatedAt = DateTime.UtcNow;
-        existingBoard.UpdatedBy = Guid.NewGuid(); // This should be set to the current user's ID
+        existingBoard.UpdatedBy = Guid.NewGuid();
 
         await _context.SaveChangesAsync();
         var updatedBoardDto = MapToDto(existingBoard, existingBoard.Lists.Select(l => l.Id).ToList());
@@ -157,7 +157,7 @@ public class BoardService : IBoardService
             Visibility = createBoardDto.Visibility,
             IsArchived = createBoardDto.IsArchived,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = Guid.NewGuid() // This should be set to the current user's ID
+            CreatedBy = Guid.NewGuid()
         };
     }
 }

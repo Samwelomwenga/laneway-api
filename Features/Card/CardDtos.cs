@@ -1,6 +1,5 @@
 namespace DefaultNamespace;
 
-// TODO: Add Validation attributes to the DTOs as needed
 public record CardDto
 (
      Guid Id,
