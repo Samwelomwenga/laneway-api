@@ -36,18 +36,19 @@ public sealed class TestStack : IAsyncLifetime
 
     public async Task DisposeAsync() => await _postgres.DisposeAsync();
 
-    public async Task<string> NewDatabaseAsync()
+    public async Task<Guid> NewDatabaseAsync()
     {
-        var name = $"test_{Guid.NewGuid():n}";
-        await RunAsync($"""CREATE DATABASE "{name}" TEMPLATE "{TemplateDatabase}" """);
-        return ConnectionStringFor(name);
+        var id = Guid.NewGuid();
+        await RunAsync($"""CREATE DATABASE "{DatabaseName(id)}" TEMPLATE "{TemplateDatabase}" """);
+        return id;
     }
 
-    public async Task DropDatabaseAsync(string connectionString)
-    {
-        var name = new NpgsqlConnectionStringBuilder(connectionString).Database;
-        await RunAsync($"""DROP DATABASE IF EXISTS "{name}" WITH (FORCE)""");
-    }
+    public string ConnectionStringFor(Guid id) => ConnectionStringFor(DatabaseName(id));
+
+    public Task DropDatabaseAsync(Guid id) =>
+        RunAsync($"""DROP DATABASE IF EXISTS "{DatabaseName(id)}" WITH (FORCE)""");
+
+    private static string DatabaseName(Guid id) => $"test_{id:n}";
 
     private async Task MigrateTemplateAsync()
     {
@@ -171,13 +172,11 @@ public sealed class TestStack : IAsyncLifetime
 
     private async Task RunAsync(string sql)
     {
-        await using var connection = new NpgsqlConnection(ConnectionStringFor("postgres"));
-        await connection.OpenAsync();
-        await using var command = connection.CreateCommand();
-#pragma warning disable CA2100
-        command.CommandText = sql;
-#pragma warning restore CA2100
-        await command.ExecuteNonQueryAsync();
+        var result = await _postgres.ExecScriptAsync(sql);
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"psql failed: {result.Stderr}");
+        }
     }
 
     // Pooling off, so a database has no connection left to stop it being copied or dropped.

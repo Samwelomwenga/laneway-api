@@ -12,7 +12,7 @@ public abstract class ApiTests : IAsyncLifetime
 
     private ApiFactory? _factory;
     private HttpClient? _client;
-    private string? _connectionString;
+    private Guid? _databaseId;
 
     protected ApiTests(TestStack stack) => _stack = stack;
 
@@ -25,8 +25,8 @@ public abstract class ApiTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _connectionString = await _stack.NewDatabaseAsync();
-        _factory = new ApiFactory(_connectionString);
+        _databaseId = await _stack.NewDatabaseAsync();
+        _factory = new ApiFactory(_stack.ConnectionStringFor(_databaseId.Value));
         _client = _factory.CreateApiClient();
         ActorUser = await CreateUserAsync();
     }
@@ -39,9 +39,9 @@ public abstract class ApiTests : IAsyncLifetime
             await _factory.DisposeAsync();
         }
 
-        if (_connectionString is not null)
+        if (_databaseId is { } databaseId)
         {
-            await _stack.DropDatabaseAsync(_connectionString);
+            await _stack.DropDatabaseAsync(databaseId);
         }
     }
 
