@@ -67,6 +67,14 @@ public sealed record DeleteBoardData(ActorRef Actor, WorkspaceRef Workspace, Boa
 
 public sealed record BoardOrigin(WorkspaceRef Workspace);
 
+public sealed record CopyBoardData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    BoardRef Source,
+    BoardOrigin? From,
+    IReadOnlyList<BoardCopyPart> Keep);
+
 public sealed record BoardFields(Was<string>? Name, Was<string>? Description, Was<BoardVisibility>? Visibility)
 {
     public static BoardFields Changed(EntityEntry<Board> tracked) => new(
@@ -93,7 +101,26 @@ public sealed record MoveListData(
 
 public sealed record DeleteListData(ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, ListRef List);
 
-public sealed record ListOrigin(WorkspaceRef? Workspace, BoardRef Board);
+public sealed record ListOrigin(WorkspaceRef? Workspace, BoardRef Board)
+{
+    public static ListOrigin Between(BoardChain from, BoardChain to)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
+
+        return new ListOrigin(from.Workspace.Id == to.Workspace.Id ? null : from.Workspace, from.Board);
+    }
+}
+
+public sealed record CopyListData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    ListRef Source,
+    ListOrigin? From,
+    IReadOnlyList<CopyPart> Keep,
+    IReadOnlyList<LabelRef>? CreatedLabels);
 
 public sealed record PositionChange(double Old, double New);
 
@@ -152,9 +179,32 @@ public sealed record DeleteCardData(
 public sealed record CardLabelData(
     ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, ListRef List, CardRef Card, LabelRef Label);
 
-public sealed record CardOrigin(WorkspaceRef? Workspace, BoardRef? Board, ListRef List);
+public sealed record CardOrigin(WorkspaceRef? Workspace, BoardRef? Board, ListRef List)
+{
+    public static CardOrigin Between(ListChain from, ListChain to)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
+
+        return new CardOrigin(
+            from.Workspace.Id == to.Workspace.Id ? null : from.Workspace,
+            from.Board.Id == to.Board.Id ? null : from.Board,
+            from.List);
+    }
+}
 
 public sealed record LabelSwap(LabelRef From, LabelRef To, bool Created);
+
+public sealed record CopyCardData(
+    ActorRef Actor,
+    WorkspaceRef Workspace,
+    BoardRef Board,
+    ListRef List,
+    CardRef Card,
+    CardRef Source,
+    CardOrigin? From,
+    IReadOnlyList<CopyPart> Keep,
+    IReadOnlyList<LabelSwap>? LabelSwaps);
 
 public sealed record CardFields(
     Was<string>? Title,

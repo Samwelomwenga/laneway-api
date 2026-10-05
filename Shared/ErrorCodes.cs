@@ -9,6 +9,7 @@ public static class ErrorCodes
     public const string OutOfRange = "outOfRange";
     public const string UnknownField = "unknownField";
     public const string RequiresDueDate = "requiresDueDate";
+    public const string RequiresCards = "requiresCards";
     public const string StartAfterDue = "startAfterDue";
     public const string NotFound = "notFound";
     public const string Duplicate = "duplicate";
@@ -25,4 +26,5 @@ public static class ErrorCodes
     public const string TooLarge = "tooLarge";
     public const string NotImage = "notImage";
     public const string NotAuthor = "notAuthor";
+    public const string InternalError = "internalError";
 }

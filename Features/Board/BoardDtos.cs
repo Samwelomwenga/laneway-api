@@ -43,6 +43,16 @@ public record MoveBoardDto
     Guid? WorkspaceId
 );
 
+public record CopyBoardDto
+(
+    Guid? WorkspaceId,
+    string? Name,
+    List<BoardCopyPart>? Keep
+)
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
+
 [ModelBinder(typeof(SearchQueryBinder<BoardSearchDto>))]
 public record BoardSearchDto
 (

@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using DefaultNamespace;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace prodigy_board_API.Tests;
@@ -12,6 +14,7 @@ public abstract class ApiTests : IAsyncLifetime
 
     private ApiFactory? _factory;
     private HttpClient? _client;
+    private HttpClient? _noRedirects;
     private Guid? _databaseId;
 
     protected ApiTests(TestStack stack) => _stack = stack;
@@ -22,6 +25,10 @@ public abstract class ApiTests : IAsyncLifetime
 
     private HttpClient Client =>
         _client ?? throw new InvalidOperationException("The test host isn't up yet.");
+
+    private HttpClient NoRedirects =>
+        _noRedirects ??= (_factory ?? throw new InvalidOperationException("The test host isn't up yet."))
+            .CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
     public async Task InitializeAsync()
     {
@@ -34,6 +41,7 @@ public abstract class ApiTests : IAsyncLifetime
     public async Task DisposeAsync()
     {
         _client?.Dispose();
+        _noRedirects?.Dispose();
         if (_factory is not null)
         {
             await _factory.DisposeAsync();
@@ -156,6 +164,27 @@ public abstract class ApiTests : IAsyncLifetime
     protected Task<HttpResponseMessage> MoveListAsync(
         Guid id, Guid boardId, object? position = null, Guid? before = null, Guid? after = null) =>
         PutAsync($"/api/v1/lists/{id}/position", new { boardId, position, before, after });
+
+    protected async Task<List<ListDto>> ReadListsOfBoardAsync(Guid boardId)
+    {
+        using var response = await GetAsync($"/api/v1/lists?boardId={boardId}&archived=Include&pageSize=100");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadPage<ListDto>()).Entries;
+    }
+
+    protected async Task<List<LabelDto>> ReadLabelsOfBoardAsync(Guid boardId)
+    {
+        using var response = await GetAsync($"/api/v1/labels?boardId={boardId}&pageSize=100");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadPage<LabelDto>()).Entries;
+    }
+
+    protected async Task<BoardDto> ReadBoardAsync(Guid id)
+    {
+        using var response = await GetAsync($"/api/v1/boards/{id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadEnvelope<BoardDto>()).Data!;
+    }
 
     protected async Task<ListDto> ReadListAsync(Guid id)
     {
@@ -350,6 +379,141 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected Task<HttpResponseMessage> RemoveCommentAsync(Guid cardId, Guid id, Guid? actor = null) =>
         DeleteAsync($"{CommentPath(cardId)}/{id}", actor);
+
+    protected async Task<T> FromDatabaseAsync<T>(Func<ApplicationDbContext, Task<T>> read)
+    {
+        ArgumentNullException.ThrowIfNull(read);
+
+        var factory = _factory ?? throw new InvalidOperationException("The test host isn't up yet.");
+        await using var scope = factory.Services.CreateAsyncScope();
+        return await read(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
+    }
+
+    protected async Task<T> FromServicesAsync<T>(Func<IServiceProvider, Task<T>> use)
+    {
+        ArgumentNullException.ThrowIfNull(use);
+
+        var factory = _factory ?? throw new InvalidOperationException("The test host isn't up yet.");
+        await using var scope = factory.Services.CreateAsyncScope();
+        return await use(scope.ServiceProvider);
+    }
+
+    protected static string CopyPath(Guid cardId) => $"/api/v1/cards/{cardId}/copies";
+
+    protected static string ListCopyPath(Guid listId) => $"/api/v1/lists/{listId}/copies";
+
+    protected static string BoardCopyPath(Guid boardId) => $"/api/v1/boards/{boardId}/copies";
+
+    protected static string CopyJobPath(Guid id) => $"/api/v1/copy-jobs/{id}";
+
+    protected Task<HttpResponseMessage> SendCardCopyAsync(Guid id, object body, Guid? actor = null) =>
+        PostAsync(CopyPath(id), body, actor);
+
+    protected Task<HttpResponseMessage> SendListCopyAsync(Guid id, object body, Guid? actor = null) =>
+        PostAsync(ListCopyPath(id), body, actor);
+
+    protected async Task<CopyJobDto> CopyListAsync(
+        Guid id,
+        Guid boardId,
+        string? name = null,
+        IEnumerable<string>? keep = null,
+        object? position = null,
+        Guid? before = null,
+        Guid? after = null,
+        Guid? actor = null)
+    {
+        using var response = await SendListCopyAsync(
+            id, new { boardId, name, keep, position, before, after }, actor);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        return (await response.ReadEnvelope<CopyJobDto>()).Data!;
+    }
+
+    protected Task<HttpResponseMessage> SendBoardCopyAsync(Guid id, object body, Guid? actor = null) =>
+        PostAsync(BoardCopyPath(id), body, actor);
+
+    protected async Task<CopyJobDto> CopyBoardAsync(
+        Guid id,
+        Guid workspaceId,
+        string? name = null,
+        IEnumerable<string>? keep = null,
+        Guid? actor = null)
+    {
+        using var response = await SendBoardCopyAsync(id, new { workspaceId, name, keep }, actor);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        return (await response.ReadEnvelope<CopyJobDto>()).Data!;
+    }
+
+    protected async Task<CopyJobDto> ReadCopyJobAsync(Guid id)
+    {
+        using var response = await GetAsync(CopyJobPath(id));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadEnvelope<CopyJobDto>()).Data!;
+    }
+
+    protected async Task<CopyJobDto> AwaitCopyJobAsync(Guid id, CopyJobStatus status = CopyJobStatus.Succeeded)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        while (true)
+        {
+            var job = await ReadCopyJobAsync(id);
+            if (job.Status == status)
+            {
+                return job;
+            }
+
+            if (job.FinishedAt is not null || DateTime.UtcNow > deadline)
+            {
+                throw new InvalidOperationException(
+                    $"Copy job {id} is {job.Status}, not {status}. Errors: {Described(job.Errors)}");
+            }
+
+            await Task.Delay(100);
+        }
+    }
+
+    protected async Task<List<CardDto>> ReadCardsOfListAsync(Guid listId) =>
+        (await ReadCardsAsync($"listId={listId}&pageSize=100")).Entries;
+
+    private static string Described(List<ApiError>? errors) =>
+        errors is null ? "none" : string.Join("; ", errors.Select(error => $"{error.Field}/{error.Code}"));
+
+    protected async Task<CardDto> CopyCardAsync(
+        Guid id,
+        Guid listId,
+        string? title = null,
+        IEnumerable<string>? keep = null,
+        object? position = null,
+        Guid? before = null,
+        Guid? after = null)
+    {
+        using var response = await SendCardCopyAsync(
+            id, new { listId, title, keep, position, before, after });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.ReadEnvelope<CardDto>()).Data!;
+    }
+
+    protected async Task<List<ChecklistDto>> ReadChecklistsAsync(Guid cardId)
+    {
+        using var response = await GetAsync($"/api/v1/checklists?cardId={cardId}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadPage<ChecklistDto>()).Entries;
+    }
+
+    protected async Task<List<AttachmentDto>> ReadAttachmentsAsync(Guid cardId)
+    {
+        using var response = await GetAsync($"{AttachmentPath(cardId)}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadEnvelope<List<AttachmentDto>>()).Data!;
+    }
+
+    protected async Task<byte[]> DownloadAttachmentAsync(Guid cardId, Guid id)
+    {
+        using var response = await NoRedirects.GetAsync($"{AttachmentPath(cardId)}/{id}/content");
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        using var storage = new HttpClient();
+        return await storage.GetByteArrayAsync(response.Headers.Location);
+    }
 
     protected async Task<ApiPage<CardDto>> ReadCardsAsync(string query)
     {

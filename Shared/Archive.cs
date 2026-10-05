@@ -199,6 +199,9 @@ public static class ArchiveErrors
     public static ApiResponse<T> NoCreate<T>(TreeItem archived, string field, TreeItem subject) =>
         Blocked<T>(archived, field, Describe(archived, subject));
 
+    public static ApiError NoCreateError(TreeItem archived, string field, TreeItem subject) =>
+        new(field, ErrorCodes.Archived, Describe(archived, subject));
+
     public static ApiResponse<T> RestoreFirst<T>(TreeItem archived, TreeItem subject) =>
         Blocked<T>(archived, null, $"{Describe(archived, subject)} Restore the {Word(archived)} first.");
 

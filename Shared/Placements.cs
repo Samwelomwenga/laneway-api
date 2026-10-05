@@ -19,6 +19,9 @@ public sealed class Placements
         return await InListAsync(listId, placement, moving: null);
     }
 
+    public Task<PlacementResult> CheckInListAsync(Guid listId, Placement placement) =>
+        InListAsync(listId, placement, moving: null);
+
     public async Task<PlacementResult> ResolveMoveInListAsync(Card card, Guid listId, Placement placement)
     {
         ArgumentNullException.ThrowIfNull(card);
@@ -26,6 +29,9 @@ public sealed class Placements
         await _context.LockListsAsync(card.ListId, listId);
         return await InListAsync(listId, placement, card);
     }
+
+    public Task<PlacementResult> CheckOnBoardAsync(Guid boardId, Placement placement) =>
+        OnBoardAsync(boardId, placement, moving: null);
 
     public async Task<PlacementResult> ResolveOnBoardAsync(Guid boardId, Placement placement)
     {

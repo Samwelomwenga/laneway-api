@@ -46,6 +46,19 @@ public record MoveListDto
     Guid? Before,
     Guid? After
 ) : IPlacing;
+public record CopyListDto
+(
+    Guid? BoardId,
+    string? Name,
+    List<CopyPart>? Keep,
+    PositionValue? Position,
+    Guid? Before,
+    Guid? After
+) : IPlacing
+{
+    public string? Name { get; init; } = Name?.Trim();
+}
+
 [ModelBinder(typeof(SearchQueryBinder<ListSearchDto>))]
 public record ListSearchDto
 (

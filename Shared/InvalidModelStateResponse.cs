@@ -55,7 +55,7 @@ public static partial class InvalidModelStateResponse
                 return new ApiError(field, ErrorCodes.UnknownField, $"'{field}' isn't a field on this request.");
             }
 
-            var valueType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+            var valueType = TypeAt(property.PropertyType, match.Groups["rest"].Value);
             if (valueType.IsEnum)
             {
                 return new ApiError(field, ErrorCodes.UnknownValue,
@@ -65,6 +65,24 @@ public static partial class InvalidModelStateResponse
 
         return new ApiError(field, ErrorCodes.InvalidFormat, $"'{field}' isn't in a valid format.");
     }
+
+    private static Type TypeAt(Type propertyType, string suffix)
+    {
+        var type = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
+        if (!suffix.StartsWith('[') || ElementType(type) is not { } element)
+        {
+            return type;
+        }
+
+        return Nullable.GetUnderlyingType(element) ?? element;
+    }
+
+    private static Type? ElementType(Type type) =>
+        type.GetInterfaces()
+            .Prepend(type)
+            .FirstOrDefault(contract =>
+                contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            ?.GetGenericArguments()[0];
 
     private static ApiError FromBindingKey(string key, ModelStateEntry entry)
     {

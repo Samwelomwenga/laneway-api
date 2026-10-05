@@ -170,7 +170,7 @@ public class ListService : IListService
         if (_context.Entry(list).Changed())
         {
             var to = await _tree.BoardAsync(boardId);
-            var origin = crossesBoards ? await OriginAsync(leaving, to) : null;
+            var origin = crossesBoards ? ListOrigin.Between(await _tree.BoardAsync(leaving), to) : null;
             await _activity.AddAsync(
                 ActivityType.MoveList,
                 new ActivityPlace(
@@ -292,12 +292,6 @@ public class ListService : IListService
             currentPage: searchDto.PageNumber,
             message: "Lists retrieved successfully"
         );
-    }
-
-    private async Task<ListOrigin> OriginAsync(Guid leftBoardId, BoardChain to)
-    {
-        var from = await _tree.BoardAsync(leftBoardId);
-        return new ListOrigin(from.Workspace.Id == to.Workspace.Id ? null : from.Workspace, from.Board);
     }
 
     private static ListDto MapToDto(List list, List<Guid>? cardIds = null)
