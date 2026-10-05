@@ -8,6 +8,12 @@ public sealed class ApiExceptionHandler : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
+        if (IsKestrelBodyTooLarge(exception))
+        {
+            httpContext.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+            return true;
+        }
+
         var response = exception switch
         {
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation } } =>
@@ -23,4 +29,7 @@ public sealed class ApiExceptionHandler : IExceptionHandler
         await httpContext.Response.WriteAsJsonAsync(response, cancellationToken);
         return true;
     }
+
+    private static bool IsKestrelBodyTooLarge(Exception exception) =>
+        exception is BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge };
 }

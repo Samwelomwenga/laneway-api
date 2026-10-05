@@ -38,6 +38,16 @@ public static class RowLocks
         }
     }
 
+    public static async Task<bool> TryLockCardAsync(this ApplicationDbContext context, Guid cardId)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var cards = await context.Cards
+            .FromSql($"SELECT * FROM \"Cards\" WHERE \"Id\" = {cardId} FOR UPDATE")
+            .ToListAsync();
+        return cards.Count > 0;
+    }
+
     public static async Task LockCardsAsync(this ApplicationDbContext context, params Guid[] cardIds)
     {
         ArgumentNullException.ThrowIfNull(context);

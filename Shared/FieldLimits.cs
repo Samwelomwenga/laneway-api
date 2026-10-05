@@ -13,4 +13,11 @@ public static class FieldLimits
     public const int ChecklistName = 100;
     public const int CheckItemName = 500;
     public const int CheckItemsPerChecklist = 200;
+    public const int AttachmentName = 256;
+    public const int AttachmentFileName = 256;
+    public const int AttachmentUrl = 2048;
+    public const int AttachmentMimeType = 255;
+    public const int AttachmentObjectKey = 512;
+    public const int AttachmentBytes = 10 * 1024 * 1024;
+    public const int AttachmentsPerCard = 100;
 }

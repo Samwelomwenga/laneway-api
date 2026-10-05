@@ -11,6 +11,7 @@ public interface ICardService
     Task<ApiResponse<List<CardDto>>> GetAllAsync(CardSearchDto searchDto);
     Task<ApiResponse<bool>> AddLabelAsync(Guid cardId, Guid labelId);
     Task<ApiResponse<bool>> RemoveLabelAsync(Guid cardId, Guid labelId);
+    Task<ApiResponse<bool>> SetCoverAsync(Guid id, CoverDto coverDto);
     Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
@@ -24,6 +25,7 @@ public class CardService: ICardService
     private readonly ArchiveGuard _archive;
     private readonly LabelMatching _labelMatching;
     private readonly CardCompletion _completion;
+    private readonly AttachmentCounts _attachments;
 
     public CardService(
         ApplicationDbContext context,
@@ -31,7 +33,8 @@ public class CardService: ICardService
         Placements placements,
         ArchiveGuard archive,
         LabelMatching labelMatching,
-        CardCompletion completion)
+        CardCompletion completion,
+        AttachmentCounts attachments)
     {
         _context = context;
         _actor = actor;
@@ -39,6 +42,7 @@ public class CardService: ICardService
         _archive = archive;
         _labelMatching = labelMatching;
         _completion = completion;
+        _attachments = attachments;
     }
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
@@ -72,7 +76,7 @@ public class CardService: ICardService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var cardDto = MapToDto(card, default);
+        var cardDto = MapToDto(card, default, attachmentCount: 0);
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card created successfully", 201);
     }
@@ -102,7 +106,6 @@ public class CardService: ICardService
         card.Description = updateCardDto.Description ?? string.Empty;
         card.DueDate = updateCardDto.DueDate;
         card.IsDueComplete = updateCardDto.IsDueComplete!.Value;
-        card.Cover = updateCardDto.Cover;
         card.StartDate = updateCardDto.StartDate;
         card.DueReminderMinutes = updateCardDto.DueReminderMinutes;
 
@@ -113,7 +116,7 @@ public class CardService: ICardService
 
         await _context.SaveChangesAsync();
 
-        var cardDto = MapToDto(card, await _completion.TallyAsync(id));
+        var cardDto = MapToDto(card, await _completion.TallyAsync(id), await _attachments.OnCardAsync(id));
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card updated successfully");
     }
@@ -199,7 +202,8 @@ public class CardService: ICardService
         await transaction.CommitAsync();
 
         return ApiResponse<CardDto>.SuccessResponse(
-            MapToDto(card, await _completion.TallyAsync(id)), "Card moved successfully");
+            MapToDto(card, await _completion.TallyAsync(id), await _attachments.OnCardAsync(id)),
+            "Card moved successfully");
     }
 
     public async Task<ApiResponse<CardDto>> GetByIdAsync(Guid id)
@@ -212,7 +216,7 @@ public class CardService: ICardService
             return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
         }
 
-        var cardDto = MapToDto(card, await _completion.TallyAsync(id));
+        var cardDto = MapToDto(card, await _completion.TallyAsync(id), await _attachments.OnCardAsync(id));
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card retrieved successfully");
     }
@@ -267,10 +271,13 @@ public class CardService: ICardService
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var tallies = await _completion.TallyAsync(cards.ConvertAll(c => c.Id));
+        var cardIds = cards.ConvertAll(c => c.Id);
+        var tallies = await _completion.TallyAsync(cardIds);
+        var attachmentCounts = await _attachments.OnCardsAsync(cardIds);
 
         return PagedResponse<CardDto>.SuccessResponse(
-            cards.ConvertAll(card => MapToDto(card, tallies.GetValueOrDefault(card.Id))),
+            cards.ConvertAll(card => MapToDto(
+                card, tallies.GetValueOrDefault(card.Id), attachmentCounts.GetValueOrDefault(card.Id))),
             totalCount,
             pageSize: searchDto.PageSize,
             currentPage: searchDto.PageNumber,
@@ -331,6 +338,60 @@ public class CardService: ICardService
         await _context.SaveChangesAsync();
 
         return ApiResponse<bool>.SuccessResponse(true, message, 204);
+    }
+
+    public async Task<ApiResponse<bool>> SetCoverAsync(Guid id, CoverDto coverDto)
+    {
+        ArgumentNullException.ThrowIfNull(coverDto);
+
+        var card = await _context.Cards.FindAsync(id);
+        if (card == null)
+        {
+            return ApiResponse<bool>.ErrorResponse("Card not found", 404);
+        }
+
+        if (await _archive.OnCardAsync(id) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.Card);
+        }
+
+        if (coverDto.AttachmentId is { } attachmentId && await CoverErrorAsync(id, attachmentId) is { } error)
+        {
+            return ReferenceErrors.Invalid<bool>([error]);
+        }
+
+        card.CoverAttachmentId = coverDto.AttachmentId;
+        card.CoverColor = coverDto.Color;
+        _context.StampChange(card, _actor);
+
+        await _context.SaveChangesAsync();
+
+        return ApiResponse<bool>.SuccessResponse(
+            true, coverDto is { AttachmentId: null, Color: null } ? "Cover cleared" : "Cover set", 204);
+    }
+
+    private async Task<ApiError?> CoverErrorAsync(Guid cardId, Guid attachmentId)
+    {
+        var attachment = await _context.Attachments
+            .Where(a => a.Id == attachmentId)
+            .Select(a => new { a.CardId, a.MimeType })
+            .FirstOrDefaultAsync();
+
+        if (attachment is null)
+        {
+            return new ApiError("attachmentId", ErrorCodes.NotFound, $"Attachment {attachmentId} does not exist.");
+        }
+
+        if (attachment.CardId != cardId)
+        {
+            return new ApiError("attachmentId", ErrorCodes.NotOnCard,
+                $"Attachment {attachmentId} isn't on card {cardId}.");
+        }
+
+        return AttachmentFileTypes.IsImage(attachment.MimeType)
+            ? null
+            : new ApiError("attachmentId", ErrorCodes.NotImage,
+                $"A cover has to be a file of one of these types: {AttachmentFileTypes.ImageExtensions}.");
     }
 
     public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedDto archivedDto)
@@ -408,7 +469,7 @@ public class CardService: ICardService
 
     private static ApiError NotOnBoard(string field, Guid labelId, Guid boardId) =>
         new(field, ErrorCodes.NotOnBoard, $"Label {labelId} isn't on board {boardId}.");
-    private static CardDto MapToDto(Card card, CardTally tally)
+    private static CardDto MapToDto(Card card, CardTally tally, int attachmentCount)
     {
         return new CardDto
         (
@@ -419,19 +480,28 @@ public class CardService: ICardService
             card.Position,
             card.ListId,
             tally.IsComplete(card),
-            card.Cover,
             card.StartDate,
             card.DueReminderMinutes,
             card.IsArchived,
             card.Labels.Select(l => l.Id).ToList(),
             tally.CheckItemCount,
             tally.CheckedItemCount,
+            attachmentCount,
+            CoverOf(card),
             card.CreatedAt,
             card.UpdatedAt,
             card.CreatedBy,
             card.UpdatedBy
         );
     }
+    private static CardCoverDto? CoverOf(Card card) => card switch
+    {
+        { CoverAttachmentId: { } attachmentId } =>
+            new CardCoverDto(attachmentId, null, AttachmentView.ContentPath(card.Id, attachmentId)),
+        { CoverColor: { } color } => new CardCoverDto(null, color, null),
+        _ => null
+    };
+
     private static Card MapToEntity(CreateCardDto createCardDto, Guid actorId, double position)
     {
         return new Card
@@ -443,7 +513,6 @@ public class CardService: ICardService
             Position = position,
             ListId = createCardDto.ListId!.Value,
             IsDueComplete = createCardDto.IsDueComplete!.Value,
-            Cover = createCardDto.Cover,
             StartDate = createCardDto.StartDate,
             DueReminderMinutes = createCardDto.DueReminderMinutes,
             CreatedAt = DateTime.UtcNow,

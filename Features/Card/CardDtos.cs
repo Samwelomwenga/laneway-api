@@ -11,17 +11,31 @@ public record CardDto
      double Position ,
      Guid ListId ,
      bool IsDueComplete ,
-     string? Cover,
      DateTime? StartDate,
      int? DueReminderMinutes ,
      bool IsArchived ,
      List<Guid> LabelIds,
      int CheckItemCount,
      int CheckedItemCount,
+     int AttachmentCount,
+     CardCoverDto? Cover,
       DateTime CreatedAt ,
      DateTime? UpdatedAt ,
      Guid CreatedBy ,
      Guid? UpdatedBy
+);
+
+public record CardCoverDto
+(
+    Guid? AttachmentId,
+    Color? Color,
+    string? Url
+);
+
+public record CoverDto
+(
+    Guid? AttachmentId,
+    Color? Color
 );
 
 public record CreateCardDto
@@ -34,7 +48,6 @@ public record CreateCardDto
     Guid? After,
     Guid? ListId,
     bool? IsDueComplete,
-    string? Cover,
     DateTime? StartDate,
     int? DueReminderMinutes,
     List<Guid?>? LabelIds
@@ -49,7 +62,6 @@ public record UpdateCardDto
     string? Description,
     DateTime? DueDate,
     bool? IsDueComplete,
-    string? Cover,
     DateTime? StartDate,
     int? DueReminderMinutes,
     List<Guid?>? LabelIds

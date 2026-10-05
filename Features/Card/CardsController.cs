@@ -66,6 +66,13 @@ public class CardsController: ApiControllerBase
         return ToActionResult(response);
     }
 
+    [HttpPut("{id}/cover")]
+    public async Task<ActionResult<ApiResponse<bool>>> SetCardCover(Guid id, [FromBody] CoverDto coverDto)
+    {
+        var response = await _cardService.SetCoverAsync(id, coverDto);
+        return ToActionResult(response);
+    }
+
     [HttpPut("{id}/archived")]
     public async Task<ActionResult<ApiResponse<bool>>> SetCardArchived(Guid id, [FromBody] ArchivedDto archivedDto)
     {

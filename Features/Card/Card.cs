@@ -7,7 +7,8 @@ public class Card: PlacedEntity, IArchivable
     public DateTime? DueDate { get; set; }
     public Guid ListId { get; set; }
     public bool IsDueComplete { get; set; }
-    public string? Cover { get; set; } = string.Empty;
+    public Color? CoverColor { get; set; }
+    public Guid? CoverAttachmentId { get; set; }
     public DateTime? StartDate { get; set; }
     public int? DueReminderMinutes { get; set; }
     public bool IsArchived { get; set; }
