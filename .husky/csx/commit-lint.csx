@@ -1,8 +1,3 @@
-/// <summary>
-/// Commit Linter for Conventional Commits
-/// This script validates commit messages against the Conventional Commits specification.
-/// It checks for correct format, length, and provides suggestions for common mistakes.
-/// </summary>
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -11,13 +6,11 @@ using System.Linq;
 
 public class CommitLinter
 {
-    // Valid commit types based on conventional commits specification
     private static readonly string[] ValidTypes = {
         "build", "feat", "ci", "chore", "docs", "fix", 
         "perf", "refactor", "revert", "style", "test"
     };
     
-    // Main pattern for conventional commits
     private static readonly string Pattern = 
         @"^(?<type>build|feat|ci|chore|docs|fix|perf|refactor|revert|style|test)" +
         @"(?:\((?<scope>.+)\))?" +
@@ -32,7 +25,6 @@ public class CommitLinter
     {
         try
         {
-            // Validate command line arguments
             if (args.Length == 0)
             {
                 PrintError("Usage: CommitLinter <commit-message-file>");
@@ -45,7 +37,6 @@ public class CommitLinter
                 return 1;
             }
 
-            // Read commit message
             var lines = File.ReadAllLines(args[0]);
             if (lines.Length == 0)
             {
@@ -55,7 +46,6 @@ public class CommitLinter
 
             var commitMessage = lines[0].Trim();
             
-            // Validate commit message
             var validationResult = ValidateCommitMessage(commitMessage);
             
             if (validationResult.IsValid)
@@ -64,7 +54,6 @@ public class CommitLinter
                 return 0;
             }
             
-            // Print detailed error information
             PrintValidationErrors(commitMessage, validationResult);
             return 1;
         }
@@ -79,14 +68,12 @@ public class CommitLinter
     {
         var result = new ValidationResult();
         
-        // Check if message is empty or whitespace
         if (string.IsNullOrWhiteSpace(message))
         {
             result.Errors.Add("Commit message cannot be empty");
             return result;
         }
         
-        // Check length constraints
         if (message.Length > 100)
         {
             result.Errors.Add($"Commit message too long ({message.Length} chars). Maximum 100 characters recommended.");
@@ -97,39 +84,24 @@ public class CommitLinter
             result.Errors.Add($"Commit message too short ({message.Length} chars). Minimum 10 characters recommended.");
         }
         
-        // Check for conventional commit format
         var match = CommitRegex.Match(message);
         if (!match.Success)
         {
             result.Errors.Add("Message doesn't follow conventional commit format");
             
-            // Provide specific guidance based on common issues
             AnalyzeCommonIssues(message, result);
             return result;
         }
         
-        // Extract and validate components
-        var type = match.Groups["type"].Value;
         var scope = match.Groups["scope"].Value;
         var subject = match.Groups["subject"].Value;
-        var isBreaking = match.Groups["breaking"].Success;
-        var issue = match.Groups["issue"].Value;
         
-        // Validate subject
         ValidateSubject(subject, result);
         
-        // Validate scope if present
         if (!string.IsNullOrEmpty(scope))
         {
             ValidateScope(scope, result);
         }
-        
-        // Store parsed components for potential future use
-        result.Type = type;
-        result.Scope = scope;
-        result.Subject = subject;
-        result.IsBreakingChange = isBreaking;
-        result.IssueNumber = issue;
         
         result.IsValid = result.Errors.Count == 0;
         return result;
@@ -143,19 +115,16 @@ public class CommitLinter
             return;
         }
         
-        // Subject should not start with uppercase (conventional commits preference)
         if (char.IsUpper(subject[0]))
         {
             result.Warnings.Add("Subject should start with lowercase letter");
         }
         
-        // Subject should not end with period
         if (subject.EndsWith("."))
         {
             result.Errors.Add("Subject should not end with a period");
         }
         
-        // Check for imperative mood (basic check)
         var discouragedStarts = new[] { "added", "fixed", "changed", "updated", "removed" };
         var subjectLower = subject.ToLower();
         
@@ -184,13 +153,11 @@ public class CommitLinter
     
     private static void AnalyzeCommonIssues(string message, ValidationResult result)
     {
-        // Check if it might be missing the colon and space
         if (ValidTypes.Any(type => message.StartsWith(type)) && !message.Contains(": "))
         {
             result.Suggestions.Add("Missing ': ' after type/scope. Format: 'type(scope): subject'");
         }
         
-        // Check if type might be invalid
         var possibleType = message.Split(new[] { '(', ':', ' ' }, StringSplitOptions.RemoveEmptyEntries)[0];
         if (!ValidTypes.Contains(possibleType.ToLower()))
         {
@@ -349,11 +316,4 @@ public class ValidationResult
     public List<string> Errors { get; } = new();
     public List<string> Warnings { get; } = new();
     public List<string> Suggestions { get; } = new();
-    
-    // Parsed commit components
-    public string Type { get; set; } = string.Empty;
-    public string Scope { get; set; } = string.Empty;
-    public string Subject { get; set; } = string.Empty;
-    public bool IsBreakingChange { get; set; }
-    public string IssueNumber { get; set; } = string.Empty;
 }
