@@ -35,7 +35,12 @@ public sealed class ArchivedDtoValidator : AbstractValidator<ArchivedDto>
 public static class ArchiveFlag
 {
     public static async Task<ApiResponse<bool>> SetArchivedAsync<TEntity>(
-        this ApplicationDbContext context, TEntity item, Actor actor, ArchivedDto archivedDto, string resource)
+        this ApplicationDbContext context,
+        TEntity item,
+        Actor actor,
+        ArchivedDto archivedDto,
+        string resource,
+        Func<bool, Task>? onChange = null)
         where TEntity : class, IArchivable, IStamped
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -47,6 +52,10 @@ public static class ArchiveFlag
         {
             item.IsArchived = value;
             context.StampChange(item, actor);
+            if (onChange is not null)
+            {
+                await onChange(value);
+            }
             await context.SaveChangesAsync();
         }
 

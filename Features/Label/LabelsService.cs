@@ -16,12 +16,21 @@ public class LabelService : ILabelService
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
     private readonly ArchiveGuard _archive;
+    private readonly ActivityWriter _activity;
+    private readonly ActivityTree _tree;
 
-    public LabelService(ApplicationDbContext context, Actor actor, ArchiveGuard archive)
+    public LabelService(
+        ApplicationDbContext context,
+        Actor actor,
+        ArchiveGuard archive,
+        ActivityWriter activity,
+        ActivityTree tree)
     {
         _context = context;
         _actor = actor;
         _archive = archive;
+        _activity = activity;
+        _tree = tree;
     }
 
     public async Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto)
@@ -92,6 +101,11 @@ public class LabelService : ILabelService
 
         var newLabel = MapToEntity(createLabelDto, name, _actor.Id);
         _context.Labels.Add(newLabel);
+        var chain = await _tree.BoardAsync(boardId);
+        await _activity.AddAsync(
+            ActivityType.CreateLabel,
+            chain.Place,
+            actor => new CreateLabelData(actor, chain.Workspace, chain.Board, LabelRef.Of(newLabel)));
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
@@ -126,6 +140,18 @@ public class LabelService : ILabelService
         existingLabel.Color = updateLabelDto.Color;
         _context.StampChange(existingLabel, _actor);
 
+        var tracked = _context.Entry(existingLabel);
+        if (tracked.Changed())
+        {
+            var old = LabelFields.Changed(tracked);
+            var chain = await _tree.BoardAsync(existingLabel.BoardId);
+            await _activity.AddAsync(
+                ActivityType.UpdateLabel,
+                chain.Place,
+                actor => new UpdateLabelData(
+                    actor, chain.Workspace, chain.Board, LabelRef.Of(existingLabel), old));
+        }
+
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
@@ -150,7 +176,12 @@ public class LabelService : ILabelService
             return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.Label);
         }
 
+        var chain = await _tree.BoardAsync(existingLabel.BoardId);
         _context.Labels.Remove(existingLabel);
+        await _activity.AddAsync(
+            ActivityType.DeleteLabel,
+            chain.Place,
+            actor => new DeleteLabelData(actor, chain.Workspace, chain.Board, LabelRef.Of(existingLabel)));
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 

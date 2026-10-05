@@ -20,19 +20,25 @@ public class CheckItemService : ICheckItemService
     private readonly Placements _placements;
     private readonly ArchiveGuard _archive;
     private readonly CardCompletion _completion;
+    private readonly ActivityWriter _activity;
+    private readonly ActivityTree _tree;
 
     public CheckItemService(
         ApplicationDbContext context,
         Actor actor,
         Placements placements,
         ArchiveGuard archive,
-        CardCompletion completion)
+        CardCompletion completion,
+        ActivityWriter activity,
+        ActivityTree tree)
     {
         _context = context;
         _actor = actor;
         _placements = placements;
         _archive = archive;
         _completion = completion;
+        _activity = activity;
+        _tree = tree;
     }
 
     public async Task<ApiResponse<CheckItemDto>> CreateAsync(CreateCheckItemDto createCheckItemDto)
@@ -40,11 +46,12 @@ public class CheckItemService : ICheckItemService
         var checklistId = createCheckItemDto.ChecklistId!.Value;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        if (!await _context.Checklists.AnyAsync(c => c.Id == checklistId))
+        if (await CardOfChecklistAsync(checklistId) is not { } cardId)
         {
             return ReferenceErrors.NotFound<CheckItemDto>("checklistId", "Checklist", checklistId);
         }
 
+        var watch = await _completion.WatchAsync(cardId);
         var placed = await _placements.ResolveInChecklistAsync(checklistId, Placement.Of(createCheckItemDto));
         if (placed.Errors.Count > 0)
         {
@@ -64,6 +71,21 @@ public class CheckItemService : ICheckItemService
         var checkItem = MapToEntity(createCheckItemDto, _actor.Id, placed.Position);
 
         _context.CheckItems.Add(checkItem);
+        var completion = watch.Change(
+            gainedCheckItems: 1, gainedCheckedItems: checkItem.IsChecked ? 1 : 0);
+        var chain = await _tree.ChecklistAsync(checklistId);
+        await _activity.AddAsync(
+            ActivityType.CreateCheckItem,
+            chain.Place,
+            actor => new CreateCheckItemData(
+                actor,
+                chain.Workspace,
+                chain.Board,
+                chain.List,
+                chain.Card,
+                chain.Checklist,
+                CheckItemRef.Of(checkItem),
+                completion));
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
@@ -86,6 +108,25 @@ public class CheckItemService : ICheckItemService
 
         checkItem.Name = updateCheckItemDto.Name!;
         _context.StampChange(checkItem, _actor);
+
+        var tracked = _context.Entry(checkItem);
+        if (tracked.Changed())
+        {
+            var old = CheckItemFields.Changed(tracked);
+            var chain = await _tree.ChecklistAsync(checkItem.ChecklistId);
+            await _activity.AddAsync(
+                ActivityType.UpdateCheckItem,
+                chain.Place,
+                actor => new UpdateCheckItemData(
+                    actor,
+                    chain.Workspace,
+                    chain.Board,
+                    chain.List,
+                    chain.Card,
+                    chain.Checklist,
+                    CheckItemRef.Of(checkItem),
+                    old));
+        }
 
         await _context.SaveChangesAsync();
 
@@ -149,9 +190,32 @@ public class CheckItemService : ICheckItemService
             return Full<CheckItemDto>();
         }
 
+        var leaving = checkItem.ChecklistId;
+        var wasAt = checkItem.Position;
         checkItem.ChecklistId = checklistId;
         checkItem.Position = position;
         _context.StampChange(checkItem, _actor);
+
+        if (_context.Entry(checkItem).Changed())
+        {
+            var chain = await _tree.ChecklistAsync(checklistId);
+            var from = leaving == checklistId
+                ? null
+                : new CheckItemOrigin(await _tree.ChecklistRefAsync(leaving));
+            await _activity.AddAsync(
+                ActivityType.MoveCheckItem,
+                chain.Place,
+                actor => new MoveCheckItemData(
+                    actor,
+                    chain.Workspace,
+                    chain.Board,
+                    chain.List,
+                    chain.Card,
+                    chain.Checklist,
+                    CheckItemRef.Of(checkItem),
+                    new PositionChange(wasAt, checkItem.Position),
+                    from));
+        }
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -164,6 +228,8 @@ public class CheckItemService : ICheckItemService
     {
         ArgumentNullException.ThrowIfNull(checkedDto);
 
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
         var checkItem = await _context.CheckItems.FindAsync(id);
         if (checkItem == null)
         {
@@ -175,13 +241,31 @@ public class CheckItemService : ICheckItemService
             return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.CheckItem);
         }
 
+        var watch = await WatchCardAsync(checkItem);
         var value = checkedDto.Value!.Value;
         if (checkItem.IsChecked != value)
         {
             checkItem.IsChecked = value;
             _context.StampChange(checkItem, _actor);
+
+            var completion = watch.Change(gainedCheckedItems: value ? 1 : -1);
+            var chain = await _tree.ChecklistAsync(checkItem.ChecklistId);
+            await _activity.AddAsync(
+                value ? ActivityType.CheckCheckItem : ActivityType.UncheckCheckItem,
+                chain.Place,
+                actor => new CheckedCheckItemData(
+                    actor,
+                    chain.Workspace,
+                    chain.Board,
+                    chain.List,
+                    chain.Card,
+                    chain.Checklist,
+                    CheckItemRef.Of(checkItem),
+                    completion));
             await _context.SaveChangesAsync();
         }
+
+        await transaction.CommitAsync();
 
         return ApiResponse<bool>.SuccessResponse(
             true, $"Check item {(value ? "checked" : "unchecked")}", 204);
@@ -189,6 +273,8 @@ public class CheckItemService : ICheckItemService
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
         var checkItem = await _context.CheckItems.FindAsync(id);
         if (checkItem == null)
         {
@@ -200,13 +286,27 @@ public class CheckItemService : ICheckItemService
             return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.CheckItem);
         }
 
-        if (await CardOfChecklistAsync(checkItem.ChecklistId) is { } cardId)
-        {
-            await _completion.KeepComputedValueAsync(cardId, losingCheckItems: 1);
-        }
+        var watch = await WatchCardAsync(checkItem);
+        watch.KeepComputedValue(losingCheckItems: 1);
+        var completion = watch.Change(
+            gainedCheckItems: -1, gainedCheckedItems: checkItem.IsChecked ? -1 : 0);
 
+        var chain = await _tree.ChecklistAsync(checkItem.ChecklistId);
         _context.CheckItems.Remove(checkItem);
+        await _activity.AddAsync(
+            ActivityType.DeleteCheckItem,
+            chain.Place,
+            actor => new DeleteCheckItemData(
+                actor,
+                chain.Workspace,
+                chain.Board,
+                chain.List,
+                chain.Card,
+                chain.Checklist,
+                CheckItemRef.Of(checkItem),
+                completion));
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         return ApiResponse<bool>.SuccessResponse(true, "Check item deleted successfully", 204);
     }
@@ -254,6 +354,14 @@ public class CheckItemService : ICheckItemService
             currentPage: searchDto.PageNumber,
             message: "Check items retrieved successfully"
         );
+    }
+
+    private async Task<CompletionWatch> WatchCardAsync(CheckItem checkItem)
+    {
+        var watch = await _completion.WatchOnChecklistAsync(checkItem.ChecklistId);
+        await _context.LockChecklistsAsync(checkItem.ChecklistId);
+        await _context.Entry(checkItem).ReloadAsync();
+        return watch;
     }
 
     private async Task<Guid?> CardOfChecklistAsync(Guid checklistId) =>

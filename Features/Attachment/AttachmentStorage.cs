@@ -10,12 +10,11 @@ public sealed class AttachmentStorageOptions
 
     public string? Url { get; set; }
     public string? ServiceRoleKey { get; set; }
+    public string BucketName { get; set; } = "attachments";
 }
 
 public sealed class AttachmentStorage
 {
-    private const string BucketName = "attachments";
-
     private readonly IStorageFileApi<FileObject> _bucket;
 
     public AttachmentStorage(IOptions<AttachmentStorageOptions> options)
@@ -35,7 +34,7 @@ public sealed class AttachmentStorage
             ["apikey"] = settings.ServiceRoleKey,
             ["Authorization"] = $"Bearer {settings.ServiceRoleKey}"
         };
-        _bucket = new Client($"{settings.Url.TrimEnd('/')}/storage/v1", headers).From(BucketName);
+        _bucket = new Client($"{settings.Url.TrimEnd('/')}/storage/v1", headers).From(settings.BucketName);
     }
 
     public static string KeyFor(Guid cardId, Guid attachmentId) => $"cards/{cardId}/{attachmentId}";

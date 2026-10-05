@@ -18,6 +18,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<CheckItem> CheckItems { get; set; }
     public DbSet<Attachment> Attachments { get; set; }
     public DbSet<PendingObjectDelete> PendingObjectDeletes { get; set; }
+    public DbSet<ActivityEntry> ActivityEntries { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Account> Accounts { get; set; }
 
@@ -191,6 +192,22 @@ public class ApplicationDbContext : DbContext
             ActorKeys(entity);
         });
 
+        modelBuilder.Entity<ActivityEntry>(entity =>
+        {
+            entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+            entity.Property(e => e.UpdatedAt).HasColumnType("timestamp with time zone");
+            entity.Property(e => e.Data).HasColumnType("jsonb");
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(e => e.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+            foreach (var place in PlaceColumns)
+            {
+                entity.HasIndex(place, nameof(ActivityEntry.CreatedAt), nameof(ActivityEntry.Id))
+                    .IsDescending(false, true, true);
+            }
+        });
+
         modelBuilder.Entity<Label>(entity =>
         {
             entity.Property(l => l.Name).HasColumnType($"varchar({FieldLimits.LabelName})");
@@ -201,6 +218,17 @@ public class ApplicationDbContext : DbContext
             ActorKeys(entity);
         });
     }
+
+    private static readonly string[] PlaceColumns =
+    [
+        nameof(ActivityEntry.WorkspaceId),
+        nameof(ActivityEntry.BoardId),
+        nameof(ActivityEntry.ListId),
+        nameof(ActivityEntry.CardId),
+        nameof(ActivityEntry.FromWorkspaceId),
+        nameof(ActivityEntry.FromBoardId),
+        nameof(ActivityEntry.FromListId)
+    ];
 
     private const string KindHoldsItsColumns = """
         ("Kind" = 'File'

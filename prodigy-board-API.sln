@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "prodigy-board-API", "prodigy-board-API.csproj", "{342BAD1F-4CFF-4CE7-B9E7-29D624F2B395}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "prodigy-board-API.Tests", "tests\prodigy-board-API.Tests\prodigy-board-API.Tests.csproj", "{D5AD48D1-948A-4A76-AF4E-0DF8BD53C06A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{342BAD1F-4CFF-4CE7-B9E7-29D624F2B395}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{342BAD1F-4CFF-4CE7-B9E7-29D624F2B395}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{342BAD1F-4CFF-4CE7-B9E7-29D624F2B395}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D5AD48D1-948A-4A76-AF4E-0DF8BD53C06A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D5AD48D1-948A-4A76-AF4E-0DF8BD53C06A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D5AD48D1-948A-4A76-AF4E-0DF8BD53C06A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D5AD48D1-948A-4A76-AF4E-0DF8BD53C06A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

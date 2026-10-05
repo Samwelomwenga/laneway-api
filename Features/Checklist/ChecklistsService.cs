@@ -20,19 +20,25 @@ public class ChecklistService : IChecklistService
     private readonly Placements _placements;
     private readonly ArchiveGuard _archive;
     private readonly CardCompletion _completion;
+    private readonly ActivityWriter _activity;
+    private readonly ActivityTree _tree;
 
     public ChecklistService(
         ApplicationDbContext context,
         Actor actor,
         Placements placements,
         ArchiveGuard archive,
-        CardCompletion completion)
+        CardCompletion completion,
+        ActivityWriter activity,
+        ActivityTree tree)
     {
         _context = context;
         _actor = actor;
         _placements = placements;
         _archive = archive;
         _completion = completion;
+        _activity = activity;
+        _tree = tree;
     }
 
     public async Task<ApiResponse<ChecklistDto>> CreateAsync(CreateChecklistDto createChecklistDto)
@@ -59,6 +65,12 @@ public class ChecklistService : IChecklistService
         var checklist = MapToEntity(createChecklistDto, _actor.Id, placed.Position);
 
         _context.Checklists.Add(checklist);
+        var chain = await _tree.CardAsync(cardId);
+        await _activity.AddAsync(
+            ActivityType.CreateChecklist,
+            chain.Place,
+            actor => new CreateChecklistData(
+                actor, chain.Workspace, chain.Board, chain.List, chain.Card, ChecklistRef.Of(checklist)));
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
         var checklistDto = MapToDto(checklist);
@@ -81,6 +93,24 @@ public class ChecklistService : IChecklistService
 
         checklist.Name = updateChecklistDto.Name!;
         _context.StampChange(checklist, _actor);
+
+        var tracked = _context.Entry(checklist);
+        if (tracked.Changed())
+        {
+            var old = ChecklistFields.Changed(tracked);
+            var chain = await _tree.CardAsync(checklist.CardId);
+            await _activity.AddAsync(
+                ActivityType.UpdateChecklist,
+                chain.Place,
+                actor => new UpdateChecklistData(
+                    actor,
+                    chain.Workspace,
+                    chain.Board,
+                    chain.List,
+                    chain.Card,
+                    ChecklistRef.Of(checklist),
+                    old));
+        }
 
         await _context.SaveChangesAsync();
         var checklistDto = MapToDto(checklist);
@@ -111,8 +141,25 @@ public class ChecklistService : IChecklistService
             return ReferenceErrors.Invalid<ChecklistDto>(placed.Errors);
         }
 
+        var wasAt = checklist.Position;
         checklist.Position = placed.Position;
         _context.StampChange(checklist, _actor);
+
+        if (_context.Entry(checklist).Changed())
+        {
+            var chain = await _tree.CardAsync(checklist.CardId);
+            await _activity.AddAsync(
+                ActivityType.MoveChecklist,
+                chain.Place,
+                actor => new MoveChecklistData(
+                    actor,
+                    chain.Workspace,
+                    chain.Board,
+                    chain.List,
+                    chain.Card,
+                    ChecklistRef.Of(checklist),
+                    new PositionChange(wasAt, checklist.Position)));
+        }
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -125,6 +172,8 @@ public class ChecklistService : IChecklistService
     {
         ArgumentNullException.ThrowIfNull(archivedDto);
 
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
         var checklist = await _context.Checklists.FindAsync(id);
         if (checklist == null)
         {
@@ -136,13 +185,41 @@ public class ChecklistService : IChecklistService
             return ArchiveErrors.RestoreFirst<bool>(archived, TreeItem.Checklist);
         }
 
-        if (archivedDto.Value == true && !checklist.IsArchived)
+        var watch = await _completion.WatchAsync(checklist.CardId);
+        await _context.LockChecklistsAsync(id);
+        await _context.Entry(checklist).ReloadAsync();
+
+        var response = await _context.SetArchivedAsync(
+            checklist, _actor, archivedDto, "Checklist",
+            archived => RecordArchivedAsync(checklist, archived, watch));
+        await transaction.CommitAsync();
+
+        return response;
+    }
+
+    private async Task RecordArchivedAsync(Checklist checklist, bool archived, CompletionWatch watch)
+    {
+        var held = await _completion.ChecklistTallyAsync(checklist.Id);
+
+        if (archived)
         {
-            var leaving = await _context.CheckItems.CountAsync(checkItem => checkItem.ChecklistId == id);
-            await _completion.KeepComputedValueAsync(checklist.CardId, losingCheckItems: leaving);
+            watch.KeepComputedValue(losingCheckItems: held.CheckItemCount);
         }
 
-        return await _context.SetArchivedAsync(checklist, _actor, archivedDto, "Checklist");
+        var completion = archived ? watch.Losing(held) : watch.Gaining(held);
+
+        var chain = await _tree.CardAsync(checklist.CardId);
+        await _activity.AddAsync(
+            archived ? ActivityType.ArchiveChecklist : ActivityType.RestoreChecklist,
+            chain.Place,
+            actor => new ArchiveChecklistData(
+                actor,
+                chain.Workspace,
+                chain.Board,
+                chain.List,
+                chain.Card,
+                ChecklistRef.Of(checklist),
+                completion));
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
@@ -163,7 +240,13 @@ public class ChecklistService : IChecklistService
             return ArchiveErrors.NotArchived<bool>(TreeItem.Checklist);
         }
 
+        var chain = await _tree.CardAsync(checklist.CardId);
         _context.Checklists.Remove(checklist);
+        await _activity.AddAsync(
+            ActivityType.DeleteChecklist,
+            chain.Place,
+            actor => new DeleteChecklistData(
+                actor, chain.Workspace, chain.Board, chain.List, chain.Card, ChecklistRef.Of(checklist)));
         await _context.SaveChangesAsync();
 
         return ApiResponse<bool>.SuccessResponse(true, "Checklist deleted successfully", 204);
