@@ -759,7 +759,7 @@ Content-Type: application/json
 
 > {% client.global.set("secondUserId", response.body.data.id); %}
 
-### Give the second user the first user's email. 409 duplicate with a null field.
+### Give the second user the first user's email. 409 duplicate on email.
 PUT {{Laneway_Api_HostAddress}}/api/v1/users/{{secondUserId}}
 X-User-Id: {{actorId}}
 Content-Type: application/json
