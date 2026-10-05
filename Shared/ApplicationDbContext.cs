@@ -20,7 +20,6 @@ public class ApplicationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Account entity configuration
         modelBuilder.Entity<Account>(entity =>
         {
             entity.HasKey(a => a.Id);
@@ -41,7 +40,6 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // User entity configuration
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasKey(u => u.Id);
