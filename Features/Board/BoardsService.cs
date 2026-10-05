@@ -14,10 +14,12 @@ public interface IBoardService
 public class BoardService : IBoardService
 {
     private readonly ApplicationDbContext _context;
+    private readonly Actor _actor;
 
-    public BoardService(ApplicationDbContext context)
+    public BoardService(ApplicationDbContext context, Actor actor)
     {
         _context = context;
+        _actor = actor;
     }
 
     public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(BoardSearchDto searchDto)
@@ -88,7 +90,7 @@ public class BoardService : IBoardService
             return WorkspaceNotFound(workspaceId);
         }
 
-        var boardEntity = MapToEntity(createBoardDto);
+        var boardEntity = MapToEntity(createBoardDto, _actor.Id);
         _context.Boards.Add(boardEntity);
         await _context.SaveChangesAsync();
         var boardDto = MapToDto(boardEntity);
@@ -116,8 +118,7 @@ public class BoardService : IBoardService
         existingBoard.WorkspaceId = workspaceId;
         existingBoard.Visibility = updateBoardDto.Visibility!.Value;
         existingBoard.IsArchived = updateBoardDto.IsArchived!.Value;
-        existingBoard.UpdatedAt = DateTime.UtcNow;
-        existingBoard.UpdatedBy = Guid.NewGuid();
+        _context.StampChange(existingBoard, _actor);
 
         await _context.SaveChangesAsync();
         var updatedBoardDto = MapToDto(existingBoard, existingBoard.Lists.Select(l => l.Id).ToList());
@@ -159,7 +160,7 @@ public class BoardService : IBoardService
         ApiResponse<BoardDto>.ErrorResponse("A referenced resource does not exist", 400,
             [new ApiError("workspaceId", ErrorCodes.NotFound, $"Workspace {workspaceId} does not exist.")]);
 
-    private static Board MapToEntity(CreateBoardDto createBoardDto)
+    private static Board MapToEntity(CreateBoardDto createBoardDto, Guid actorId)
     {
         return new Board
         {
@@ -170,7 +171,7 @@ public class BoardService : IBoardService
             Visibility = createBoardDto.Visibility!.Value,
             IsArchived = createBoardDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = Guid.NewGuid()
+            CreatedBy = actorId
         };
     }
 }

@@ -36,6 +36,7 @@ public class UsersController : ApiControllerBase
     }
 
     [HttpPost]
+    [NoActor]
     public async Task<ActionResult<ApiResponse<UserDto>>> CreateUser([FromBody] CreateUserDto createUserDto)
     {
         var response = await _userService.CreateAsync(createUserDto);

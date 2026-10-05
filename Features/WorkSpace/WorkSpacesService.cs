@@ -15,10 +15,12 @@ public interface IWorkSpaceService
 public class WorkSpaceService : IWorkSpaceService
 {
     private readonly ApplicationDbContext _context;
+    private readonly Actor _actor;
 
-    public WorkSpaceService(ApplicationDbContext context)
+    public WorkSpaceService(ApplicationDbContext context, Actor actor)
     {
         _context = context;
+        _actor = actor;
     }
 
     public async Task<ApiResponse<List<WorkSpaceDto>>> GetAllAsync(WorkSpaceSearchDto searchDto)
@@ -71,7 +73,7 @@ public class WorkSpaceService : IWorkSpaceService
 
     public async Task<ApiResponse<WorkSpaceDto>> CreateAsync(CreateWorkSpaceDto createWorkSpaceDto)
     {
-        var newWorkSpace = MapToEntity(createWorkSpaceDto);
+        var newWorkSpace = MapToEntity(createWorkSpaceDto, _actor.Id);
         _context.WorkSpaces.Add(newWorkSpace);
         await _context.SaveChangesAsync();
         return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(newWorkSpace), "Workspace created successfully", 201);
@@ -91,7 +93,7 @@ public class WorkSpaceService : IWorkSpaceService
         existingWorkSpace.Description = updateWorkSpaceDto.Description ?? string.Empty;
         existingWorkSpace.Visibility = updateWorkSpaceDto.Visibility!.Value;
         existingWorkSpace.IsArchived = updateWorkSpaceDto.IsArchived!.Value;
-        existingWorkSpace.UpdatedAt = DateTime.UtcNow;
+        _context.StampChange(existingWorkSpace, _actor);
 
         await _context.SaveChangesAsync();
 
@@ -128,7 +130,7 @@ public class WorkSpaceService : IWorkSpaceService
         );
     }
 
-    private static WorkSpace MapToEntity(CreateWorkSpaceDto createWorkSpaceDto)
+    private static WorkSpace MapToEntity(CreateWorkSpaceDto createWorkSpaceDto, Guid actorId)
     {
         return new WorkSpace
         {
@@ -138,7 +140,7 @@ public class WorkSpaceService : IWorkSpaceService
             Visibility = createWorkSpaceDto.Visibility!.Value,
             IsArchived = createWorkSpaceDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = Guid.NewGuid()
+            CreatedBy = actorId
         };
     }
 }

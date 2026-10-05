@@ -15,10 +15,12 @@ namespace DefaultNamespace
     public class UserService : IUserService
     {
         private readonly ApplicationDbContext _context;
+        private readonly Actor _actor;
 
-        public UserService(ApplicationDbContext context)
+        public UserService(ApplicationDbContext context, Actor actor)
         {
             _context = context;
+            _actor = actor;
         }
 
         public async Task<PagedResponse<UserDto>> GetAllAsync(UserSearchDto searchDto)
@@ -34,14 +36,7 @@ namespace DefaultNamespace
 
             }
 
-
-            if (searchDto.IsActive.HasValue)
-            {
-                query = query.Where(u => u.IsActive == searchDto.IsActive.Value);
-            }
-
             var totalCount = await query.CountAsync();
-            var totalPages = (int)Math.Ceiling((double)totalCount / searchDto.PageSize);
             var users = await query
                 .OrderByDescending(u => u.CreatedAt)
                 .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
@@ -111,7 +106,7 @@ namespace DefaultNamespace
 
         public async Task<ApiResponse<UserDto>> UpdateAsync(Guid id, UpdateUserDto updateUserDto)
         {
-            var existingUser = await _context.Users.FindAsync(id);
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
             if (existingUser is null)
             {
                 return ApiResponse<UserDto>.ErrorResponse("User not found", 404);
@@ -127,11 +122,8 @@ namespace DefaultNamespace
             existingUser.TimeZone = updateUserDto.TimeZone;
             existingUser.Location = updateUserDto.Location;
             existingUser.ProfilePictureUrl = updateUserDto.ProfilePictureUrl;
-            existingUser.IsActive = updateUserDto.IsActive;
-            existingUser.UpdatedAt = DateTime.UtcNow;
-            existingUser.UpdatedBy = Guid.NewGuid();
+            _context.StampChange(existingUser, _actor);
 
-            _context.Users.Update(existingUser);
             await _context.SaveChangesAsync();
 
             return ApiResponse<UserDto>.SuccessResponse(MapToDto(existingUser), "User updated successfully", 200);
@@ -139,13 +131,13 @@ namespace DefaultNamespace
 
         public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
         {
-            var user = await _context.Users.FindAsync(id);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
             if (user == null)
             {
                 return ApiResponse<bool>.ErrorResponse("User not found", 404);
             }
 
-            _context.Users.Remove(user);
+            user.DeletedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
             return ApiResponse<bool>.SuccessResponse(true, "User deleted successfully", 204);
         }
@@ -171,7 +163,6 @@ namespace DefaultNamespace
                 user.TimeZone,
                 user.Location,
                 user.ProfilePictureUrl,
-                user.IsActive,
                 accounts,
                 user.CreatedAt,
                 user.UpdatedAt,
@@ -182,9 +173,10 @@ namespace DefaultNamespace
 
         private static User MapToEntity(CreateUserDto createUserDto)
         {
+            var id = Guid.NewGuid();
             return new User
             {
-                Id = Guid.NewGuid(),
+                Id = id,
                 Username = createUserDto.Username,
                 Email = createUserDto.Email,
                 FirstName = createUserDto.FirstName,
@@ -196,9 +188,8 @@ namespace DefaultNamespace
                 Location = createUserDto.Location,
                 ProfilePictureUrl = createUserDto.ProfilePictureUrl,
                 PasswordHash = "temp_hash",
-                IsActive = createUserDto.IsActive,
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = Guid.NewGuid()
+                CreatedBy = id
             };
         }
     }

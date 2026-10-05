@@ -8,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers(options =>
     {
+        options.Filters.Add<ActorFilter>();
         options.Filters.Add<ValidationFilter>();
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
     })
@@ -24,6 +25,7 @@ ValidatorOptions.Global.DisplayNameResolver = (_, member, _) =>
 
 builder.Services.AddOpenApi(options => options.AddSchemaTransformer<EnumSchemaTransformer>());
 
+builder.Services.AddScoped<Actor>();
 builder.Services.AddScoped<IBoardService, BoardService>();
 builder.Services.AddScoped<ICardService, CardService>();
 builder.Services.AddScoped<ILabelService, LabelService>();

@@ -13,10 +13,12 @@ public interface ICardService
 public class CardService: ICardService
 {
     private readonly ApplicationDbContext _context;
+    private readonly Actor _actor;
 
-    public CardService(ApplicationDbContext context)
+    public CardService(ApplicationDbContext context, Actor actor)
     {
         _context = context;
+        _actor = actor;
     }
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardDto createCardDto)
@@ -27,7 +29,7 @@ public class CardService: ICardService
             return ApiResponse<CardDto>.ErrorResponse("A referenced resource does not exist", 400, referenceErrors);
         }
 
-        var card = MapToEntity(createCardDto);
+        var card = MapToEntity(createCardDto, _actor.Id);
         card.Labels.AddRange(labels);
 
         _context.Cards.Add(card);
@@ -64,9 +66,11 @@ public class CardService: ICardService
         card.StartDate = updateCardDto.StartDate;
         card.DueReminderMinutes = updateCardDto.DueReminderMinutes;
         card.IsArchived = updateCardDto.IsArchived!.Value;
-        card.UpdatedAt = DateTime.UtcNow;
+
+        var labelsChanged = !card.Labels.Select(label => label.Id).ToHashSet().SetEquals(labels.Select(label => label.Id));
         card.Labels.Clear();
         card.Labels.AddRange(labels);
+        _context.StampChange(card, _actor, relatedChanged: labelsChanged);
 
         await _context.SaveChangesAsync();
 
@@ -203,7 +207,7 @@ public class CardService: ICardService
             card.UpdatedBy
         );
     }
-    private static Card MapToEntity(CreateCardDto createCardDto)
+    private static Card MapToEntity(CreateCardDto createCardDto, Guid actorId)
     {
         return new Card
         {
@@ -219,7 +223,7 @@ public class CardService: ICardService
             DueReminderMinutes = createCardDto.DueReminderMinutes,
             IsArchived = createCardDto.IsArchived!.Value,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = Guid.NewGuid()
+            CreatedBy = actorId
         };
     }
 }

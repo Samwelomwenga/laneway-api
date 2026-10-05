@@ -14,10 +14,12 @@ namespace DefaultNamespace
     public class AccountService : IAccountService
     {
         private readonly ApplicationDbContext _context;
+        private readonly Actor _actor;
 
-        public AccountService(ApplicationDbContext context)
+        public AccountService(ApplicationDbContext context, Actor actor)
         {
             _context = context;
+            _actor = actor;
         }
 
         public async Task<PagedResponse<AccountDto>> GetAllAsync(AccountSearchDto searchDto)
@@ -65,7 +67,12 @@ namespace DefaultNamespace
 
         public async Task<ApiResponse<AccountDto>> CreateAsync(CreateAccountDto createAccountDto)
         {
-            var account = MapToEntity(createAccountDto);
+            if (!await _context.Users.AnyAsync(u => u.Id == createAccountDto.UserId))
+            {
+                return ReferenceErrors.NotFound<AccountDto>("userId", "User", createAccountDto.UserId);
+            }
+
+            var account = MapToEntity(createAccountDto, _actor.Id);
             _context.Accounts.Add(account);
             await _context.SaveChangesAsync();
             var newAccount = await _context.Accounts.Include(a => a.User).FirstOrDefaultAsync(a => a.Id == account.Id);
@@ -78,9 +85,7 @@ namespace DefaultNamespace
             if (account == null)
                 return ApiResponse<AccountDto>.ErrorResponse("Account not found", 404);
             account.Name = updateAccountDto.Name;
-            account.UpdatedAt = DateTime.UtcNow;
-            account.UpdatedBy = updateAccountDto.UpdatedBy;
-            _context.Accounts.Update(account);
+            _context.StampChange(account, _actor);
             await _context.SaveChangesAsync();
             return ApiResponse<AccountDto>.SuccessResponse(MapToDto(account), "Account updated successfully", 200);
         }
@@ -109,7 +114,6 @@ namespace DefaultNamespace
                 account.User.TimeZone,
                 account.User.Location,
                 account.User.ProfilePictureUrl,
-                account.User.IsActive,
                 new List<AccountDto>(),
                 account.User.CreatedAt,
                 account.User.UpdatedAt,
@@ -127,7 +131,7 @@ namespace DefaultNamespace
             );
         }
 
-        private static Account MapToEntity(CreateAccountDto dto)
+        private static Account MapToEntity(CreateAccountDto dto, Guid actorId)
         {
             return new Account
             {
@@ -135,7 +139,7 @@ namespace DefaultNamespace
                 Name = dto.Name,
                 UserId = dto.UserId,
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = dto.CreatedBy
+                CreatedBy = actorId
             };
         }
     }
