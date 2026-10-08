@@ -90,7 +90,7 @@ To fix a blocked PR, read the alert. Each one names the query, the file and the 
 
 ## Workflow lint
 
-The check runs [zizmor](https://docs.zizmor.sh) over the repo. It audits the workflows and, once it exists, `dependabot.yml`. Any finding fails the check, and each one shows as an annotation on the file and line.
+The check runs [zizmor](https://docs.zizmor.sh) over the repo. It audits the workflows and `.github/dependabot.yml`, where it checks that every update entry has a cooldown. Any finding fails the check, and each one shows as an annotation on the file and line.
 
 To run it locally with Docker:
 
@@ -114,6 +114,8 @@ The check runs `.husky/csx/commit-lint.csx` on the PR title. Your `commit-msg` h
 The title must look like `<type>[(scope)][!]: <subject>`, such as `ci: lint the PR title`. The script holds the list of types and the length limits.
 
 The check lives in its own workflow, `pr-title.yml`, which also runs when you edit the PR. Fixing a title reruns only this check. Editing the PR body reruns it too. It reruns nothing in `CI`. A new edit or push cancels the title run still going.
+
+Dependabot's PRs pass without edits. `.github/dependabot.yml` gives NuGet and SDK updates the `chore(deps)` prefix and action updates `ci(deps)`.
 
 To check a title locally, install husky first. `husky exec` won't run without it.
 
