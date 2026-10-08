@@ -6,7 +6,7 @@ fail=0
 
 mapfile -t tracked < <(git ls-files | grep -iE '(^|/)(secrets\.json|\.env)($|\.)' | grep -vE '(^|/)\.env\.example$' || true)
 if [[ ${#tracked[@]} -gt 0 ]]; then
-  echo "Secret files are tracked by git. Remove them with git rm --cached and rotate what they held:"
+  echo "Git tracks secret files. Remove them with git rm --cached and rotate what they held:"
   printf '  %s\n' "${tracked[@]}"
   fail=1
 fi

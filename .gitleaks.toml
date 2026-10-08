@@ -12,5 +12,6 @@ paths = [
   '''(^|/)scripts/check-secrets\.sh$''',
 ]
 regexes = [
+  # UserSecretsId from the csproj files. It names a local folder and holds no secret.
   '''0e838897-61eb-4e95-aa86-b5dad1c4e8e2''',
 ]

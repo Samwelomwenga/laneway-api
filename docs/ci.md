@@ -84,13 +84,13 @@ To fix a red run:
 
 The check runs CodeQL on the C# code with the `security-extended` queries. It reads the source without building it.
 
-The job goes green once the analysis finishes, whatever it found. Findings show in the PR's annotations and in the Security tab. The code scanning rule on main is what blocks a PR with a CodeQL error or a high or critical alert.
+The job goes green once the analysis finishes, whatever it found. Findings show in the PR's annotations and in the Security tab. The code scanning rule on main blocks a PR with a CodeQL error or a high or critical alert.
 
-To fix a red run, read the alert. Each one names the query, the file and the line, and links to the query's help with an example fix. If the alert is wrong, dismiss it in the Security tab with a reason.
+To fix a blocked PR, read the alert. Each one names the query, the file and the line, and links to the query's help with an example fix. If the alert is wrong, dismiss it in the Security tab with a reason.
 
 ## Workflow lint
 
-The check runs [zizmor](https://docs.zizmor.sh) over `.github/`. It covers the workflows and, once it exists, `dependabot.yml`. Any finding fails the check, and each one shows as an annotation on the file and line.
+The check runs [zizmor](https://docs.zizmor.sh) over the repo. It audits the workflows and, once it exists, `dependabot.yml`. Any finding fails the check, and each one shows as an annotation on the file and line.
 
 To run it locally with Docker:
 
