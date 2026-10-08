@@ -16,8 +16,7 @@ public sealed class TestStack : IAsyncLifetime
 
     private const string TemplateDatabase = "laneway_template";
 
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:18")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18")
         .WithDatabase(TemplateDatabase)
         .Build();
 

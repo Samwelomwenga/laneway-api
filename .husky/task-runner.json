@@ -9,6 +9,18 @@
        "include": ["**/*.cs"]
      },
      {
+       "name": "check-secrets",
+       "group": "pre-commit",
+       "command": "bash",
+       "args": ["scripts/check-secrets.sh"]
+     },
+     {
+       "name": "format-solution",
+       "group": "pre-push",
+       "command": "dotnet",
+       "args": ["format", "Laneway.Api.sln", "--verify-no-changes"]
+     },
+     {
        "name": "commit-message-linter",
        "group": "commit-msg",
        "command": "dotnet",
