@@ -135,3 +135,17 @@ When any `CI` check fails, the `notify` job sends a Telegram message with the PR
 `notify` reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Doppler syncs both to the repo's Actions secrets and Dependabot secrets, because a Dependabot run reads only Dependabot secrets. A PR from a fork gets no secrets, so `notify` skips the send without a word. On any other run, a missing secret prints `Telegram secrets missing, failure alert not sent` as a warning. If you see that warning, check the Doppler sync.
 
 harden-runner blocks every host but `api.telegram.org` in this job, since it is the only job that reads a secret.
+
+## Local hooks
+
+Restoring the solution installs the husky hooks, so a fresh clone or a new worktree runs them with no extra step. Until that first restore, every commit in a new worktree fails with `.husky/_/husky.sh: No such file or directory`. Run `dotnet restore Laneway.Api.sln` and commit again.
+
+| Hook | Runs | Mirrors |
+| --- | --- | --- |
+| `pre-commit` | `dotnet format whitespace` on staged `.cs` files, then `scripts/check-secrets.sh` | part of `Build & format`, and the script half of `Secret scan` |
+| `commit-msg` | `.husky/csx/commit-lint.csx` on the message | `PR title` |
+| `pre-push` | `dotnet format Laneway.Api.sln --verify-no-changes` | the format step of `Build & format` |
+
+The rest stays in CI: the build, gitleaks, both package scans, CodeQL and zizmor. They are slow or need tools a laptop may not have.
+
+`git commit --no-verify` and `git push --no-verify` skip the hooks for one run. `HUSKY=0` skips every hook and also stops restore from installing them. CI sets `HUSKY=0`, so runners don't install hooks. Skipping a hook skips nothing in CI. Every check still runs on the PR.
