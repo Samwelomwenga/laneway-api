@@ -127,3 +127,11 @@ dotnet husky exec .husky/csx/commit-lint.csx --args title.txt
 ```
 
 To fix a red run, edit the PR title. The log lists what failed and shows valid examples. No push needed.
+
+## Failure alerts
+
+When any `CI` check fails, the `notify` job sends a Telegram message with the PR number, the PR title and a link to the run. It isn't a required check. It shows as skipped on a green run, and it never goes red. `PR title` sends no alert.
+
+`notify` reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Doppler syncs both to the repo's Actions secrets and Dependabot secrets, because a Dependabot run reads only Dependabot secrets. A PR from a fork gets no secrets, so `notify` skips the send without a word. On any other run, a missing secret prints `Telegram secrets missing, failure alert not sent` as a warning. If you see that warning, check the Doppler sync.
+
+harden-runner blocks every host but `api.telegram.org` in this job, since it is the only job that reads a secret.

@@ -144,3 +144,37 @@ jobs:
         with:
           advanced-security: false
           annotations: true
+
+  notify:
+    needs: [build, secret-scan, dependencies, trivy, codeql, zizmor]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: block
+          allowed-endpoints: api.telegram.org:443
+      - name: Send Telegram alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [[ "$IS_FORK" == "true" ]]; then
+            exit 0
+          fi
+          if [[ -z "$TELEGRAM_BOT_TOKEN" || -z "$TELEGRAM_CHAT_ID" ]]; then
+            echo "::warning::Telegram secrets missing, failure alert not sent"
+            exit 0
+          fi
+          text=$(printf 'Laneway CI failed on PR #%s\n%s\n%s' "$PR_NUMBER" "$PR_TITLE" "$RUN_URL")
+          if ! curl --silent --show-error --fail --max-time 30 \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=$text" \
+            "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" > /dev/null; then
+            echo "::warning::Telegram alert failed to send"
+          fi
