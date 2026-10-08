@@ -2,7 +2,7 @@
 
 CI runs no tests. A green PR means the code builds and passes the checks below. Run `dotnet test` before you push.
 
-Every PR to main runs the `CI` workflow in `.github/workflows/ci.yml`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR.
+Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR.
 
 ## Build & format
 
@@ -87,6 +87,24 @@ The check runs CodeQL on the C# code with the `security-extended` queries. It re
 The job goes green once the analysis finishes, whatever it found. Findings show in the PR's annotations and in the Security tab. The code scanning rule on main blocks a PR with a CodeQL error or a high or critical alert.
 
 To fix a blocked PR, read the alert. Each one names the query, the file and the line, and links to the query's help with an example fix. If the alert is wrong, dismiss it in the Security tab with a reason.
+
+## PR title
+
+The check runs `.husky/csx/commit-lint.csx` on the PR title. Your `commit-msg` hook runs the same script on each commit message, so both follow one rule. A squash merge uses the PR title as the commit on main, which is why CI checks the title and not each commit.
+
+The title must look like `<type>[(scope)][!]: <subject>`, with one of the types `build`, `feat`, `ci`, `chore`, `docs`, `fix`, `perf`, `refactor`, `revert`, `style` or `test`. It must be 10 to 100 characters and must not end with a period.
+
+The check lives in its own workflow, `pr-title.yml`, which also runs when you edit the PR. Fixing a title reruns only this check. Editing the PR body reruns it too, and nothing in `CI`.
+
+To check a title locally:
+
+```sh
+dotnet tool restore
+echo 'ci: lint the PR title' > title.txt
+dotnet husky exec .husky/csx/commit-lint.csx --args title.txt
+```
+
+To fix a red run, edit the PR title. The log lists what failed and shows valid examples. No push needed.
 
 ## Workflow lint
 
