@@ -115,10 +115,11 @@ The title must look like `<type>[(scope)][!]: <subject>`, such as `ci: lint the 
 
 The check lives in its own workflow, `pr-title.yml`, which also runs when you edit the PR. Fixing a title reruns only this check. Editing the PR body reruns it too. It reruns nothing in `CI`. A new edit or push cancels the title run still going.
 
-To check a title locally:
+To check a title locally, install husky first. `husky exec` won't run without it.
 
 ```sh
 dotnet tool restore
+dotnet husky install
 echo 'ci: lint the PR title' > title.txt
 dotnet husky exec .husky/csx/commit-lint.csx --args title.txt
 ```

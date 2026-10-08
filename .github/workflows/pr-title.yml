@@ -28,6 +28,8 @@ jobs:
           global-json-file: global.json
       - name: Restore tools
         run: dotnet tool restore
+      - name: Install husky
+        run: dotnet husky install
       - name: Lint title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
