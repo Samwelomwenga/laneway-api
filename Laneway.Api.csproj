@@ -32,7 +32,7 @@
         <PackageReference Include="Supabase.Storage" />
     </ItemGroup>
 
-    <Target Name="Husky" BeforeTargets="_GenerateRestoreGraphProjectEntry" Condition="'$(HUSKY)' != '0'">
+    <Target Name="Husky" BeforeTargets="_GenerateRestoreGraphProjectEntry" Condition="'$(HUSKY)' != '0' and !Exists('$(MSBuildThisFileDirectory).husky/_/husky.sh')">
         <Exec Command="dotnet tool restore" WorkingDirectory="$(MSBuildThisFileDirectory)" StandardOutputImportance="Low" StandardErrorImportance="High" />
         <Exec Command="dotnet husky install" WorkingDirectory="$(MSBuildThisFileDirectory)" StandardOutputImportance="Low" StandardErrorImportance="High" />
     </Target>

@@ -15,7 +15,7 @@
        "args": ["scripts/check-secrets.sh"]
      },
      {
-       "name": "format-check",
+       "name": "format-solution",
        "group": "pre-push",
        "command": "dotnet",
        "args": ["format", "Laneway.Api.sln", "--verify-no-changes"]

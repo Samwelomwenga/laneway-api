@@ -128,17 +128,19 @@ dotnet husky exec .husky/csx/commit-lint.csx --args title.txt
 
 To fix a red run, edit the PR title. The log lists what failed and shows valid examples. No push needed.
 
-## Failure alerts
+## notify
 
-When any `CI` check fails, the `notify` job sends a Telegram message with the PR number, the PR title and a link to the run. It isn't a required check. It shows as skipped on a green run, and it never goes red. `PR title` sends no alert.
+When any `CI` check fails, `notify` sends a Telegram message with the PR number, the PR title and a link to the run. It isn't a required check. It shows as skipped on a green run, and it never goes red. `PR title` sends no alert.
 
 `notify` reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Doppler syncs both to the repo's Actions secrets and Dependabot secrets, because a Dependabot run reads only Dependabot secrets. A PR from a fork gets no secrets, so `notify` skips the send without a word. On any other run, a missing secret prints `Telegram secrets missing, failure alert not sent` as a warning. If you see that warning, check the Doppler sync.
 
-harden-runner blocks every host but `api.telegram.org` in this job, since it is the only job that reads a secret.
+harden-runner blocks every host but `api.telegram.org` in this job, since it reads the Telegram bot token.
+
+A new job in `ci.yml` goes in the `needs` list of `notify` too. Otherwise its failures send no alert.
 
 ## Local hooks
 
-Restoring the solution installs the husky hooks, so a fresh clone or a new worktree runs them with no extra step. Until that first restore, every commit in a new worktree fails with `.husky/_/husky.sh: No such file or directory`. Run `dotnet restore Laneway.Api.sln` and commit again.
+Restoring the solution installs the husky hooks, so a fresh clone or a new worktree runs them with no extra step. Until that first restore, every commit in a new worktree fails with `.husky/_/husky.sh: No such file or directory`. Run `dotnet restore Laneway.Api.sln` and commit again. Restore skips the install once `.husky/_/husky.sh` exists. To reinstall, delete `.husky/_` and restore.
 
 | Hook | Runs | Mirrors |
 | --- | --- | --- |
