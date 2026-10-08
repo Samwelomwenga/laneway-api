@@ -1,0 +1,16 @@
+title = "Laneway API gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Files and values that are safe to commit"
+paths = [
+  '''(^|/)appsettings\.Development\.json$''',
+  '''(^|/)Migrations/''',
+  '''(^|/)\.gitleaks\.toml$''',
+  '''(^|/)scripts/check-secrets\.sh$''',
+]
+regexes = [
+  '''0e838897-61eb-4e95-aa86-b5dad1c4e8e2''',
+]
