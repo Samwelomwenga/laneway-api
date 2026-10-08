@@ -23,3 +23,22 @@ To fix a red run:
 - The format step failed. Run `dotnet format Laneway.Api.sln` and commit what it changes.
 - The build step failed on a warning. `TreatWarningsAsErrors` is on in `Directory.Build.props`, so any compiler warning fails the build. Fix the warning. The log names the file and line.
 - The build step failed on a CA rule. It shouldn't. `CodeAnalysisTreatWarningsAsErrors` is false, so CA warnings don't fail the build. If one does, someone changed the props.
+
+## Workflow lint
+
+The check runs [zizmor](https://docs.zizmor.sh) over `.github/`. It covers the workflows and, once it exists, `dependabot.yml`. Any finding fails the check, and each one shows as an annotation on the file and line.
+
+To run it locally with Docker:
+
+```sh
+docker run --rm -v "$PWD:/repo" -w /repo ghcr.io/zizmorcore/zizmor:latest .
+```
+
+Without a `GH_TOKEN`, zizmor skips the online audits that CI runs, such as the check for actions with known advisories.
+
+To fix a red run:
+
+- An action is pinned to a tag or branch. Pin it to the full commit SHA of that release and put the version in a trailing comment, like `uses: actions/checkout@<sha> # v7.0.1`.
+- A job asks for more permissions than it uses. Drop the extra ones. A job that needs more than `contents: read` declares its own block and repeats `contents: read` in it.
+- A `${{ }}` expression sits inside a `run:` script. Pass the value in through `env:` and read the variable in the script.
+- You accept the finding. Add `# zizmor: ignore[<audit>]` on the flagged line, followed by the reason. Every exception lives next to the line it excuses.
