@@ -2,7 +2,7 @@
 
 CI runs no tests. A green PR means the code builds and passes the checks below. Run `dotnet test` before you push.
 
-Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR.
+Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
 
 ## Build & format
 
@@ -132,7 +132,7 @@ To fix a red run, edit the PR title. The log lists what failed and shows valid e
 
 When any `CI` check fails, `notify` sends a Telegram message with the PR number, the PR title and a link to the run. It isn't a required check. It shows as skipped on a green run, and it never goes red. `PR title` sends no alert.
 
-`notify` reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Doppler syncs both to the repo's Actions secrets and Dependabot secrets, because a Dependabot run reads only Dependabot secrets. A PR from a fork gets no secrets, so `notify` skips the send without a word. On any other run, a missing secret prints `Telegram secrets missing, failure alert not sent` as a warning. If you see that warning, check the Doppler sync.
+`notify` reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Doppler syncs both to the repo's Actions secrets and Dependabot secrets, because a Dependabot run reads only Dependabot secrets. A PR from a fork gets no secrets, so `notify` skips the send without a word. On any other run, a missing secret prints `Telegram secrets missing, failure alert not sent` as a warning. If you see that warning, check the Doppler sync. [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) has the setup steps.
 
 harden-runner blocks every host but `api.telegram.org` in this job, since it reads the Telegram bot token.
 
