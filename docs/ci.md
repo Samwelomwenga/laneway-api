@@ -48,6 +48,46 @@ To fix a red run:
 - gitleaks found a real secret. Rotate it first. Then drop the commit that added it, because deleting the line in a later commit leaves it in the PR's history and the scan stays red.
 - gitleaks flagged something that isn't a secret. Add the file path or the exact value to the allowlist in `.gitleaks.toml`.
 
+## Vulnerable packages
+
+The check restores the `.sln` and runs `dotnet list package --vulnerable --include-transitive`. It fails when any package has a known advisory, including packages that only arrive through another package.
+
+```sh
+dotnet restore Laneway.Api.sln
+dotnet list Laneway.Api.sln package --vulnerable --include-transitive
+```
+
+Restore runs the same NuGet audit, and `TreatWarningsAsErrors` turns its NU1901 to NU1904 warnings into errors. So a vulnerable package usually turns this check red at the Restore step, and `Build & format` goes red with it. The log names the package, the version and the advisory link either way.
+
+To fix a red run:
+
+- A direct package is vulnerable. Bump its version in `Directory.Packages.props` to one the advisory lists as patched.
+- A transitive package is vulnerable. Bump the direct package that pulls it in. If no release of that package has the fix yet, pin the patched transitive version in `Directory.Packages.props` and reference it from the project that needs it.
+
+## Trivy filesystem scan
+
+The check runs [Trivy](https://trivy.dev) over the checkout with its vulnerability, secret and misconfiguration scanners. It fails on any high or critical finding. Trivy reads package versions from `Directory.Packages.props`, so it only sees direct packages. `Vulnerable packages` covers the transitive ones.
+
+The results go to code scanning under the `trivy` category, even when the scan fails. Read them in the PR's annotations or in the Security tab.
+
+```sh
+docker run --rm -v "$PWD:/src" aquasec/trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --skip-dirs '**/bin' --skip-dirs '**/obj' /src
+```
+
+To fix a red run:
+
+- A vulnerability. Bump the package, the same way as for `Vulnerable packages`.
+- A secret. Treat it like a gitleaks finding in `Secret scan`. Rotate it and drop the commit.
+- A misconfiguration. The finding links to the rule. Fix the config it names.
+
+## CodeQL (SAST)
+
+The check runs CodeQL on the C# code with the `security-extended` queries. It reads the source without building it.
+
+The job goes green once the analysis finishes, whatever it found. Findings show in the PR's annotations and in the Security tab. The code scanning rule on main is what blocks a PR with a CodeQL error or a high or critical alert.
+
+To fix a red run, read the alert. Each one names the query, the file and the line, and links to the query's help with an example fix. If the alert is wrong, dismiss it in the Security tab with a reason.
+
 ## Workflow lint
 
 The check runs [zizmor](https://docs.zizmor.sh) over `.github/`. It covers the workflows and, once it exists, `dependabot.yml`. Any finding fails the check, and each one shows as an annotation on the file and line.
