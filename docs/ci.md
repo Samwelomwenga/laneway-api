@@ -88,24 +88,6 @@ The job goes green once the analysis finishes, whatever it found. Findings show 
 
 To fix a blocked PR, read the alert. Each one names the query, the file and the line, and links to the query's help with an example fix. If the alert is wrong, dismiss it in the Security tab with a reason.
 
-## PR title
-
-The check runs `.husky/csx/commit-lint.csx` on the PR title. Your `commit-msg` hook runs the same script on each commit message, so both follow one rule. A squash merge uses the PR title as the commit on main, which is why CI checks the title and not each commit.
-
-The title must look like `<type>[(scope)][!]: <subject>`, with one of the types `build`, `feat`, `ci`, `chore`, `docs`, `fix`, `perf`, `refactor`, `revert`, `style` or `test`. It must be 10 to 100 characters and must not end with a period.
-
-The check lives in its own workflow, `pr-title.yml`, which also runs when you edit the PR. Fixing a title reruns only this check. Editing the PR body reruns it too, and nothing in `CI`.
-
-To check a title locally:
-
-```sh
-dotnet tool restore
-echo 'ci: lint the PR title' > title.txt
-dotnet husky exec .husky/csx/commit-lint.csx --args title.txt
-```
-
-To fix a red run, edit the PR title. The log lists what failed and shows valid examples. No push needed.
-
 ## Workflow lint
 
 The check runs [zizmor](https://docs.zizmor.sh) over the repo. It audits the workflows and, once it exists, `dependabot.yml`. Any finding fails the check, and each one shows as an annotation on the file and line.
@@ -124,3 +106,21 @@ To fix a red run:
 - A job asks for more permissions than it uses. Drop the extra ones. A job that needs more than `contents: read` declares its own block and repeats `contents: read` in it.
 - A `${{ }}` expression sits inside a `run:` script. Pass the value in through `env:` and read the variable in the script.
 - You accept the finding. Add `# zizmor: ignore[<audit>]` on the flagged line, followed by the reason. Every exception lives next to the line it excuses.
+
+## PR title
+
+The check runs `.husky/csx/commit-lint.csx` on the PR title. Your `commit-msg` hook runs the same script on each commit message, so both follow one rule. A squash merge uses the PR title as the commit on main, which is why CI checks the title and not each commit.
+
+The title must look like `<type>[(scope)][!]: <subject>`, such as `ci: lint the PR title`. The script holds the list of types and the length limits.
+
+The check lives in its own workflow, `pr-title.yml`, which also runs when you edit the PR. Fixing a title reruns only this check. Editing the PR body reruns it too. It reruns nothing in `CI`. A new edit or push cancels the title run still going.
+
+To check a title locally:
+
+```sh
+dotnet tool restore
+echo 'ci: lint the PR title' > title.txt
+dotnet husky exec .husky/csx/commit-lint.csx --args title.txt
+```
+
+To fix a red run, edit the PR title. The log lists what failed and shows valid examples. No push needed.
