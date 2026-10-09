@@ -5,6 +5,7 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+var gateTest = 0;
 
 builder.Services.AddControllers(options =>
     {
