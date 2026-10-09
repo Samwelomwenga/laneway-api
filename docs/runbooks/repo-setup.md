@@ -22,7 +22,7 @@ The same applies to a new required check. Add it to the ruleset only after it ha
 GitHub's evaluate mode for rulesets is Enterprise only, so there is no dry run. Follow this order once.
 
 1. Merge the build PR with both rulesets off.
-2. Set up [Doppler and Telegram](#doppler-and-telegram), and turn on GitHub Code Quality under Settings, Security, Code quality.
+2. Set up [Doppler and Telegram](#doppler-and-telegram).
 3. Open a test PR. Confirm these checks report, spelled exactly like this:
    - `Build & format`
    - `Secret scan`
@@ -31,7 +31,6 @@ GitHub's evaluate mode for rulesets is Enterprise only, so there is no dry run. 
    - `CodeQL (SAST)`
    - `Workflow lint`
    - `PR title`
-   - `CodeQL - Code Quality`. Confirm it runs next to the `CodeQL (SAST)` job without either one failing.
 4. Turn on the rest of the [repo settings](#repo-settings).
 5. Rewrite `DEfault_RULES` as the [`main` ruleset](#ruleset-main).
 6. Create the [`main-merge-lock` ruleset](#ruleset-main-merge-lock).
@@ -46,10 +45,6 @@ Settings, General, Pull Requests:
 - Default squash commit title: pull request title (`PR_TITLE`). `PR title` checks the title because it becomes the commit on main.
 - Default squash commit message: pull request description (`PR_BODY`).
 - Automatically delete head branches: on.
-
-Settings, Security, Code quality:
-
-- GitHub Code Quality: on. It must report on a PR before the code quality rule goes into the `main` ruleset.
 
 Settings, Actions, General:
 
@@ -82,12 +77,13 @@ Rules:
   - Allowed merge methods: squash only.
 - Require status checks to pass:
   - Require branches to be up to date before merging: off. With it on, every merge forces every open PR to rebase and rerun. With it off, two PRs that pass alone can break main together. CI runs no tests, so it only catches a break that stops the build, and only on the next PR.
-  - Add the seven checks from step 3 of the rollout, `CodeQL - Code Quality` aside. Pin each one to the GitHub Actions app, integration id `15368`. Then a commit status with the same name from some other source can't satisfy the check.
+  - Add the seven checks from step 3 of the rollout. Pin each one to the GitHub Actions app, integration id `15368`. Then a commit status with the same name from some other source can't satisfy the check.
 - Require code scanning results:
   - Tool: CodeQL.
   - Alerts: errors. Security alerts: high or higher.
   - The `CodeQL (SAST)` job stays green with findings, so this rule does the blocking. Trivy isn't listed, because its job fails on its own.
-- Require code quality results: errors.
+
+Leave out "Require code quality results". GitHub Code Quality is a paid per-committer product, and this personal-account repo has no Code quality settings page. With nothing reporting, the rule would block every PR.
 
 ## Ruleset `main-merge-lock`
 
