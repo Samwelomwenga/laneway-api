@@ -68,7 +68,6 @@ Rules:
 
 - Restrict deletions.
 - Require linear history.
-- Require signed commits. GitHub signs every squash merge, so this costs nothing.
 - Block force pushes.
 - Require a pull request before merging:
   - Required approvals: 0.
@@ -82,6 +81,8 @@ Rules:
   - Tool: CodeQL.
   - Alerts: errors. Security alerts: high or higher.
   - The `CodeQL (SAST)` job stays green with findings, so this rule does the blocking. Trivy isn't listed, because its job fails on its own.
+
+Leave out "Require signed commits". It checks the commits on the PR branch too, so every unsigned commit there blocks the merge. GitHub signs each squash commit it creates, and with restrict updates a squash merge is the only way into main. So main ends up signed without the rule.
 
 Leave out "Require code quality results". GitHub Code Quality is a paid per-committer product, and this personal-account repo has no Code quality settings page. With nothing reporting, the rule would block every PR.
 
