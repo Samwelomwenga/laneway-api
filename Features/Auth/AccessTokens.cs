@@ -16,10 +16,10 @@ public sealed class AccessTokens(IOptions<AuthOptions> options, SigningKeys keys
 
     private readonly JsonWebTokenHandler _handler = new() { SetDefaultTimesOnTokenCreation = false };
 
-    public string Issue(Guid userId, Guid sessionId)
+    public IssuedAccessToken Issue(Guid userId, Guid sessionId)
     {
         var now = time.GetUtcNow().UtcDateTime;
-        return _handler.CreateToken(new SecurityTokenDescriptor
+        var token = _handler.CreateToken(new SecurityTokenDescriptor
         {
             Issuer = options.Value.Issuer,
             Audience = options.Value.Audience,
@@ -33,5 +33,8 @@ public sealed class AccessTokens(IOptions<AuthOptions> options, SigningKeys keys
                 [SessionClaim] = sessionId.ToString()
             }
         });
+        return new IssuedAccessToken(token, now + Lifetime);
     }
 }
+
+public sealed record IssuedAccessToken(string Value, DateTime ExpiresAt);

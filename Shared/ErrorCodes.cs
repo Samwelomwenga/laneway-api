@@ -4,6 +4,7 @@ public static class ErrorCodes
 {
     public const string Required = "required";
     public const string TooLong = "tooLong";
+    public const string TooShort = "tooShort";
     public const string InvalidFormat = "invalidFormat";
     public const string UnknownValue = "unknownValue";
     public const string OutOfRange = "outOfRange";
@@ -28,4 +29,5 @@ public static class ErrorCodes
     public const string NotAuthor = "notAuthor";
     public const string InternalError = "internalError";
     public const string NotAuthenticated = "notAuthenticated";
+    public const string InvalidCredentials = "invalidCredentials";
 }

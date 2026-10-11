@@ -44,7 +44,7 @@ namespace Laneway.Api
                 .Include(u => u.Accounts)
                 .ToListAsync();
 
-            var userDtos = users.Select(MapToDto).ToList();
+            var userDtos = users.Select(UserView.Of).ToList();
 
             return PagedResponse<UserDto>.SuccessResponse(
                 userDtos,
@@ -65,31 +65,21 @@ namespace Laneway.Api
             {
                 return ApiResponse<UserDto>.ErrorResponse("User not found", 404);
             }
-            var userDto = MapToDto(existingUser);
+            var userDto = UserView.Of(existingUser);
             return ApiResponse<UserDto>.SuccessResponse(userDto, "User retrieved successfully", 200);
         }
 
         public async Task<ApiResponse<UserDto>> CreateAsync(CreateUserDto createUserDto)
         {
-            var errors = await TakenAsync(createUserDto.Username, createUserDto.Email, exceptId: null);
+            var errors = await UserRules.TakenAsync(_context, createUserDto.Username, createUserDto.Email, exceptId: null);
             if (errors.Count > 0)
             {
-                return ApiResponse<UserDto>.ErrorResponse("User already exists", 409, errors);
+                return UserRules.AlreadyExists<UserDto>(errors);
             }
-            var newUser = MapToEntity(createUserDto);
+            var newUser = UserRules.Create(NewUser.Of(createUserDto), "temp_hash", DateTime.UtcNow);
             _context.Users.Add(newUser);
-
-            var newAccount = new Account
-            {
-                Id = Guid.NewGuid(),
-                Name = $"{newUser.Username}'s Account",
-                UserId = newUser.Id,
-                CreatedAt = newUser.CreatedAt,
-                CreatedBy = newUser.CreatedBy
-            };
-            _context.Accounts.Add(newAccount);
             await _context.SaveChangesAsync();
-            return ApiResponse<UserDto>.SuccessResponse(MapToDto(newUser), "User created successfully", 201);
+            return ApiResponse<UserDto>.SuccessResponse(UserView.Of(newUser), "User created successfully", 201);
         }
 
         public async Task<ApiResponse<UserDto>> UpdateAsync(Guid id, UpdateUserDto updateUserDto)
@@ -102,10 +92,10 @@ namespace Laneway.Api
                 return ApiResponse<UserDto>.ErrorResponse("User not found", 404);
             }
 
-            var errors = await TakenAsync(updateUserDto.Username, updateUserDto.Email, exceptId: id);
+            var errors = await UserRules.TakenAsync(_context, updateUserDto.Username, updateUserDto.Email, exceptId: id);
             if (errors.Count > 0)
             {
-                return ApiResponse<UserDto>.ErrorResponse("User already exists", 409, errors);
+                return UserRules.AlreadyExists<UserDto>(errors);
             }
 
             existingUser.Username = updateUserDto.Username;
@@ -122,7 +112,7 @@ namespace Laneway.Api
 
             await _context.SaveChangesAsync();
 
-            return ApiResponse<UserDto>.SuccessResponse(MapToDto(existingUser), "User updated successfully", 200);
+            return ApiResponse<UserDto>.SuccessResponse(UserView.Of(existingUser), "User updated successfully", 200);
         }
 
         public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
@@ -141,69 +131,6 @@ namespace Laneway.Api
         {
             var exists = await _context.Users.AnyAsync(u => u.Username == username);
             return ApiResponse<bool>.SuccessResponse(exists, "Username existence checked successfully", 200);
-        }
-
-        private async Task<List<ApiError>> TakenAsync(string username, string email, Guid? exceptId)
-        {
-            var takenUsers = await _context.Users
-                .Where(u => u.Id != exceptId && (u.Username == username || u.Email == email))
-                .Select(u => new { u.Username, u.Email })
-                .ToListAsync();
-            List<ApiError> errors = [];
-            if (takenUsers.Any(u => u.Username == username))
-            {
-                errors.Add(new ApiError("username", ErrorCodes.Duplicate, "A user with this username already exists."));
-            }
-            if (takenUsers.Any(u => u.Email == email))
-            {
-                errors.Add(new ApiError("email", ErrorCodes.Duplicate, "A user with this email already exists."));
-            }
-            return errors;
-        }
-
-        private static UserDto MapToDto(User user)
-        {
-            return new UserDto
-            (
-                user.Id,
-                user.Username,
-                user.Email,
-                user.FirstName,
-                user.LastName,
-                user.PhoneNumber,
-                user.Bio,
-                user.Language,
-                user.TimeZone,
-                user.Location,
-                user.ProfilePictureUrl,
-                user.Accounts?.Select(AccountView.Of).ToList() ?? [],
-                user.CreatedAt,
-                user.UpdatedAt,
-                user.CreatedBy,
-                user.UpdatedBy
-            );
-        }
-
-        private static User MapToEntity(CreateUserDto createUserDto)
-        {
-            var id = Guid.NewGuid();
-            return new User
-            {
-                Id = id,
-                Username = createUserDto.Username,
-                Email = createUserDto.Email,
-                FirstName = createUserDto.FirstName,
-                LastName = createUserDto.LastName,
-                PhoneNumber = createUserDto.PhoneNumber,
-                Bio = createUserDto.Bio,
-                Language = createUserDto.Language,
-                TimeZone = createUserDto.TimeZone,
-                Location = createUserDto.Location,
-                ProfilePictureUrl = createUserDto.ProfilePictureUrl,
-                PasswordHash = "temp_hash",
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = id
-            };
         }
     }
 }

@@ -24,6 +24,8 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected ApiTests(TestStack stack) => _stack = stack;
 
+    private static readonly Lazy<string> SeededPasswordHash = new(() => new Passwords().Hash(TestUser.Password));
+
     protected TestUser ActorUser { get; private set; } = null!;
 
     protected Guid ActorId => ActorUser.Id;
@@ -73,8 +75,9 @@ public abstract class ApiTests : IAsyncLifetime
     protected Task<HttpResponseMessage> DeleteAsync(string path, TestUser? @as = null) =>
         SendAsync(HttpMethod.Delete, path, null, @as ?? ActorUser);
 
-    protected Task<HttpResponseMessage> SendWithoutActorAsync(HttpMethod method, string path, object? body) =>
-        SendAsync(method, path, body, user: null);
+    protected Task<HttpResponseMessage> SendWithoutActorAsync(
+        HttpMethod method, string path, object? body, string? userAgent = null) =>
+        SendAsync(method, path, body, user: null, userAgent);
 
     protected Task<HttpResponseMessage> GetAsync(string path, TestUser? @as = null) =>
         SendAsync(HttpMethod.Get, path, null, @as ?? ActorUser);
@@ -88,7 +91,7 @@ public abstract class ApiTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             Username = $"actor-{tag}",
             Email = $"{tag}@example.com",
-            PasswordHash = "temp_hash",
+            PasswordHash = SeededPasswordHash.Value,
             FirstName = "Ana",
             LastName = "Waweru",
             Language = "en-US",
@@ -137,7 +140,9 @@ public abstract class ApiTests : IAsyncLifetime
 
     private Task<string> IssueTokenAsync(Guid userId, Guid sessionId) =>
         FromServicesAsync(services =>
-            Task.FromResult(services.GetRequiredService<AccessTokens>().Issue(userId, sessionId)));
+            Task.FromResult(services.GetRequiredService<AccessTokens>().Issue(userId, sessionId).Value));
+
+    protected IServiceProvider Services => Factory.Services;
 
     protected IReadOnlyList<FakeLogRecord> Logs() => Factory.Services.GetFakeLogCollector().GetSnapshot();
 
@@ -668,16 +673,20 @@ public abstract class ApiTests : IAsyncLifetime
     }
 
     private async Task<HttpResponseMessage> SendAsync(
-        HttpMethod method, string path, object? body, TestUser? user)
+        HttpMethod method, string path, object? body, TestUser? user, string? userAgent = null)
     {
         using var request = new HttpRequestMessage(method, path);
         if (body is not null)
         {
-            request.Content = JsonContent.Create(body);
+            request.Content = body as HttpContent ?? JsonContent.Create(body);
         }
         if (user is not null)
         {
             request.Headers.Authorization = Bearer(user);
+        }
+        if (userAgent is not null)
+        {
+            request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
         }
 
         return await Client.SendAsync(request);

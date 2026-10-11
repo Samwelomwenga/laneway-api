@@ -46,6 +46,7 @@ builder.Services.AddHostedService<CopyJobWorker>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddBearerTokens();
+builder.Services.AddSingleton<Passwords>();
 
 builder.Services.AddScoped<Actor>();
 builder.Services.AddScoped<ActivityWriter>();
@@ -79,6 +80,7 @@ builder.Services.AddScoped<ICopyJobRunner, BoardCopyRunner>();
 builder.Services.AddScoped<IWorkSpaceService, WorkSpaceService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<AuthService>();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 
@@ -98,6 +100,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 var app = builder.Build();
 app.Services.GetRequiredService<AuthMeter>();
+app.Services.GetRequiredService<Passwords>();
 
 app.UseExceptionHandler();
 

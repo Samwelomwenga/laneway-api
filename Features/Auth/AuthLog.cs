@@ -14,6 +14,42 @@ public static class AuthLog
         LoggerMessage.Define<string, bool>(
             LogLevel.Information, AccessTokenRejectedId, "Access token rejected: {reason}, kidKnown {kidKnown}");
 
+    private static readonly EventId SignUpId = new(2, "SignUp");
+
+    private static readonly EventId SignInSucceededId = new(3, "SignInSucceeded");
+
+    private static readonly EventId SignInFailedId = new(4, "SignInFailed");
+
+    private static readonly Action<ILogger, Guid, Guid, Exception?> SignUpEvent =
+        LoggerMessage.Define<Guid, Guid>(LogLevel.Information, SignUpId, "Signed up: sub {sub}, sid {sid}");
+
+    private static readonly Action<ILogger, Guid, Guid, Exception?> SignInSucceededEvent =
+        LoggerMessage.Define<Guid, Guid>(LogLevel.Information, SignInSucceededId, "Signed in: sub {sub}, sid {sid}");
+
+    private static readonly Action<ILogger, Guid, Exception?> SignInFailedWithSub =
+        LoggerMessage.Define<Guid>(LogLevel.Warning, SignInFailedId, "Sign-in failed: sub {sub}");
+
+    private static readonly Action<ILogger, bool, Exception?> SignInFailedWithoutAccount =
+        LoggerMessage.Define<bool>(LogLevel.Warning, SignInFailedId, "Sign-in failed: accountFound {accountFound}");
+
+    public static void SignUp(this ILogger logger, Guid userId, Guid sessionId) =>
+        SignUpEvent(logger, userId, sessionId, null);
+
+    public static void SignInSucceeded(this ILogger logger, Guid userId, Guid sessionId) =>
+        SignInSucceededEvent(logger, userId, sessionId, null);
+
+    public static void SignInFailed(this ILogger logger, Guid? userId)
+    {
+        if (userId is { } sub)
+        {
+            SignInFailedWithSub(logger, sub, null);
+        }
+        else
+        {
+            SignInFailedWithoutAccount(logger, false, null);
+        }
+    }
+
     public static void AccessTokenRejected(this ILogger logger, string reason, string? knownKid)
     {
         if (knownKid is null)

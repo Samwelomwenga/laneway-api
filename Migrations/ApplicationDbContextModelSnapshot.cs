@@ -679,6 +679,10 @@ namespace Laneway.Api.Migrations
 
                     b.HasIndex("UpdatedBy");
 
+                    b.HasIndex("Username")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
                     b.ToTable("Users");
                 });
 

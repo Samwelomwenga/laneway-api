@@ -17,6 +17,28 @@ public class Session
     public SessionEndReason? EndReason { get; set; }
     public required string UserAgent { get; set; }
 
+    public static Session Start(Guid userId, string? userAgent, DateTime now)
+    {
+        var agent = userAgent ?? string.Empty;
+        if (agent.Length > FieldLimits.SessionUserAgent)
+        {
+            var end = char.IsHighSurrogate(agent[FieldLimits.SessionUserAgent - 1])
+                ? FieldLimits.SessionUserAgent - 1
+                : FieldLimits.SessionUserAgent;
+            agent = agent[..end];
+        }
+
+        return new Session
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            CreatedAt = now,
+            LastUsedAt = now,
+            ExpiresAt = now + AbsoluteLifetime,
+            UserAgent = agent
+        };
+    }
+
     public static Expression<Func<Session, bool>> ActiveAt(DateTime now)
     {
         var idleSince = now - IdleTimeout;

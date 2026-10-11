@@ -69,6 +69,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(u => u.Username)
                 .HasColumnType("varchar(50)")
                 .IsRequired();
+            entity.HasIndex(u => u.Username)
+                .IsUnique()
+                .HasFilter("\"DeletedAt\" IS NULL");
             entity.Property(u => u.Email)
                 .HasColumnType("varchar(255)")
                 .IsRequired();

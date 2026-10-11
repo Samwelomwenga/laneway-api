@@ -13,6 +13,9 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | Id | Event | Level | Fields |
 |---|---|---|---|
 | 1 | `AccessTokenRejected` | Information | `reason`, and `kid` when it names a configured key, otherwise `kidKnown: false` |
+| 2 | `SignUp` | Information | `sub`, `sid` |
+| 3 | `SignInSucceeded` | Information | `sub`, `sid` |
+| 4 | `SignInFailed` | Warning | `sub` when the email belongs to a user, otherwise `accountFound: false` |
 
 `reason` is one of `malformed`, `expired`, `unknownKey`, `invalidSignature`, `invalidAlgorithm`, `invalidType`, `invalidIssuer`, `invalidAudience`, `sessionEnded`, or `invalid`.
 
@@ -28,7 +31,11 @@ On .NET 9, `ExceptionHandlerMiddleware` logs every exception before the handler 
 
 A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold only small fixed sets, never `sub` or `sid`. Locally, `dotnet-counters monitor --counters Laneway.Auth` reads it.
 
-No counters yet.
+| Counter | Tags |
+|---|---|
+| `laneway.auth.sign_in.attempts` | `result`: `succeeded`, `wrong_password`, or `unknown_account` |
+
+The counter includes successes, so the failure-to-success ratio is visible. A climbing ratio is the usual sign of credential stuffing.
 
 ## Never logged
 

@@ -32,7 +32,10 @@ public record CreateUserDto
     string TimeZone,
     string Location,
     Uri? ProfilePictureUrl
-);
+)
+{
+    public string Email { get; init; } = Emails.Normalize(Email);
+}
 
 public record UpdateUserDto
 (
@@ -46,7 +49,10 @@ public record UpdateUserDto
     string TimeZone,
     string Location,
     Uri? ProfilePictureUrl
-);
+)
+{
+    public string Email { get; init; } = Emails.Normalize(Email);
+}
 
 public record UserSearchDto
 (
