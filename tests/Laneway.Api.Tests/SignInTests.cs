@@ -70,7 +70,7 @@ public class SignInTests : ApiTests
         using var signUp = await SignUpAsync(SignUpBody("Ana.Waweru@Example.com"));
         var userId = (await signUp.ReadEnvelope<SignedUpDto>()).Data!.User.Id;
 
-        using var response = await SignInAsync("  ANA.waweru@example.COM ", Password);
+        using var response = await SignInAsync("  ANA.waweru@example.COM ", SignUpPassword);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var raw = await response.Content.ReadAsStringAsync();
@@ -159,7 +159,7 @@ public class SignInTests : ApiTests
     [InlineData(129, ErrorCodes.TooLong)]
     public async Task Sign_up_rejects_a_password_outside_8_to_128_characters(int length, string code)
     {
-        using var response = await SignUpAsync(SignUpBody("ana@example.com", new string('k', length)));
+        using var response = await SignUpAsync(SignUpBody("ana@example.com", PasswordOfLength(length)));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = Assert.Single((await response.ReadEnvelope<object>()).Errors!);
@@ -172,7 +172,7 @@ public class SignInTests : ApiTests
     [InlineData(128)]
     public async Task Sign_up_accepts_a_password_of_8_or_128_characters(int length)
     {
-        using var response = await SignUpAsync(SignUpBody("ana@example.com", new string('k', length)));
+        using var response = await SignUpAsync(SignUpBody("ana@example.com", PasswordOfLength(length)));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
@@ -257,25 +257,11 @@ public class SignInTests : ApiTests
         Assert.Equal(ErrorCodes.InvalidFormat, error.Code);
     }
 
-    private const string Password = "plum tractor ocean";
-
-    private Task<HttpResponseMessage> SignUpAsync(object body) =>
-        SendWithoutActorAsync(HttpMethod.Post, "/api/v1/auth/sign-up", body);
+    private static string PasswordOfLength(int length) =>
+        string.Concat(Enumerable.Repeat("plum tractor ", 10))[..length];
 
     private Task<HttpResponseMessage> SignInAsync(string email, string password, string? userAgent = null) =>
         SendWithoutActorAsync(HttpMethod.Post, "/api/v1/auth/sign-in", new { email, password }, userAgent);
-
-    private static object SignUpBody(string email, string password = Password, string? username = null) => new
-    {
-        username = username ?? $"ana-{Guid.NewGuid():n}"[..20],
-        email,
-        password,
-        firstName = "Ana",
-        lastName = "Waweru",
-        language = "en-US",
-        timeZone = "UTC",
-        location = "Nairobi"
-    };
 
     private Task<string> OnlySessionIdAsync(Guid userId) =>
         FromDatabaseAsync(async database =>

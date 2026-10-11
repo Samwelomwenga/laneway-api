@@ -5,6 +5,7 @@ namespace Laneway.Api;
 public sealed class AuthService(
     ApplicationDbContext database,
     Passwords passwords,
+    PasswordPolicy passwordPolicy,
     AccessTokens tokens,
     AuthMeter meter,
     TimeProvider time,
@@ -22,6 +23,11 @@ public sealed class AuthService(
         if (taken.Count > 0)
         {
             return UserRules.AlreadyExists<SignedUpDto>(taken);
+        }
+
+        if (await passwordPolicy.CheckAsync(write.Password, write.User.Username, write.User.Email) is { } refused)
+        {
+            return ApiResponse<SignedUpDto>.ErrorResponse("Invalid data", StatusCodes.Status400BadRequest, [refused]);
         }
 
         var now = time.GetUtcNow().UtcDateTime;

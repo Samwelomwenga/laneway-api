@@ -47,6 +47,8 @@ builder.Services.AddHostedService<CopyJobWorker>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddBearerTokens();
 builder.Services.AddSingleton<Passwords>();
+builder.Services.AddHttpClient<BreachedPasswords>(BreachedPasswords.Configure).RemoveAllLoggers();
+builder.Services.AddScoped<PasswordPolicy>();
 
 builder.Services.AddScoped<Actor>();
 builder.Services.AddScoped<ActivityWriter>();

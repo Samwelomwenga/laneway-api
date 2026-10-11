@@ -20,6 +20,12 @@ public static class AuthLog
 
     private static readonly EventId SignInFailedId = new(4, "SignInFailed");
 
+    private static readonly EventId BreachedCheckUnavailableId = new(5, "BreachedCheckUnavailable");
+
+    private static readonly Action<ILogger, Exception?> BreachedCheckUnavailableEvent =
+        LoggerMessage.Define(
+            LogLevel.Warning, BreachedCheckUnavailableId, "Breached password check unavailable, password accepted");
+
     private static readonly Action<ILogger, Guid, Guid, Exception?> SignUpEvent =
         LoggerMessage.Define<Guid, Guid>(LogLevel.Information, SignUpId, "Signed up: sub {sub}, sid {sid}");
 
@@ -49,6 +55,9 @@ public static class AuthLog
             SignInFailedWithoutAccount(logger, false, null);
         }
     }
+
+    public static void BreachedCheckUnavailable(this ILogger logger, Exception exception) =>
+        BreachedCheckUnavailableEvent(logger, exception);
 
     public static void AccessTokenRejected(this ILogger logger, string reason, string? knownKid)
     {

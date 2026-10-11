@@ -8,7 +8,11 @@ public sealed class AuthMeter
 
     public const string SignInAttemptsName = "laneway.auth.sign_in.attempts";
 
+    public const string BreachedCheckUnavailableName = "laneway.auth.breached_check.unavailable";
+
     private readonly Counter<long> _signInAttempts;
+
+    private readonly Counter<long> _breachedCheckUnavailable;
 
     public AuthMeter(IMeterFactory factory)
     {
@@ -16,6 +20,7 @@ public sealed class AuthMeter
 
         Meter = factory.Create(Name);
         _signInAttempts = Meter.CreateCounter<long>(SignInAttemptsName);
+        _breachedCheckUnavailable = Meter.CreateCounter<long>(BreachedCheckUnavailableName);
     }
 
     public Meter Meter { get; }
@@ -28,6 +33,8 @@ public sealed class AuthMeter
             SignInResult.UnknownAccount => "unknown_account",
             _ => throw new ArgumentOutOfRangeException(nameof(result), result, null)
         }));
+
+    public void BreachedCheckUnavailable() => _breachedCheckUnavailable.Add(1);
 }
 
 public enum SignInResult

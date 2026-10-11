@@ -32,6 +32,8 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected FakeTimeProvider Time => Factory.Time;
 
+    internal PwnedPasswordsStub PwnedPasswords => Factory.PwnedPasswords;
+
     private ApiFactory Factory =>
         _factory ?? throw new InvalidOperationException("The test host isn't up yet.");
 
@@ -78,6 +80,23 @@ public abstract class ApiTests : IAsyncLifetime
     protected Task<HttpResponseMessage> SendWithoutActorAsync(
         HttpMethod method, string path, object? body, string? userAgent = null) =>
         SendAsync(method, path, body, user: null, userAgent);
+
+    protected const string SignUpPassword = "plum tractor ocean";
+
+    protected Task<HttpResponseMessage> SignUpAsync(object body) =>
+        SendWithoutActorAsync(HttpMethod.Post, "/api/v1/auth/sign-up", body);
+
+    protected static object SignUpBody(string email, string password = SignUpPassword, string? username = null) => new
+    {
+        username = username ?? $"ana-{Guid.NewGuid():n}"[..20],
+        email,
+        password,
+        firstName = "Ana",
+        lastName = "Waweru",
+        language = "en-US",
+        timeZone = "UTC",
+        location = "Nairobi"
+    };
 
     protected Task<HttpResponseMessage> GetAsync(string path, TestUser? @as = null) =>
         SendAsync(HttpMethod.Get, path, null, @as ?? ActorUser);

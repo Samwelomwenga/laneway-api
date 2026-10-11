@@ -16,8 +16,11 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | 2 | `SignUp` | Information | `sub`, `sid` |
 | 3 | `SignInSucceeded` | Information | `sub`, `sid` |
 | 4 | `SignInFailed` | Warning | `sub` when the email belongs to a user, otherwise `accountFound: false` |
+| 5 | `BreachedCheckUnavailable` | Warning | the exception from the Pwned Passwords call |
 
 `reason` is one of `malformed`, `expired`, `unknownKey`, `invalidSignature`, `invalidAlgorithm`, `invalidType`, `invalidIssuer`, `invalidAudience`, `sessionEnded`, or `invalid`.
+
+`BreachedCheckUnavailable` means the Pwned Passwords check failed or took over 2 seconds, so the password was accepted without it. Each entry is one password that skipped ASVS 6.2.12.
 
 ## Unexpected errors
 
@@ -34,8 +37,9 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 | Counter | Tags |
 |---|---|
 | `laneway.auth.sign_in.attempts` | `result`: `succeeded`, `wrong_password`, or `unknown_account` |
+| `laneway.auth.breached_check.unavailable` | none |
 
-The counter includes successes, so the failure-to-success ratio is visible. A climbing ratio is the usual sign of credential stuffing.
+`laneway.auth.sign_in.attempts` includes successes, so the failure-to-success ratio is visible. A climbing ratio is the usual sign of credential stuffing.
 
 ## Never logged
 
@@ -44,6 +48,7 @@ The counter includes successes, so the failure-to-success ratio is visible. A cl
 - A refresh token, or its hash.
 - Any part of an access token. A `kid` is a key name, not part of the secret, and follows the rule below.
 - A client IP address or user agent.
+- The Pwned Passwords request URI. It ends in the first 5 hex characters of the password's SHA-1, so the `BreachedPasswords` client has its HttpClient request logs turned off.
 
 ## Request values
 

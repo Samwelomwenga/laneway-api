@@ -24,6 +24,8 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
 
     public FakeTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
 
+    public PwnedPasswordsStub PwnedPasswords { get; } = new();
+
     public HttpClient CreateApiClient()
     {
         var client = CreateClient();
@@ -52,6 +54,12 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
                 ["Auth:SigningKeys:0:Key"] = SigningKey
             }));
         builder.ConfigureLogging(logging => logging.AddFakeLogging());
-        builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(Time));
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton<TimeProvider>(Time);
+            services.AddHttpClient<BreachedPasswords>()
+                .ConfigurePrimaryHttpMessageHandler(() => PwnedPasswords)
+                .SetHandlerLifetime(Timeout.InfiniteTimeSpan);
+        });
     }
 }
