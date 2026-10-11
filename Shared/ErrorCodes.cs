@@ -27,4 +27,5 @@ public static class ErrorCodes
     public const string NotImage = "notImage";
     public const string NotAuthor = "notAuthor";
     public const string InternalError = "internalError";
+    public const string NotAuthenticated = "notAuthenticated";
 }

@@ -1,15 +1,28 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Laneway.Api.Tests;
 
 internal sealed class ApiFactory : WebApplicationFactory<Program>
 {
+    public const string SigningKeyId = "test";
+
+    public const string SigningKey = "cNDergQ+t0OsqAmWjqRYls/RSPk11lB9DEUWpkpREDU=";
+
+    public const string Issuer = "https://localhost:7287";
+
+    public const string Audience = "laneway-api";
+
     private readonly string _connectionString;
 
     public ApiFactory(string connectionString) => _connectionString = connectionString;
+
+    public FakeTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
 
     public HttpClient CreateApiClient()
     {
@@ -31,10 +44,14 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
 
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:DefaultConnection", _connectionString);
+        builder.UseSetting("Auth:SigningKeys:0:Id", SigningKeyId);
+        builder.UseSetting("Auth:SigningKeys:0:Key", SigningKey);
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>(StringComparer.Ordinal)
             {
                 ["Supabase:BucketName"] = TestStack.BucketName
             }));
+        builder.ConfigureLogging(logging => logging.AddFakeLogging());
+        builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(Time));
     }
 }

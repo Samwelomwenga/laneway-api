@@ -93,3 +93,15 @@ _Avoid_: Creator, current user
 **Deleted user**:
 A user who is gone for good. The work they did stays, and their activity entries still show their name, but the user can no longer be looked up.
 _Avoid_: Removed user, inactive user, disabled user
+
+**Session**:
+One stretch of a user being signed in on one device. It starts when the user signs in. It ends when they sign out, sign out everywhere, or are deleted, when they change their password from another session, or when it runs out. It also ends when the user ends it from their list of sessions, or when Laneway sees one of its old refresh tokens used again. A user can have several at once.
+_Avoid_: Login, token family
+
+**Profile**:
+The signed-in user's own data, which only they can see or change. Other users see a smaller summary of it.
+_Avoid_: Me, account
+
+**Sign-in block**:
+A stretch of time when a user can't sign in, because someone typed the wrong password for them too many times. It ends on its own, and it gets longer the more wrong passwords keep coming. The user's existing sessions keep working.
+_Avoid_: Lockout, locked account, suspended user

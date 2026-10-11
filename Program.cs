@@ -6,6 +6,13 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.AddJsonConsole(options =>
+{
+    options.IncludeScopes = true;
+    options.UseUtcTimestamp = true;
+    options.TimestampFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
+});
+
 builder.Services.AddControllers(options =>
     {
         options.Filters.Add<ActorFilter>();
@@ -32,6 +39,9 @@ builder.Services.AddHostedService<PendingObjectDrainer>();
 builder.Services.AddSingleton<CopyJobSignal>();
 builder.Services.AddSingleton<CopyJobClaims>();
 builder.Services.AddHostedService<CopyJobWorker>();
+
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddBearerTokens(AuthOptions.From(builder.Configuration));
 
 builder.Services.AddScoped<Actor>();
 builder.Services.AddScoped<ActivityWriter>();
@@ -83,6 +93,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 
 var app = builder.Build();
+app.Services.GetRequiredService<AuthMeter>();
 
 app.UseExceptionHandler();
 
@@ -93,6 +104,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.RefuseFailedBearerTokens();
 
 app.MapGet("/", () => Results.Redirect("/scalar/v1"));
 

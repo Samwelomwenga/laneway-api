@@ -1,8 +1,11 @@
 using System.Globalization;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Testing;
+using Microsoft.Extensions.Time.Testing;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -21,6 +24,11 @@ public abstract class ApiTests : IAsyncLifetime
     protected UserDto ActorUser { get; private set; } = null!;
 
     protected Guid ActorId => ActorUser.Id;
+
+    protected FakeTimeProvider Time => Factory.Time;
+
+    private ApiFactory Factory =>
+        _factory ?? throw new InvalidOperationException("The test host isn't up yet.");
 
     private HttpClient Client =>
         _client ?? throw new InvalidOperationException("The test host isn't up yet.");
@@ -83,6 +91,71 @@ public abstract class ApiTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await response.ReadEnvelope<UserDto>()).Data!;
+    }
+
+    protected async Task<TestUser> SeedUserAsync()
+    {
+        var tag = Guid.NewGuid().ToString("n")[..12];
+        var now = Time.GetUtcNow().UtcDateTime;
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = $"seeded-{tag}",
+            Email = $"{tag}@example.com",
+            PasswordHash = "temp_hash",
+            FirstName = "Ben",
+            LastName = "Otieno",
+            Language = "en-US",
+            TimeZone = "UTC",
+            Location = "Kisumu"
+        };
+        user.CreatedBy = user.Id;
+        var session = new Session
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            CreatedAt = now,
+            LastUsedAt = now,
+            ExpiresAt = now + Session.AbsoluteLifetime,
+            UserAgent = "Laneway.Api.Tests"
+        };
+
+        await FromDatabaseAsync(async database =>
+        {
+            database.Users.Add(user);
+            database.Sessions.Add(session);
+            return await database.SaveChangesAsync();
+        });
+
+        var seeded = new TestUser(user.Id, session.Id, string.Empty);
+        return seeded with { AccessToken = await IssueTokenAsync(seeded) };
+    }
+
+    protected Task<string> IssueTokenAsync(TestUser user)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        return FromServicesAsync(services =>
+            Task.FromResult(services.GetRequiredService<AccessTokens>().Issue(user.Id, user.SessionId)));
+    }
+
+    protected IReadOnlyList<FakeLogRecord> Logs() => Factory.Services.GetFakeLogCollector().GetSnapshot();
+
+    protected async Task<HttpResponseMessage> SendWithTokenAsync(
+        HttpMethod method, string path, string token, object? body = null, Guid? userIdHeader = null)
+    {
+        using var request = new HttpRequestMessage(method, path);
+        if (body is not null)
+        {
+            request.Content = JsonContent.Create(body);
+        }
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (userIdHeader is { } id)
+        {
+            request.Headers.Add(ActorFilter.HeaderName, id.ToString());
+        }
+
+        return await Client.SendAsync(request);
     }
 
     protected async Task<WorkSpaceDto> CreateWorkspaceAsync(

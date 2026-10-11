@@ -15,7 +15,7 @@ public sealed class ActorFilter : IAsyncResourceFilter
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(next);
 
-        if (!NeedsActor(context))
+        if (!NeedsActor(context) || context.HttpContext.RequestServices.GetRequiredService<Actor>().IsResolved)
         {
             await next();
             return;

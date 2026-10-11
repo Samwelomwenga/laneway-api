@@ -22,6 +22,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<CopyJob> CopyJobs { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Account> Accounts { get; set; }
+    public DbSet<Session> Sessions { get; set; }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -108,6 +109,17 @@ public class ApplicationDbContext : DbContext
                 .IsRequired(false);
             entity.HasQueryFilter(u => u.DeletedAt == null);
             ActorKeys(entity);
+        });
+
+        modelBuilder.Entity<Session>(entity =>
+        {
+            entity.Property(s => s.UserAgent).HasColumnType($"varchar({FieldLimits.SessionUserAgent})");
+            entity.Property(s => s.EndReason).HasColumnType("varchar(32)");
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(s => s.UserId);
         });
 
         modelBuilder.Entity<WorkSpace>(entity =>
