@@ -3,7 +3,8 @@ using System.Text.Json;
 
 namespace Laneway.Api.Tests;
 
-public sealed record ApiEnvelope<T>(bool Success, string Message, T? Data, int StatusCode, List<ApiError>? Errors);
+public sealed record ApiEnvelope<T>(
+    bool Success, string Message, T? Data, int StatusCode, List<ApiError>? Errors, string? TraceId = null);
 
 public sealed record ApiPage<T>(
     bool Success,

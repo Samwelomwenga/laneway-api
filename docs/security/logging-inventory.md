@@ -1,6 +1,6 @@
 # Logging inventory
 
-What Laneway logs about auth, and what it never logs. This meets ASVS 16.1.1. A change that adds an auth event or counter updates this file in the same diff.
+What Laneway logs about auth and unexpected errors, and what it never logs. This meets ASVS 16.1.1. A change that adds an auth event or counter updates this file in the same diff.
 
 ## Sink
 
@@ -15,6 +15,14 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | 1 | `AccessTokenRejected` | Information | `reason`, and `kid` when it names a configured key, otherwise `kidKnown: false` |
 
 `reason` is one of `malformed`, `expired`, `unknownKey`, `invalidSignature`, `invalidAlgorithm`, `invalidType`, `invalidIssuer`, `invalidAudience`, `sessionEnded`, or `invalid`.
+
+## Unexpected errors
+
+`ApiExceptionHandler` logs each exception it turns into a 500 once, at Error, under the `Laneway.Api.ApiExceptionHandler` category as event 1, `UnexpectedError`. Event ids are unique within a category, so this id doesn't clash with `AccessTokenRejected`. The entry carries the exception and `traceId`, the request's `TraceIdentifier`. The 500 body returns the same `traceId` with a generic message, so a client can quote it and nothing else leaks. This meets ASVS 16.3.4 and 16.5.1.
+
+`ApiExceptionHandler` doesn't log the foreign-key 400 or the unique-violation 409. They're expected outcomes.
+
+On .NET 9, `ExceptionHandlerMiddleware` logs every exception before the handler runs, so `Program.cs` filters that category out. The filter costs two rarer entries from the same category. One says the response had already started, so the handler never ran. The other carries the exception when `ApiExceptionHandler` itself throws. In both cases Kestrel still logs the original exception. .NET 10 adds `SuppressDiagnosticsCallback`, which mutes only the duplicate, and the upgrade should swap the filter for it.
 
 ## Meter
 

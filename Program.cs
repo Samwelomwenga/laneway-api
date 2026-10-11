@@ -13,6 +13,10 @@ builder.Logging.AddJsonConsole(options =>
     options.TimestampFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
 });
 
+// .NET 9's ExceptionHandlerMiddleware logs every exception before ApiExceptionHandler sees it, and has no
+// SuppressDiagnosticsCallback until .NET 10.
+builder.Logging.AddFilter("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware", LogLevel.None);
+
 builder.Services.AddControllers(options =>
     {
         options.Filters.Add<ActorFilter>();

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 
 namespace Laneway.Api;
 
@@ -8,6 +9,9 @@ public class ApiResponse<T>
     public T? Data { get; set; }
     public int StatusCode { get; set; }
     public List<ApiError> Errors { get; set; } = new();
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TraceId { get; set; }
 
     public static ApiResponse<T> SuccessResponse(T data, string message = "Request was successful", int statusCode = 200)
     {
@@ -20,14 +24,16 @@ public class ApiResponse<T>
         };
     }
 
-    public static ApiResponse<T> ErrorResponse(string message, int statusCode = 400, List<ApiError>? errors = null)
+    public static ApiResponse<T> ErrorResponse(
+        string message, int statusCode = 400, List<ApiError>? errors = null, string? traceId = null)
     {
         return new ApiResponse<T>
         {
             Success = false,
             Message = message,
             StatusCode = statusCode,
-            Errors = errors ?? new List<ApiError>()
+            Errors = errors ?? new List<ApiError>(),
+            TraceId = traceId
         };
     }
 }

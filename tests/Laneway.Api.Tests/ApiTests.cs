@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
@@ -18,6 +19,8 @@ public abstract class ApiTests : IAsyncLifetime
     private HttpClient? _client;
     private HttpClient? _noRedirects;
     private Guid? _databaseId;
+
+    private readonly List<HttpClient> _hostClients = [];
 
     protected ApiTests(TestStack stack) => _stack = stack;
 
@@ -49,6 +52,7 @@ public abstract class ApiTests : IAsyncLifetime
     {
         _client?.Dispose();
         _noRedirects?.Dispose();
+        _hostClients.ForEach(client => client.Dispose());
         if (_factory is not null)
         {
             await _factory.DisposeAsync();
@@ -139,6 +143,14 @@ public abstract class ApiTests : IAsyncLifetime
     }
 
     protected IReadOnlyList<FakeLogRecord> Logs() => Factory.Services.GetFakeLogCollector().GetSnapshot();
+
+    protected (HttpClient Client, FakeLogCollector Collector) HostWith(Action<IServiceCollection> services)
+    {
+        var host = Factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services));
+        var client = host.CreateClient();
+        _hostClients.Add(client);
+        return (client, host.Services.GetFakeLogCollector());
+    }
 
     protected async Task<HttpResponseMessage> SendWithTokenAsync(
         HttpMethod method, string path, string token, object? body = null, Guid? userIdHeader = null)
