@@ -41,7 +41,7 @@ builder.Services.AddSingleton<CopyJobClaims>();
 builder.Services.AddHostedService<CopyJobWorker>();
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddBearerTokens(AuthOptions.From(builder.Configuration));
+builder.Services.AddBearerTokens();
 
 builder.Services.AddScoped<Actor>();
 builder.Services.AddScoped<ActivityWriter>();

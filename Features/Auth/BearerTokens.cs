@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
@@ -8,41 +9,20 @@ namespace Laneway.Api;
 
 public static class BearerTokens
 {
-    public static IServiceCollection AddBearerTokens(this IServiceCollection services, AuthOptions options)
+    public static IServiceCollection AddBearerTokens(this IServiceCollection services)
     {
-        ArgumentNullException.ThrowIfNull(options);
-
-        var keys = SigningKeys.From(options.SigningKeys);
-        services.AddSingleton(options);
-        services.AddSingleton(keys);
+        services.AddOptions<AuthOptions>()
+            .BindConfiguration(AuthOptions.Section)
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<AuthOptions>, AuthOptionsValidator>();
+        services.AddSingleton(provider =>
+            SigningKeys.From(provider.GetRequiredService<IOptions<AuthOptions>>().Value.SigningKeys));
         services.AddSingleton<AccessTokens>();
         services.AddSingleton<AuthMeter>();
         services.AddScoped<BearerEvents>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
-        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
-            .Configure<TimeProvider>((bearer, time) =>
-            {
-                bearer.MapInboundClaims = false;
-                bearer.SaveToken = false;
-                bearer.IncludeErrorDetails = false;
-                bearer.TimeProvider = time;
-                bearer.EventsType = typeof(BearerEvents);
-                bearer.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidIssuer = options.Issuer,
-                    ValidAudience = options.Audience,
-                    IssuerSigningKeys = keys.All,
-                    TryAllIssuerSigningKeys = false,
-                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
-                    ValidTypes = [AccessTokens.TokenType],
-                    ClockSkew = AccessTokens.ClockSkew,
-                    RequireExpirationTime = true,
-                    RequireSignedTokens = true,
-                    NameClaimType = JwtRegisteredClaimNames.Sub,
-                    LifetimeValidator = (_, expires, _, parameters) => Unexpired(expires, parameters, time)
-                };
-            });
+        services.ConfigureOptions<JwtBearerSetup>();
 
         return services;
     }
@@ -58,18 +38,6 @@ public static class BearerTokens
 
             await next();
         });
-
-    // IdentityModel checks lifetime against DateTime.UtcNow, which a test clock can't move.
-    private static bool Unexpired(DateTime? expires, TokenValidationParameters parameters, TimeProvider time)
-    {
-        var now = time.GetUtcNow().UtcDateTime;
-        if (expires is null || expires.Value.ToUniversalTime() + parameters.ClockSkew <= now)
-        {
-            throw new SecurityTokenExpiredException { Expires = expires ?? DateTime.MinValue };
-        }
-
-        return true;
-    }
 }
 
 public sealed class BearerEvents(

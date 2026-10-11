@@ -16,46 +16,63 @@ public sealed class SigningKeys
 
     public SigningCredentials Signing { get; }
 
-    public bool Has(string? id) => id is not null && All.Any(key => string.Equals(key.KeyId, id, StringComparison.Ordinal));
+    public bool Has(string? id) => id is not null && All.Any(key => SameId(key.KeyId, id));
 
     public static SigningKeys From(IReadOnlyList<SigningKeyOptions> configured)
+    {
+        var problems = Problems(configured);
+        if (problems.Count > 0)
+        {
+            throw new InvalidOperationException(string.Join(" ", problems));
+        }
+
+        return new SigningKeys(configured
+            .Select(entry => new SymmetricSecurityKey(Decode(entry.Key)) { KeyId = entry.Id })
+            .ToList());
+    }
+
+    public static IReadOnlyList<string> Problems(IReadOnlyList<SigningKeyOptions> configured)
     {
         ArgumentNullException.ThrowIfNull(configured);
 
         if (configured.Count == 0)
         {
-            throw new InvalidOperationException(
-                "Auth:SigningKeys is empty. Run the app through `doppler run --` or set AUTH__SIGNINGKEYS__0__ID and AUTH__SIGNINGKEYS__0__KEY.");
+            return ["Auth:SigningKeys is empty. Run the app through `doppler run --` or set AUTH__SIGNINGKEYS__0__ID and AUTH__SIGNINGKEYS__0__KEY."];
         }
 
-        var keys = new List<SymmetricSecurityKey>(configured.Count);
-        foreach (var (entry, index) in configured.Select((entry, index) => (entry, index)))
+        var problems = new List<string>();
+        for (var index = 0; index < configured.Count; index++)
         {
+            var entry = configured[index];
             if (string.IsNullOrWhiteSpace(entry.Id))
             {
-                throw new InvalidOperationException($"Auth:SigningKeys:{index} has no id.");
+                problems.Add($"Auth:SigningKeys:{index} has no id.");
+                continue;
             }
 
-            if (keys.Any(key => string.Equals(key.KeyId, entry.Id, StringComparison.Ordinal)))
+            if (configured.Take(index).Any(earlier => SameId(earlier.Id, entry.Id)))
             {
-                throw new InvalidOperationException($"Auth:SigningKeys lists the id {entry.Id} twice.");
+                problems.Add($"Auth:SigningKeys lists the id {entry.Id} twice.");
             }
 
-            var bytes = new byte[entry.Key.Length];
-            if (!Convert.TryFromBase64String(entry.Key, bytes, out var length))
+            if (Decode(entry.Key) is not { } bytes)
             {
-                throw new InvalidOperationException($"Auth:SigningKeys key {entry.Id} isn't base64.");
+                problems.Add($"Auth:SigningKeys key {entry.Id} isn't base64.");
             }
-
-            if (length < MinimumBytes)
+            else if (bytes.Length < MinimumBytes)
             {
-                throw new InvalidOperationException(
-                    $"Auth:SigningKeys key {entry.Id} is {length} bytes. It needs at least {MinimumBytes}.");
+                problems.Add($"Auth:SigningKeys key {entry.Id} is {bytes.Length} bytes. It needs at least {MinimumBytes}.");
             }
-
-            keys.Add(new SymmetricSecurityKey(bytes[..length]) { KeyId = entry.Id });
         }
 
-        return new SigningKeys(keys);
+        return problems;
+    }
+
+    private static bool SameId(string? left, string? right) => string.Equals(left, right, StringComparison.Ordinal);
+
+    private static byte[]? Decode(string key)
+    {
+        var bytes = new byte[key.Length];
+        return Convert.TryFromBase64String(key, bytes, out var length) ? bytes[..length] : null;
     }
 }

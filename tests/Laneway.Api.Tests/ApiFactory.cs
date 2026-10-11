@@ -44,12 +44,12 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
 
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:DefaultConnection", _connectionString);
-        builder.UseSetting("Auth:SigningKeys:0:Id", SigningKeyId);
-        builder.UseSetting("Auth:SigningKeys:0:Key", SigningKey);
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>(StringComparer.Ordinal)
             {
-                ["Supabase:BucketName"] = TestStack.BucketName
+                ["Supabase:BucketName"] = TestStack.BucketName,
+                ["Auth:SigningKeys:0:Id"] = SigningKeyId,
+                ["Auth:SigningKeys:0:Key"] = SigningKey
             }));
         builder.ConfigureLogging(logging => logging.AddFakeLogging());
         builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(Time));

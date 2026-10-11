@@ -1,9 +1,10 @@
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Laneway.Api;
 
-public sealed class AccessTokens(AuthOptions options, SigningKeys keys, TimeProvider time)
+public sealed class AccessTokens(IOptions<AuthOptions> options, SigningKeys keys, TimeProvider time)
 {
     public const string TokenType = "at+jwt";
 
@@ -20,8 +21,8 @@ public sealed class AccessTokens(AuthOptions options, SigningKeys keys, TimeProv
         var now = time.GetUtcNow().UtcDateTime;
         return _handler.CreateToken(new SecurityTokenDescriptor
         {
-            Issuer = options.Issuer,
-            Audience = options.Audience,
+            Issuer = options.Value.Issuer,
+            Audience = options.Value.Audience,
             IssuedAt = now,
             Expires = now + Lifetime,
             TokenType = TokenType,

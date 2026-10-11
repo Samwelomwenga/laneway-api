@@ -1,8 +1,11 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
@@ -273,53 +276,71 @@ public class BearerTokenTests : ApiTests
     }
 }
 
-public class SigningKeyTests
+public class AuthOptionsTests
 {
     private const string Key = ApiFactory.SigningKey;
 
     [Fact]
     public void An_empty_key_list_fails()
     {
-        var thrown = Assert.Throws<InvalidOperationException>(() => SigningKeys.From([]));
+        var result = Validate(Options());
 
-        Assert.Contains("Auth:SigningKeys", thrown.Message, StringComparison.Ordinal);
+        Assert.True(result.Failed);
+        Assert.Contains("Auth:SigningKeys", result.FailureMessage, StringComparison.Ordinal);
     }
 
     [Fact]
     public void A_key_under_32_bytes_fails()
     {
-        var shortKey = Convert.ToBase64String(new byte[31]);
+        var result = Validate(Options(new SigningKeyOptions { Id = "2026-10", Key = Convert.ToBase64String(new byte[31]) }));
 
-        var thrown = Assert.Throws<InvalidOperationException>(() =>
-            SigningKeys.From([new SigningKeyOptions { Id = "2026-10", Key = shortKey }]));
-
-        Assert.Contains("2026-10", thrown.Message, StringComparison.Ordinal);
+        Assert.True(result.Failed);
+        Assert.Contains("2026-10", result.FailureMessage, StringComparison.Ordinal);
     }
 
     [Fact]
     public void A_key_that_is_not_base64_fails()
     {
-        Assert.Throws<InvalidOperationException>(() =>
-            SigningKeys.From([new SigningKeyOptions { Id = "2026-10", Key = "not base64!" }]));
+        var result = Validate(Options(new SigningKeyOptions { Id = "2026-10", Key = "not base64!" }));
+
+        Assert.True(result.Failed);
     }
 
     [Fact]
     public void A_repeated_id_fails()
     {
-        var thrown = Assert.Throws<InvalidOperationException>(() => SigningKeys.From(
-        [
+        var result = Validate(Options(
             new SigningKeyOptions { Id = "2026-10", Key = Key },
-            new SigningKeyOptions { Id = "2026-10", Key = Convert.ToBase64String(new byte[32]) }
-        ]));
+            new SigningKeyOptions { Id = "2026-10", Key = Convert.ToBase64String(new byte[32]) }));
 
-        Assert.Contains("2026-10", thrown.Message, StringComparison.Ordinal);
+        Assert.True(result.Failed);
+        Assert.Contains("2026-10", result.FailureMessage, StringComparison.Ordinal);
     }
 
     [Fact]
     public void A_key_with_no_id_fails()
     {
-        Assert.Throws<InvalidOperationException>(() =>
-            SigningKeys.From([new SigningKeyOptions { Id = " ", Key = Key }]));
+        var result = Validate(Options(new SigningKeyOptions { Id = " ", Key = Key }));
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void A_missing_issuer_fails()
+    {
+        var options = Options(new SigningKeyOptions { Id = "2026-10", Key = Key });
+        options.Issuer = string.Empty;
+
+        var result = Validate(options);
+
+        Assert.True(result.Failed);
+        Assert.Contains("Auth:Issuer", result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Valid_options_pass()
+    {
+        Assert.True(Validate(Options(new SigningKeyOptions { Id = "2026-10", Key = Key })).Succeeded);
     }
 
     [Fact]
@@ -335,4 +356,29 @@ public class SigningKeyTests
         Assert.Equal(SecurityAlgorithms.HmacSha256, keys.Signing.Algorithm);
         Assert.Equal(["2026-11", "2026-10"], keys.All.Select(key => key.KeyId));
     }
+
+    [Fact]
+    public void A_bad_signing_key_stops_the_app_at_startup()
+    {
+        using var factory = new ApiFactory("Host=localhost;Database=never_opened");
+        using var broken = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration(
+            (_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["Auth:SigningKeys:0:Key"] = Convert.ToBase64String(new byte[31])
+            })));
+
+        var thrown = Assert.Throws<OptionsValidationException>(() => broken.CreateClient());
+
+        Assert.Contains("is 31 bytes", thrown.Message, StringComparison.Ordinal);
+    }
+
+    private static AuthOptions Options(params SigningKeyOptions[] keys) => new()
+    {
+        Issuer = ApiFactory.Issuer,
+        Audience = ApiFactory.Audience,
+        SigningKeys = [.. keys]
+    };
+
+    private static ValidateOptionsResult Validate(AuthOptions options) =>
+        new AuthOptionsValidator().Validate(null, options);
 }
