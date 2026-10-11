@@ -206,8 +206,8 @@ public class CommentTests : ApiTests
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
         var ben = await CreateUserAsync();
 
-        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." }, ben.Id);
-        using var removed = await RemoveCommentAsync(card.Id, comment.Id, ben.Id);
+        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." }, ben);
+        using var removed = await RemoveCommentAsync(card.Id, comment.Id, ben);
 
         foreach (var response in new[] { edited, removed })
         {
@@ -228,7 +228,7 @@ public class CommentTests : ApiTests
         await CreateCommentAsync(card.Id, "By Friday.");
         var ben = await CreateUserAsync();
 
-        var comment = await CreateCommentAsync(card.Id, "I'll take it.", ben.Id);
+        var comment = await CreateCommentAsync(card.Id, "I'll take it.", ben);
 
         Assert.Equal(ben.Id, comment.CreatedBy);
         Assert.Equal(2, (await ActivityAsync($"cardId={card.Id}&type=comment")).TotalCount);
@@ -292,7 +292,7 @@ public class CommentTests : ApiTests
         var ben = await CreateUserAsync();
 
         using var response = await EditCommentAsync(
-            card.Id, Guid.NewGuid(), new { text = "By Monday." }, ben.Id);
+            card.Id, Guid.NewGuid(), new { text = "By Monday." }, ben);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -305,8 +305,8 @@ public class CommentTests : ApiTests
         await SetCardArchivedAsync(card.Id, true);
         var ben = await CreateUserAsync();
 
-        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." }, ben.Id);
-        using var removed = await RemoveCommentAsync(card.Id, comment.Id, ben.Id);
+        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." }, ben);
+        using var removed = await RemoveCommentAsync(card.Id, comment.Id, ben);
 
         Assert.Equal(HttpStatusCode.Forbidden, edited.StatusCode);
         Assert.Equal(ErrorCodes.NotAuthor, Assert.Single(await edited.ReadErrors()).Code);

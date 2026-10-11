@@ -154,16 +154,4 @@ public class ActivityRouteTests : ApiTests
         Assert.Empty(page.Entries);
         Assert.Equal(0, page.TotalCount);
     }
-
-    [Fact]
-    public async Task The_actor_header_is_ignored()
-    {
-        var workspace = await CreateWorkspaceAsync("Design");
-
-        using var response = await GetAsync(
-            $"/api/v1/activity?workspaceId={workspace.Id}", actorHeader: Guid.NewGuid().ToString());
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(1, (await response.ReadPage<ActivityEntryDto>()).TotalCount);
-    }
 }

@@ -421,7 +421,7 @@ public class CardCopyTests : ApiTests
         await CreateCheckItemAsync(checklist.Id, "Draft it");
         await CreateLinkAttachmentAsync(source.Id, "https://example.com/brief", "The brief");
 
-        using var response = await SendCardCopyAsync(source.Id, new { listId = list.Id }, other.Id);
+        using var response = await SendCardCopyAsync(source.Id, new { listId = list.Id }, other);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var copy = (await response.ReadEnvelope<CardDto>()).Data!;
 

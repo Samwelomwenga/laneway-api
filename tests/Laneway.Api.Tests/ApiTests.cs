@@ -24,7 +24,7 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected ApiTests(TestStack stack) => _stack = stack;
 
-    protected UserDto ActorUser { get; private set; } = null!;
+    protected TestUser ActorUser { get; private set; } = null!;
 
     protected Guid ActorId => ActorUser.Id;
 
@@ -64,54 +64,37 @@ public abstract class ApiTests : IAsyncLifetime
         }
     }
 
-    protected Task<HttpResponseMessage> PostAsync(string path, object body, Guid? actor = null) =>
-        SendAsync(HttpMethod.Post, path, body, (actor ?? ActorId).ToString());
+    protected Task<HttpResponseMessage> PostAsync(string path, object body, TestUser? @as = null) =>
+        SendAsync(HttpMethod.Post, path, body, @as ?? ActorUser);
 
-    protected Task<HttpResponseMessage> PutAsync(string path, object body, Guid? actor = null) =>
-        SendAsync(HttpMethod.Put, path, body, (actor ?? ActorId).ToString());
+    protected Task<HttpResponseMessage> PutAsync(string path, object body, TestUser? @as = null) =>
+        SendAsync(HttpMethod.Put, path, body, @as ?? ActorUser);
 
-    protected Task<HttpResponseMessage> DeleteAsync(string path, Guid? actor = null) =>
-        SendAsync(HttpMethod.Delete, path, null, (actor ?? ActorId).ToString());
+    protected Task<HttpResponseMessage> DeleteAsync(string path, TestUser? @as = null) =>
+        SendAsync(HttpMethod.Delete, path, null, @as ?? ActorUser);
 
     protected Task<HttpResponseMessage> SendWithoutActorAsync(HttpMethod method, string path, object? body) =>
-        SendAsync(method, path, body, actorHeader: null);
+        SendAsync(method, path, body, user: null);
 
-    protected Task<HttpResponseMessage> GetAsync(string path, string? actorHeader = null) =>
-        SendAsync(HttpMethod.Get, path, null, actorHeader);
+    protected Task<HttpResponseMessage> GetAsync(string path, TestUser? @as = null) =>
+        SendAsync(HttpMethod.Get, path, null, @as ?? ActorUser);
 
-    protected async Task<UserDto> CreateUserAsync()
-    {
-        var tag = Guid.NewGuid().ToString("n")[..12];
-        using var response = await SendAsync(HttpMethod.Post, "/api/v1/users", new
-        {
-            username = $"actor-{tag}",
-            email = $"{tag}@example.com",
-            firstName = "Ana",
-            lastName = "Waweru",
-            language = "en-US",
-            timeZone = "UTC",
-            location = "Nairobi"
-        }, actorHeader: null);
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        return (await response.ReadEnvelope<UserDto>()).Data!;
-    }
-
-    protected async Task<TestUser> SeedUserAsync()
+    protected async Task<TestUser> CreateUserAsync()
     {
         var tag = Guid.NewGuid().ToString("n")[..12];
         var now = Time.GetUtcNow().UtcDateTime;
         var user = new User
         {
             Id = Guid.NewGuid(),
-            Username = $"seeded-{tag}",
+            Username = $"actor-{tag}",
             Email = $"{tag}@example.com",
             PasswordHash = "temp_hash",
-            FirstName = "Ben",
-            LastName = "Otieno",
+            FirstName = "Ana",
+            LastName = "Waweru",
             Language = "en-US",
             TimeZone = "UTC",
-            Location = "Kisumu"
+            Location = "Nairobi",
+            CreatedAt = now
         };
         user.CreatedBy = user.Id;
         var session = new Session
@@ -127,20 +110,34 @@ public abstract class ApiTests : IAsyncLifetime
         await FromDatabaseAsync(async database =>
         {
             database.Users.Add(user);
+            database.Accounts.Add(new Account
+            {
+                Id = Guid.NewGuid(),
+                Name = $"{user.Username}'s Account",
+                UserId = user.Id,
+                CreatedAt = now,
+                CreatedBy = user.Id
+            });
             database.Sessions.Add(session);
             return await database.SaveChangesAsync();
         });
 
-        var seeded = new TestUser(user.Id, session.Id, string.Empty);
-        return seeded with { AccessToken = await IssueTokenAsync(seeded) };
+        var token = await IssueTokenAsync(user.Id, session.Id);
+        using var response = await SendWithTokenAsync(HttpMethod.Get, $"/api/v1/users/{user.Id}", token);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        return new TestUser((await response.ReadEnvelope<UserDto>()).Data!, session.Id, token);
     }
 
     protected Task<string> IssueTokenAsync(TestUser user)
     {
         ArgumentNullException.ThrowIfNull(user);
-        return FromServicesAsync(services =>
-            Task.FromResult(services.GetRequiredService<AccessTokens>().Issue(user.Id, user.SessionId)));
+        return IssueTokenAsync(user.Id, user.SessionId);
     }
+
+    private Task<string> IssueTokenAsync(Guid userId, Guid sessionId) =>
+        FromServicesAsync(services =>
+            Task.FromResult(services.GetRequiredService<AccessTokens>().Issue(userId, sessionId)));
 
     protected IReadOnlyList<FakeLogRecord> Logs() => Factory.Services.GetFakeLogCollector().GetSnapshot();
 
@@ -447,22 +444,22 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected static string CommentPath(Guid cardId) => $"/api/v1/cards/{cardId}/comments";
 
-    protected async Task<ActivityEntryDto> CreateCommentAsync(Guid cardId, string text, Guid? actor = null)
+    protected async Task<ActivityEntryDto> CreateCommentAsync(Guid cardId, string text, TestUser? @as = null)
     {
-        using var response = await SendCommentAsync(cardId, new { text }, actor);
+        using var response = await SendCommentAsync(cardId, new { text }, @as);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await response.ReadEnvelope<ActivityEntryDto>()).Data!;
     }
 
-    protected Task<HttpResponseMessage> SendCommentAsync(Guid cardId, object body, Guid? actor = null) =>
-        PostAsync(CommentPath(cardId), body, actor);
+    protected Task<HttpResponseMessage> SendCommentAsync(Guid cardId, object body, TestUser? @as = null) =>
+        PostAsync(CommentPath(cardId), body, @as);
 
     protected Task<HttpResponseMessage> EditCommentAsync(
-        Guid cardId, Guid id, object body, Guid? actor = null) =>
-        PutAsync($"{CommentPath(cardId)}/{id}", body, actor);
+        Guid cardId, Guid id, object body, TestUser? @as = null) =>
+        PutAsync($"{CommentPath(cardId)}/{id}", body, @as);
 
-    protected Task<HttpResponseMessage> RemoveCommentAsync(Guid cardId, Guid id, Guid? actor = null) =>
-        DeleteAsync($"{CommentPath(cardId)}/{id}", actor);
+    protected Task<HttpResponseMessage> RemoveCommentAsync(Guid cardId, Guid id, TestUser? @as = null) =>
+        DeleteAsync($"{CommentPath(cardId)}/{id}", @as);
 
     protected async Task<T> FromDatabaseAsync<T>(Func<ApplicationDbContext, Task<T>> read)
     {
@@ -490,11 +487,11 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected static string CopyJobPath(Guid id) => $"/api/v1/copy-jobs/{id}";
 
-    protected Task<HttpResponseMessage> SendCardCopyAsync(Guid id, object body, Guid? actor = null) =>
-        PostAsync(CopyPath(id), body, actor);
+    protected Task<HttpResponseMessage> SendCardCopyAsync(Guid id, object body, TestUser? @as = null) =>
+        PostAsync(CopyPath(id), body, @as);
 
-    protected Task<HttpResponseMessage> SendListCopyAsync(Guid id, object body, Guid? actor = null) =>
-        PostAsync(ListCopyPath(id), body, actor);
+    protected Task<HttpResponseMessage> SendListCopyAsync(Guid id, object body, TestUser? @as = null) =>
+        PostAsync(ListCopyPath(id), body, @as);
 
     protected async Task<CopyJobDto> CopyListAsync(
         Guid id,
@@ -504,25 +501,25 @@ public abstract class ApiTests : IAsyncLifetime
         object? position = null,
         Guid? before = null,
         Guid? after = null,
-        Guid? actor = null)
+        TestUser? @as = null)
     {
         using var response = await SendListCopyAsync(
-            id, new { boardId, name, keep, position, before, after }, actor);
+            id, new { boardId, name, keep, position, before, after }, @as);
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         return (await response.ReadEnvelope<CopyJobDto>()).Data!;
     }
 
-    protected Task<HttpResponseMessage> SendBoardCopyAsync(Guid id, object body, Guid? actor = null) =>
-        PostAsync(BoardCopyPath(id), body, actor);
+    protected Task<HttpResponseMessage> SendBoardCopyAsync(Guid id, object body, TestUser? @as = null) =>
+        PostAsync(BoardCopyPath(id), body, @as);
 
     protected async Task<CopyJobDto> CopyBoardAsync(
         Guid id,
         Guid workspaceId,
         string? name = null,
         IEnumerable<string>? keep = null,
-        Guid? actor = null)
+        TestUser? @as = null)
     {
-        using var response = await SendBoardCopyAsync(id, new { workspaceId, name, keep }, actor);
+        using var response = await SendBoardCopyAsync(id, new { workspaceId, name, keep }, @as);
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         return (await response.ReadEnvelope<CopyJobDto>()).Data!;
     }
@@ -592,7 +589,9 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected async Task<byte[]> DownloadAttachmentAsync(Guid cardId, Guid id)
     {
-        using var response = await NoRedirects.GetAsync($"{AttachmentPath(cardId)}/{id}/content");
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{AttachmentPath(cardId)}/{id}/content");
+        request.Headers.Authorization = Bearer(ActorUser);
+        using var response = await NoRedirects.SendAsync(request);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
         using var storage = new HttpClient();
@@ -633,7 +632,7 @@ public abstract class ApiTests : IAsyncLifetime
 
         form.Add(new ByteArrayContent(FileBytes(fileName)), "file", fileName);
         request.Content = form;
-        request.Headers.Add(ActorFilter.HeaderName, ActorId.ToString());
+        request.Headers.Authorization = Bearer(ActorUser);
 
         return await Client.SendAsync(request);
     }
@@ -669,18 +668,20 @@ public abstract class ApiTests : IAsyncLifetime
     }
 
     private async Task<HttpResponseMessage> SendAsync(
-        HttpMethod method, string path, object? body, string? actorHeader)
+        HttpMethod method, string path, object? body, TestUser? user)
     {
         using var request = new HttpRequestMessage(method, path);
         if (body is not null)
         {
             request.Content = JsonContent.Create(body);
         }
-        if (actorHeader is not null)
+        if (user is not null)
         {
-            request.Headers.Add(ActorFilter.HeaderName, actorHeader);
+            request.Headers.Authorization = Bearer(user);
         }
 
         return await Client.SendAsync(request);
     }
+
+    private static AuthenticationHeaderValue Bearer(TestUser user) => new("Bearer", user.AccessToken);
 }

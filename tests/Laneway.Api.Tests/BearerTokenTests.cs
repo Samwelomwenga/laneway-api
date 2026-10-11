@@ -22,7 +22,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_write_with_a_token_records_the_tokens_user_as_actor()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
 
         using var response = await SendWithTokenAsync(
             HttpMethod.Post, "/api/v1/workspaces", ben.AccessToken, new { name = "Design", visibility = "Public" });
@@ -35,7 +35,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_read_with_a_token_works()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         var workspace = await CreateWorkspaceAsync("Design");
 
         using var response = await SendWithTokenAsync(
@@ -47,7 +47,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task The_issued_token_carries_only_the_agreed_header_and_claims()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
 
         var token = new JsonWebToken(ben.AccessToken);
 
@@ -67,7 +67,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_token_within_the_clock_skew_past_its_expiry_still_works()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         Time.Advance(TimeSpan.FromMinutes(15) + TimeSpan.FromSeconds(20));
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", ben.AccessToken);
@@ -78,7 +78,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task An_expired_token_gets_401()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         Time.Advance(TimeSpan.FromMinutes(15) + TimeSpan.FromSeconds(31));
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", ben.AccessToken);
@@ -89,7 +89,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_token_for_an_ended_session_gets_401()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         await EndSessionAsync(ben.SessionId);
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", ben.AccessToken);
@@ -100,7 +100,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_token_for_a_session_idle_past_seven_days_gets_401()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         Time.Advance(TimeSpan.FromDays(7));
         var token = await IssueTokenAsync(ben);
 
@@ -112,7 +112,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_token_for_a_deleted_user_gets_401()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         await FromDatabaseAsync(database => database.Users
             .Where(user => user.Id == ben.Id)
             .ExecuteUpdateAsync(user => user.SetProperty(u => u.DeletedAt, Time.GetUtcNow().UtcDateTime)));
@@ -125,7 +125,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_token_with_an_unknown_kid_gets_401_and_logs_no_kid()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         var forged = Forge(ben, new SymmetricSecurityKey(Convert.FromBase64String(OtherKey)) { KeyId = "stolen" });
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", forged);
@@ -141,7 +141,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_rejected_token_with_a_configured_kid_logs_the_kid()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         Time.Advance(TimeSpan.FromMinutes(16));
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", ben.AccessToken);
@@ -155,7 +155,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_token_with_the_wrong_typ_gets_401()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         var forged = Forge(ben, TestKey(), type: "JWT");
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", forged);
@@ -166,7 +166,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task An_unsigned_token_gets_401()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         var forged = Resigned(Forge(ben, TestKey()), "none", _ => []);
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", forged);
@@ -177,7 +177,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_token_signed_with_the_right_key_and_the_wrong_alg_gets_401()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         var key = Convert.FromBase64String(ApiFactory.SigningKey);
         var forged = Resigned(Forge(ben, TestKey()), "HS512", input => HMACSHA512.HashData(key, input));
 
@@ -199,7 +199,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_correctly_forged_token_is_accepted()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
         var forged = Forge(ben, TestKey());
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", forged);
@@ -210,7 +210,7 @@ public class BearerTokenTests : ApiTests
     [Fact]
     public async Task A_token_write_ignores_the_user_id_header()
     {
-        var ben = await SeedUserAsync();
+        var ben = await CreateUserAsync();
 
         using var response = await SendWithTokenAsync(
             HttpMethod.Post, "/api/v1/workspaces", ben.AccessToken, new { name = "Design", visibility = "Public" },
