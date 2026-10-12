@@ -28,6 +28,7 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | 14 | `PasswordChanged` | Information | `sub`, `sid` |
 | 15 | `EmailChanged` | Information | `sub`, `sid` |
 | 16 | `UserDeleted` | Information | `sub`, `sid` |
+| 17 | `RateLimited` | Warning | `policy`, and `sub` when the policy counts by user |
 
 `reason` is one of `malformed`, `expired`, `unknownKey`, `invalidSignature`, `invalidAlgorithm`, `invalidType`, `invalidIssuer`, `invalidAudience`, `sessionEnded`, or `invalid`.
 
@@ -44,6 +45,8 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 `PasswordCheckFailed` is a wrong password, or any password during a sign-in block, sent to change password, change email, or delete user. `sid` is the session that sent it. A wrong password there counts toward the sign-in block, so it can also log `SignInBlockStarted`. `blocked: true` means the request got a 429 because a block was running.
 
 `PasswordChanged`, `EmailChanged`, and `UserDeleted` log the action itself, with the `sid` of the session that made it. `EmailChanged` never logs either email.
+
+`RateLimited` logs a request that got a 429 from a rate limit. `policy` is `sign-in`, `sign-up`, `refresh`, `password-check`, `signed-in`, or `anonymous`. Only `password-check` and `signed-in` count by user, so only they log `sub`. The limits are in [Rate limits](rate-limits.md).
 
 `BreachedCheckUnavailable` means the Pwned Passwords check failed or took over 2 seconds, so the password was accepted without it. Each entry is one password that skipped ASVS 6.2.12.
 
@@ -67,6 +70,7 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 | `laneway.auth.breached_check.unavailable` | none |
 | `laneway.auth.refresh` | `result`: `rotated`, `superseded`, `reused`, or `rejected` |
 | `laneway.auth.csrf.rejections` | `check`: `header`, `origin`, or `fetch_site` |
+| `laneway.auth.rate_limit.rejections` | `policy`: one of the six rate limit policies |
 
 `laneway.auth.sign_in.attempts` includes successes, so the failure-to-success ratio is visible. A climbing ratio is the usual sign of credential stuffing. `blocked` counts attempts made during a block, and `sign_in.blocks` counts the blocks themselves.
 

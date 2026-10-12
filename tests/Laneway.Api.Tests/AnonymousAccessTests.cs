@@ -29,9 +29,10 @@ public partial class AnonymousAccessTests : ApiTests
         var (client, services) = ProductionHost(OverHttps);
         var routes = Routes(services);
         var accepted = new List<string>();
-        foreach (var route in routes)
+        foreach (var (route, index) in routes.Select((route, index) => (route, index)))
         {
             using var request = new HttpRequestMessage(new HttpMethod(route.Method), Filled(route.Template));
+            request.Headers.Add(ApiFactory.ClientIpHeader, IpUnderTheAnonymousLimitFor(index));
             using var response = await client.SendAsync(request);
             if (response.Headers.WwwAuthenticate.Count == 0)
             {
@@ -154,6 +155,9 @@ public partial class AnonymousAccessTests : ApiTests
 
         Assert.Contains("isn't authenticated", error.Message, StringComparison.Ordinal);
     }
+
+    private static string IpUnderTheAnonymousLimitFor(int routeIndex) =>
+        $"10.0.{routeIndex / 256}.{routeIndex % 256}";
 
     private static List<Route> Routes(IServiceProvider services) =>
         services.GetRequiredService<EndpointDataSource>().Endpoints

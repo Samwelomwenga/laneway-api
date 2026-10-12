@@ -18,6 +18,8 @@ public sealed class AuthMeter
 
     public const string CsrfRejectionsName = "laneway.auth.csrf.rejections";
 
+    public const string RateLimitRejectionsName = "laneway.auth.rate_limit.rejections";
+
     private readonly Counter<long> _signInAttempts;
 
     private readonly Counter<long> _signInBlocks;
@@ -30,6 +32,8 @@ public sealed class AuthMeter
 
     private readonly Counter<long> _csrfRejections;
 
+    private readonly Counter<long> _rateLimitRejections;
+
     public AuthMeter(IMeterFactory factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
@@ -41,6 +45,7 @@ public sealed class AuthMeter
         _breachedCheckUnavailable = Meter.CreateCounter<long>(BreachedCheckUnavailableName);
         _refresh = Meter.CreateCounter<long>(RefreshName);
         _csrfRejections = Meter.CreateCounter<long>(CsrfRejectionsName);
+        _rateLimitRejections = Meter.CreateCounter<long>(RateLimitRejectionsName);
     }
 
     public Meter Meter { get; }
@@ -89,6 +94,9 @@ public sealed class AuthMeter
             FailedCsrfCheck.FetchSite => "fetch_site",
             _ => throw new ArgumentOutOfRangeException(nameof(check), check, null)
         }));
+
+    public void RateLimited(string policy) =>
+        _rateLimitRejections.Add(1, new KeyValuePair<string, object?>("policy", policy));
 }
 
 public enum SignInResult

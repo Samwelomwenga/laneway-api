@@ -1,3 +1,5 @@
+using System.Net;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -19,6 +21,8 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
     public const string Audience = "laneway-api";
 
     public const string AllowedOrigin = "https://app.laneway.example";
+
+    public const string ClientIpHeader = "X-Test-Client-Ip";
 
     private readonly string _connectionString;
 
@@ -59,10 +63,29 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
         builder.ConfigureLogging(logging => logging.AddFakeLogging());
         builder.ConfigureTestServices(services =>
         {
+            services.Insert(0, ServiceDescriptor.Transient<IStartupFilter, ClientIpFromHeader>());
             services.AddSingleton<TimeProvider>(Time);
             services.AddHttpClient<BreachedPasswords>()
                 .ConfigurePrimaryHttpMessageHandler(() => PwnedPasswords)
                 .SetHandlerLifetime(Timeout.InfiniteTimeSpan);
         });
     }
+}
+
+// TestServer leaves RemoteIpAddress null.
+internal sealed class ClientIpFromHeader : IStartupFilter
+{
+    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+    {
+        app.Use((context, nextMiddleware) =>
+        {
+            if (IPAddress.TryParse(context.Request.Headers[ApiFactory.ClientIpHeader], out var address))
+            {
+                context.Connection.RemoteIpAddress = address;
+            }
+
+            return nextMiddleware(context);
+        });
+        next(app);
+    };
 }

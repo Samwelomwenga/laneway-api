@@ -97,6 +97,7 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddHttpHardening(builder.Configuration);
 builder.Services.AddBrowserCors();
+builder.Services.AddRateLimits();
 
 builder.WebHost.ConfigureKestrel(options =>
 {
@@ -133,6 +134,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.RefuseFailedBearerTokens();
 app.UseAuthorization();
 

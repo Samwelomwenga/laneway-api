@@ -107,6 +107,14 @@ public static class AuthLog
     private static readonly Action<ILogger, Guid, Guid, Exception?> UserDeletedEvent =
         LoggerMessage.Define<Guid, Guid>(LogLevel.Information, UserDeletedId, "User deleted: sub {sub}, sid {sid}");
 
+    private static readonly EventId RateLimitedId = new(17, "RateLimited");
+
+    private static readonly Action<ILogger, string, Guid, Exception?> RateLimitedWithSub =
+        LoggerMessage.Define<string, Guid>(LogLevel.Warning, RateLimitedId, "Rate limited: policy {policy}, sub {sub}");
+
+    private static readonly Action<ILogger, string, Exception?> RateLimitedWithoutSub =
+        LoggerMessage.Define<string>(LogLevel.Warning, RateLimitedId, "Rate limited: policy {policy}");
+
     public static void SignUp(this ILogger logger, Guid userId, Guid sessionId) =>
         SignUpEvent(logger, userId, sessionId, null);
 
@@ -175,6 +183,18 @@ public static class AuthLog
             FailedCsrfCheck.FetchSite => "fetch-site",
             _ => throw new ArgumentOutOfRangeException(nameof(check), check, null)
         }, null);
+
+    public static void RateLimited(this ILogger logger, string policy, Guid? userId)
+    {
+        if (userId is { } sub)
+        {
+            RateLimitedWithSub(logger, policy, sub, null);
+        }
+        else
+        {
+            RateLimitedWithoutSub(logger, policy, null);
+        }
+    }
 
     public static void AccessTokenRejected(this ILogger logger, string reason, string? knownKid)
     {
