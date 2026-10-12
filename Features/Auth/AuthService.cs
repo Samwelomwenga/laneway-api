@@ -140,10 +140,10 @@ public sealed class AuthService(
 
         await using var transaction = await database.Database.BeginTransactionAsync();
         var stillActive = await database.Sessions
-            .FromSql($"SELECT * FROM \"Sessions\" WHERE \"Id\" = {session.Id} FOR UPDATE")
+            .Where(s => s.Id == session.Id)
             .Where(Session.ActiveAt(now))
-            .AnyAsync();
-        if (!stillActive)
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.LastUsedAt, now));
+        if (stillActive == 0)
         {
             await transaction.RollbackAsync();
             return RefreshRejected(RefreshRejection.SessionEnded, session.Id, RefreshCookieChange.Cleared);
@@ -162,7 +162,6 @@ public sealed class AuthService(
             return await RetiredAsync(token, session, winnerRetiredAt ?? now, now);
         }
 
-        session.LastUsedAt = now;
         var (cookie, successor) = AddRefreshToken(session, now);
         await database.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -181,20 +180,20 @@ public sealed class AuthService(
     public async Task<AuthReply<bool>> SignOutEverywhereAsync(Guid userId)
     {
         var now = time.GetUtcNow().UtcDateTime;
-        await using var transaction = await database.Database.BeginTransactionAsync();
-        var active = await database.Sessions
-            .FromSql($"SELECT * FROM \"Sessions\" WHERE \"UserId\" = {userId} FOR UPDATE")
-            .Where(Session.ActiveAt(now))
-            .Select(s => s.Id)
-            .ToListAsync();
         await database.Sessions
-            .Where(s => active.Contains(s.Id))
+            .Where(Session.ActiveAt(now))
+            .Where(s => s.UserId == userId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(e => e.EndedAt, now)
                 .SetProperty(e => e.EndReason, SessionEndReason.SignedOutEverywhere));
-        await transaction.CommitAsync();
+        var ended = await database.Sessions
+            .Where(s => s.UserId == userId
+                && s.EndedAt == now
+                && s.EndReason == SessionEndReason.SignedOutEverywhere)
+            .Select(s => s.Id)
+            .ToListAsync();
 
-        foreach (var sessionId in active)
+        foreach (var sessionId in ended)
         {
             _log.SessionEnded(userId, sessionId, SessionEndReason.SignedOutEverywhere);
         }

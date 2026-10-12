@@ -8,10 +8,7 @@ public static class RowLocks
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var boards = await context.Boards
-            .FromSql($"SELECT * FROM \"Boards\" WHERE \"Id\" = {boardId} FOR UPDATE")
-            .ToListAsync();
-        return boards.Count > 0;
+        return await LockAsync(context.Boards, boardId);
     }
 
     public static async Task LockBoardsAsync(this ApplicationDbContext context, params Guid[] boardIds)
@@ -21,7 +18,7 @@ public static class RowLocks
 
         foreach (var boardId in boardIds.Distinct().Order())
         {
-            await context.TryLockBoardAsync(boardId);
+            await LockAsync(context.Boards, boardId);
         }
     }
 
@@ -32,9 +29,7 @@ public static class RowLocks
 
         foreach (var listId in listIds.Distinct().Order())
         {
-            await context.Lists
-                .FromSql($"SELECT * FROM \"Lists\" WHERE \"Id\" = {listId} FOR UPDATE")
-                .ToListAsync();
+            await LockAsync(context.Lists, listId);
         }
     }
 
@@ -42,10 +37,7 @@ public static class RowLocks
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var cards = await context.Cards
-            .FromSql($"SELECT * FROM \"Cards\" WHERE \"Id\" = {cardId} FOR UPDATE")
-            .ToListAsync();
-        return cards.Count > 0;
+        return await LockAsync(context.Cards, cardId);
     }
 
     public static async Task LockCardsAsync(this ApplicationDbContext context, params Guid[] cardIds)
@@ -55,9 +47,7 @@ public static class RowLocks
 
         foreach (var cardId in cardIds.Distinct().Order())
         {
-            await context.Cards
-                .FromSql($"SELECT * FROM \"Cards\" WHERE \"Id\" = {cardId} FOR UPDATE")
-                .ToListAsync();
+            await LockAsync(context.Cards, cardId);
         }
     }
 
@@ -68,9 +58,12 @@ public static class RowLocks
 
         foreach (var checklistId in checklistIds.Distinct().Order())
         {
-            await context.Checklists
-                .FromSql($"SELECT * FROM \"Checklists\" WHERE \"Id\" = {checklistId} FOR UPDATE")
-                .ToListAsync();
+            await LockAsync(context.Checklists, checklistId);
         }
     }
+
+    private static async Task<bool> LockAsync<T>(IQueryable<T> rows, Guid id) where T : BaseEntity =>
+        await rows
+            .Where(row => row.Id == id)
+            .ExecuteUpdateAsync(row => row.SetProperty(r => r.CreatedAt, r => r.CreatedAt)) == 1;
 }
