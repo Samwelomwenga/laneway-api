@@ -31,18 +31,19 @@ public sealed class Passwords
 
     public string Hash(string password) => _hasher.HashPassword(null!, password);
 
-    public bool Verify(User user, string password)
+    public PasswordCheck Verify(User user, string password)
     {
         ArgumentNullException.ThrowIfNull(user);
 
-        var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, password);
-        if (result == PasswordVerificationResult.SuccessRehashNeeded)
+        return _hasher.VerifyHashedPassword(user, user.PasswordHash, password) switch
         {
-            user.PasswordHash = Hash(password);
-        }
-
-        return result != PasswordVerificationResult.Failed;
+            PasswordVerificationResult.Failed => new PasswordCheck(false, user.PasswordHash),
+            PasswordVerificationResult.SuccessRehashNeeded => new PasswordCheck(true, Hash(password)),
+            _ => new PasswordCheck(true, user.PasswordHash)
+        };
     }
 
     public void VerifyDummy(string password) => _hasher.VerifyHashedPassword(null!, _dummyHash, password);
 }
+
+public readonly record struct PasswordCheck(bool Matched, string HashToStore);

@@ -65,22 +65,45 @@ public sealed class AuthService(
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        var user = await database.Users.FirstOrDefaultAsync(u => u.Email == write.Email);
+        var user = await database.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Email == write.Email);
         if (user is null)
         {
             passwords.VerifyDummy(write.Password);
             return Rejected(userId: null, SignInResult.UnknownAccount);
         }
 
-        if (!passwords.Verify(user, write.Password))
+        var now = time.GetUtcNow().UtcDateTime;
+        var check = passwords.Verify(user, write.Password);
+        if (SignInBlock.IsBlocked(user, now))
         {
-            return Rejected(user.Id, SignInResult.WrongPassword);
+            return Rejected(user.Id, SignInResult.Blocked);
         }
 
-        var now = time.GetUtcNow().UtcDateTime;
+        if (!check.Matched)
+        {
+            return await WrongPasswordAsync(user, now);
+        }
+
+        await using var transaction = await database.Database.BeginTransactionAsync();
+        var checkedHash = user.PasswordHash;
+        var cleared = await database.Users
+            .Where(u => u.Id == user.Id
+                && u.PasswordHash == checkedHash
+                && (u.SignInBlockedUntil == null || u.SignInBlockedUntil <= now))
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(e => e.PasswordHash, check.HashToStore)
+                .SetProperty(e => e.FailedSignInCount, 0)
+                .SetProperty(e => e.LastFailedSignInAt, (DateTime?)null)
+                .SetProperty(e => e.SignInBlockedUntil, (DateTime?)null));
+        if (cleared == 0)
+        {
+            return Rejected(user.Id, SignInResult.Blocked);
+        }
+
         var session = database.Sessions.Add(Session.Start(user.Id, userAgent, now)).Entity;
         var (cookie, _) = AddRefreshToken(session, now);
         await database.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         _log.SignInSucceeded(user.Id, session.Id);
         meter.SignInAttempted(SignInResult.Succeeded);
@@ -272,9 +295,47 @@ public sealed class AuthService(
             cookie);
     }
 
+    private async Task<AuthReply<SignedInDto>> WrongPasswordAsync(User user, DateTime now)
+    {
+        while (true)
+        {
+            if (SignInBlock.IsBlocked(user, now))
+            {
+                return Rejected(user.Id, SignInResult.Blocked);
+            }
+
+            var (userId, readCount, readLastFailedAt) = (user.Id, user.FailedSignInCount, user.LastFailedSignInAt);
+            var blockStarted = SignInBlock.RecordFailure(user, now);
+            var (count, lastFailedAt, blockedUntil) = (user.FailedSignInCount, user.LastFailedSignInAt, user.SignInBlockedUntil);
+            var recorded = await database.Users
+                .Where(u => u.Id == userId && u.FailedSignInCount == readCount && u.LastFailedSignInAt == readLastFailedAt)
+                .ExecuteUpdateAsync(u => u
+                    .SetProperty(e => e.FailedSignInCount, count)
+                    .SetProperty(e => e.LastFailedSignInAt, lastFailedAt)
+                    .SetProperty(e => e.SignInBlockedUntil, blockedUntil));
+            if (recorded == 1)
+            {
+                if (blockStarted)
+                {
+                    _log.SignInBlockStarted(userId, count, blockedUntil!.Value);
+                    meter.SignInBlockStarted();
+                }
+
+                return Rejected(userId, SignInResult.WrongPassword);
+            }
+
+            if (await database.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId) is not { } reread)
+            {
+                return Rejected(userId, SignInResult.WrongPassword);
+            }
+
+            user = reread;
+        }
+    }
+
     private AuthReply<SignedInDto> Rejected(Guid? userId, SignInResult result)
     {
-        _log.SignInFailed(userId);
+        _log.SignInFailed(userId, blocked: result == SignInResult.Blocked);
         meter.SignInAttempted(result);
         return AuthReply.Of(ApiResponse<SignedInDto>.ErrorResponse(
             IncorrectCredentials,

@@ -32,11 +32,13 @@ public static class AuthLog
     private static readonly Action<ILogger, Guid, Guid, Exception?> SignInSucceededEvent =
         LoggerMessage.Define<Guid, Guid>(LogLevel.Information, SignInSucceededId, "Signed in: sub {sub}, sid {sid}");
 
-    private static readonly Action<ILogger, Guid, Exception?> SignInFailedWithSub =
-        LoggerMessage.Define<Guid>(LogLevel.Warning, SignInFailedId, "Sign-in failed: sub {sub}");
+    private static readonly Action<ILogger, Guid, bool, Exception?> SignInFailedWithSub =
+        LoggerMessage.Define<Guid, bool>(
+            LogLevel.Warning, SignInFailedId, "Sign-in failed: sub {sub}, blocked {blocked}");
 
-    private static readonly Action<ILogger, bool, Exception?> SignInFailedWithoutAccount =
-        LoggerMessage.Define<bool>(LogLevel.Warning, SignInFailedId, "Sign-in failed: accountFound {accountFound}");
+    private static readonly Action<ILogger, bool, bool, Exception?> SignInFailedWithoutAccount =
+        LoggerMessage.Define<bool, bool>(
+            LogLevel.Warning, SignInFailedId, "Sign-in failed: accountFound {accountFound}, blocked {blocked}");
 
     private static readonly EventId SessionRefreshedId = new(6, "SessionRefreshed");
 
@@ -76,23 +78,34 @@ public static class AuthLog
     private static readonly Action<ILogger, string, Exception?> CsrfRejectedEvent =
         LoggerMessage.Define<string>(LogLevel.Warning, CsrfRejectedId, "CSRF check failed: {check}");
 
+    private static readonly EventId SignInBlockStartedId = new(12, "SignInBlockStarted");
+
+    private static readonly Action<ILogger, Guid, int, DateTime, Exception?> SignInBlockStartedEvent =
+        LoggerMessage.Define<Guid, int, DateTime>(
+            LogLevel.Warning,
+            SignInBlockStartedId,
+            "Sign-in block started: sub {sub}, failureCount {failureCount}, blockedUntil {blockedUntil}");
+
     public static void SignUp(this ILogger logger, Guid userId, Guid sessionId) =>
         SignUpEvent(logger, userId, sessionId, null);
 
     public static void SignInSucceeded(this ILogger logger, Guid userId, Guid sessionId) =>
         SignInSucceededEvent(logger, userId, sessionId, null);
 
-    public static void SignInFailed(this ILogger logger, Guid? userId)
+    public static void SignInFailed(this ILogger logger, Guid? userId, bool blocked)
     {
         if (userId is { } sub)
         {
-            SignInFailedWithSub(logger, sub, null);
+            SignInFailedWithSub(logger, sub, blocked, null);
         }
         else
         {
-            SignInFailedWithoutAccount(logger, false, null);
+            SignInFailedWithoutAccount(logger, false, blocked, null);
         }
     }
+
+    public static void SignInBlockStarted(this ILogger logger, Guid userId, int failureCount, DateTime blockedUntil) =>
+        SignInBlockStartedEvent(logger, userId, failureCount, blockedUntil, null);
 
     public static void BreachedCheckUnavailable(this ILogger logger, Exception exception) =>
         BreachedCheckUnavailableEvent(logger, exception);

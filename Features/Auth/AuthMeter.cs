@@ -8,6 +8,8 @@ public sealed class AuthMeter
 
     public const string SignInAttemptsName = "laneway.auth.sign_in.attempts";
 
+    public const string SignInBlocksName = "laneway.auth.sign_in.blocks";
+
     public const string BreachedCheckUnavailableName = "laneway.auth.breached_check.unavailable";
 
     public const string RefreshName = "laneway.auth.refresh";
@@ -15,6 +17,8 @@ public sealed class AuthMeter
     public const string CsrfRejectionsName = "laneway.auth.csrf.rejections";
 
     private readonly Counter<long> _signInAttempts;
+
+    private readonly Counter<long> _signInBlocks;
 
     private readonly Counter<long> _breachedCheckUnavailable;
 
@@ -28,6 +32,7 @@ public sealed class AuthMeter
 
         Meter = factory.Create(Name);
         _signInAttempts = Meter.CreateCounter<long>(SignInAttemptsName);
+        _signInBlocks = Meter.CreateCounter<long>(SignInBlocksName);
         _breachedCheckUnavailable = Meter.CreateCounter<long>(BreachedCheckUnavailableName);
         _refresh = Meter.CreateCounter<long>(RefreshName);
         _csrfRejections = Meter.CreateCounter<long>(CsrfRejectionsName);
@@ -41,8 +46,11 @@ public sealed class AuthMeter
             SignInResult.Succeeded => "succeeded",
             SignInResult.WrongPassword => "wrong_password",
             SignInResult.UnknownAccount => "unknown_account",
+            SignInResult.Blocked => "blocked",
             _ => throw new ArgumentOutOfRangeException(nameof(result), result, null)
         }));
+
+    public void SignInBlockStarted() => _signInBlocks.Add(1);
 
     public void BreachedCheckUnavailable() => _breachedCheckUnavailable.Add(1);
 
@@ -70,7 +78,8 @@ public enum SignInResult
 {
     Succeeded,
     WrongPassword,
-    UnknownAccount
+    UnknownAccount,
+    Blocked
 }
 
 public enum RefreshResult

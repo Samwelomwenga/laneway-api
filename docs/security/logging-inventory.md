@@ -15,7 +15,7 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | 1 | `AccessTokenRejected` | Information | `reason`, and `kid` when it names a configured key, otherwise `kidKnown: false` |
 | 2 | `SignUp` | Information | `sub`, `sid` |
 | 3 | `SignInSucceeded` | Information | `sub`, `sid` |
-| 4 | `SignInFailed` | Warning | `sub` when the email belongs to a user, otherwise `accountFound: false` |
+| 4 | `SignInFailed` | Warning | `sub` when the email belongs to a user, otherwise `accountFound: false`, and `blocked` |
 | 5 | `BreachedCheckUnavailable` | Warning | the exception from the Pwned Passwords call |
 | 6 | `SessionRefreshed` | Information | `sub`, `sid`, and `refreshTokenId` of the new token |
 | 7 | `RefreshSuperseded` | Information | `sub`, `sid` |
@@ -23,6 +23,7 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | 9 | `RefreshRejected` | Information | `reason`, and `sid` when the token was found |
 | 10 | `SessionEnded` | Information | `sub`, `sid`, `endReason` |
 | 11 | `CsrfRejected` | Warning | `check` |
+| 12 | `SignInBlockStarted` | Warning | `sub`, `failureCount`, `blockedUntil` |
 
 `reason` is one of `malformed`, `expired`, `unknownKey`, `invalidSignature`, `invalidAlgorithm`, `invalidType`, `invalidIssuer`, `invalidAudience`, `sessionEnded`, or `invalid`.
 
@@ -33,6 +34,8 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 `SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment. `endReason` is `SignedOut`, `SignedOutEverywhere`, `EndedFromSessionList`, or `TokenReused`. Sign-out everywhere logs one entry per session it ends. Ending a session that already ended logs nothing.
 
 `CsrfRejected` is a sign-up, sign-in, or refresh that failed a CSRF check. `check` names the first one that failed: `header` when `X-Laneway-Csrf: 1` is missing, `origin` when `Origin` isn't in `Cors:AllowedOrigins`, or `fetch-site` when `Sec-Fetch-Site` is `cross-site`. The 403 body is the same for all three.
+
+`SignInFailed` has `blocked: true` when the user was in a sign-in block, whatever password they sent. An unknown email always has `blocked: false`. `SignInBlockStarted` logs when a block starts, on every 5th wrong password since the count last reset. `failureCount` is the count that started the block, and `blockedUntil` is when it ends. Attempts during a block don't add to the count. A successful sign-in resets the count, and so do 12 hours with no wrong password.
 
 `BreachedCheckUnavailable` means the Pwned Passwords check failed or took over 2 seconds, so the password was accepted without it. Each entry is one password that skipped ASVS 6.2.12.
 
@@ -50,12 +53,13 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 
 | Counter | Tags |
 |---|---|
-| `laneway.auth.sign_in.attempts` | `result`: `succeeded`, `wrong_password`, or `unknown_account` |
+| `laneway.auth.sign_in.attempts` | `result`: `succeeded`, `wrong_password`, `unknown_account`, or `blocked` |
+| `laneway.auth.sign_in.blocks` | none |
 | `laneway.auth.breached_check.unavailable` | none |
 | `laneway.auth.refresh` | `result`: `rotated`, `superseded`, `reused`, or `rejected` |
 | `laneway.auth.csrf.rejections` | `check`: `header`, `origin`, or `fetch_site` |
 
-`laneway.auth.sign_in.attempts` includes successes, so the failure-to-success ratio is visible. A climbing ratio is the usual sign of credential stuffing.
+`laneway.auth.sign_in.attempts` includes successes, so the failure-to-success ratio is visible. A climbing ratio is the usual sign of credential stuffing. `blocked` counts attempts made during a block, and `sign_in.blocks` counts the blocks themselves.
 
 ## Never logged
 
