@@ -28,6 +28,22 @@ public static class UserRules
     public static ApiResponse<T> AlreadyExists<T>(List<ApiError> errors) =>
         ApiResponse<T>.ErrorResponse("User already exists", 409, errors);
 
+    public static void Apply(this User user, UpdateProfileDto profile)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(profile);
+
+        user.Username = profile.Username;
+        user.FirstName = profile.FirstName;
+        user.LastName = profile.LastName;
+        user.PhoneNumber = profile.PhoneNumber;
+        user.Bio = profile.Bio;
+        user.Language = profile.Language;
+        user.TimeZone = profile.TimeZone;
+        user.Location = profile.Location;
+        user.ProfilePictureUrl = profile.ProfilePictureUrl;
+    }
+
     public static User Create(NewUser fields, string passwordHash, DateTime now)
     {
         ArgumentNullException.ThrowIfNull(fields);

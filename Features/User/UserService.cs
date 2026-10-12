@@ -45,15 +45,7 @@ namespace Laneway.Api
                 return UserRules.AlreadyExists<UserDto>(errors);
             }
 
-            user.Username = updateProfileDto.Username;
-            user.FirstName = updateProfileDto.FirstName;
-            user.LastName = updateProfileDto.LastName;
-            user.PhoneNumber = updateProfileDto.PhoneNumber;
-            user.Bio = updateProfileDto.Bio;
-            user.Language = updateProfileDto.Language;
-            user.TimeZone = updateProfileDto.TimeZone;
-            user.Location = updateProfileDto.Location;
-            user.ProfilePictureUrl = updateProfileDto.ProfilePictureUrl;
+            user.Apply(updateProfileDto);
             _context.StampChange(user, _actor);
 
             await _context.SaveChangesAsync();
