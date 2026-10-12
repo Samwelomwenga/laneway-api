@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -9,6 +11,8 @@ namespace Laneway.Api.Tests;
 [Collection(ApiCollection.Name)]
 public class CorsTests : ApiTests
 {
+    private const string LocalWebApp = "http://localhost:3000";
+
     public CorsTests(TestStack stack) : base(stack)
     {
     }
@@ -110,7 +114,7 @@ public class CorsTests : ApiTests
     [Fact]
     public void An_empty_origin_list_is_allowed()
     {
-        var result = new CorsOriginsValidator().Validate(null, new CorsOrigins());
+        var result = Validator(Environments.Production).Validate(null, new CorsOrigins());
 
         Assert.True(result.Succeeded);
     }
@@ -120,12 +124,40 @@ public class CorsTests : ApiTests
     [InlineData("http://localhost:3000")]
     [InlineData("http://127.0.0.1:3000")]
     [InlineData("http://[::1]:3000")]
-    public void A_good_allowed_origin_is_allowed(string origin)
+    public void A_good_allowed_origin_is_allowed_in_development(string origin)
     {
-        var result = new CorsOriginsValidator().Validate(null, new CorsOrigins { AllowedOrigins = [origin] });
+        var result = Validator(Environments.Development).Validate(null, new CorsOrigins { AllowedOrigins = [origin] });
 
         Assert.True(result.Succeeded);
     }
+
+    [Theory]
+    [InlineData("http://localhost:3000")]
+    [InlineData("http://127.0.0.1:3000")]
+    [InlineData("http://[::1]:3000")]
+    public void A_plain_http_loopback_origin_is_refused_outside_development(string origin)
+    {
+        var result = Validator(Environments.Production).Validate(null, new CorsOrigins { AllowedOrigins = [origin] });
+
+        Assert.True(result.Failed);
+        Assert.Contains(origin, result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_sign_in_from_the_local_http_web_app_passes()
+    {
+        var headers = BrowserHeaders();
+        headers["Origin"] = LocalWebApp;
+
+        using var response = await SendFromBrowserAsync(
+            "/api/v1/auth/sign-in", new { email = ActorUser.User.Email, password = TestUser.Password }, headers);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(LocalWebApp, Header(response, "Access-Control-Allow-Origin"));
+    }
+
+    private static CorsOriginsValidator Validator(string environment) =>
+        new(new HostingEnvironment { EnvironmentName = environment });
 
     private async Task<HttpResponseMessage> PreflightAsync(string origin, string path = "/api/v1/auth/sign-in")
     {
