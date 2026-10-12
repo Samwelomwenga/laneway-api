@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
@@ -89,14 +90,14 @@ public abstract class ApiTests : IAsyncLifetime
     protected Task<HttpResponseMessage> DeleteAsync(string path, TestUser? @as = null) =>
         SendAsync(HttpMethod.Delete, path, null, @as ?? ActorUser);
 
-    protected Task<HttpResponseMessage> SendWithoutActorAsync(
+    protected Task<HttpResponseMessage> SendAnonymousAsync(
         HttpMethod method, string path, object? body, string? userAgent = null) =>
         SendAsync(method, path, body, user: null, userAgent);
 
     protected const string SignUpPassword = "plum tractor ocean";
 
     protected Task<HttpResponseMessage> SignUpAsync(object body) =>
-        SendWithoutActorAsync(HttpMethod.Post, "/api/v1/auth/sign-up", body);
+        SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/sign-up", body);
 
     protected static object SignUpBody(string email, string password = SignUpPassword, string? username = null) => new
     {
@@ -241,15 +242,41 @@ public abstract class ApiTests : IAsyncLifetime
         return (client, host.Services.GetFakeLogCollector());
     }
 
-    protected HttpClient ClientFor(Action<IWebHostBuilder> configure, WebApplicationFactoryClientOptions options)
+    protected (HttpClient Client, IServiceProvider Services) ProductionHost(
+        WebApplicationFactoryClientOptions options, Action<IWebHostBuilder>? configure = null)
     {
-        var client = Factory.WithWebHostBuilder(configure).CreateClient(options);
+        var host = Factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            // Only Development loads the API's user secrets, and attachment storage won't start without them.
+            // They go in first, so every setting the test host gives still wins.
+            builder.ConfigureAppConfiguration(configuration => configuration.Sources.Insert(
+                0, new ConfigurationBuilder().AddUserSecrets(typeof(Program).Assembly, optional: true).Sources[0]));
+            configure?.Invoke(builder);
+        });
+        var client = host.CreateClient(options);
         _hostClients.Add(client);
-        return client;
+        return (client, host.Services);
+    }
+
+    protected static async Task AssertChallengedAsync(HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("Bearer", Assert.Single(response.Headers.WwwAuthenticate).ToString());
+        var envelope = await response.ReadEnvelope<object>();
+        Assert.False(envelope.Success);
+        Assert.Equal("Sign in again.", envelope.Message);
+        Assert.Equal(401, envelope.StatusCode);
+        var error = Assert.Single(envelope.Errors!);
+        Assert.Equal(ErrorCodes.NotAuthenticated, error.Code);
+        Assert.Equal("Sign in again.", error.Message);
+        Assert.Null(error.Field);
     }
 
     protected async Task<HttpResponseMessage> SendWithTokenAsync(
-        HttpMethod method, string path, string token, object? body = null, Guid? userIdHeader = null)
+        HttpMethod method, string path, string token, object? body = null)
     {
         using var request = new HttpRequestMessage(method, path);
         if (body is not null)
@@ -258,10 +285,6 @@ public abstract class ApiTests : IAsyncLifetime
         }
 
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        if (userIdHeader is { } id)
-        {
-            request.Headers.Add(ActorFilter.HeaderName, id.ToString());
-        }
 
         return await Client.SendAsync(request);
     }

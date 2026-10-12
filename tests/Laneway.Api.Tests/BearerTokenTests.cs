@@ -83,7 +83,7 @@ public class BearerTokenTests : ApiTests
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", ben.AccessToken);
 
-        await AssertNotAuthenticatedAsync(response);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public class BearerTokenTests : ApiTests
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", ben.AccessToken);
 
-        await AssertNotAuthenticatedAsync(response);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class BearerTokenTests : ApiTests
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", token);
 
-        await AssertNotAuthenticatedAsync(response);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public class BearerTokenTests : ApiTests
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", ben.AccessToken);
 
-        await AssertNotAuthenticatedAsync(response);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public class BearerTokenTests : ApiTests
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", forged);
 
-        await AssertNotAuthenticatedAsync(response);
+        await AssertChallengedAsync(response);
         var rejected = Assert.Single(Logs(), log => log.Id.Name == "AccessTokenRejected");
         Assert.Equal("Laneway.Auth", rejected.Category);
         Assert.Equal(LogLevel.Information, rejected.Level);
@@ -146,7 +146,7 @@ public class BearerTokenTests : ApiTests
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", ben.AccessToken);
 
-        await AssertNotAuthenticatedAsync(response);
+        await AssertChallengedAsync(response);
         var rejected = Assert.Single(Logs(), log => log.Id.Name == "AccessTokenRejected");
         Assert.Equal(ApiFactory.SigningKeyId, rejected.GetStructuredStateValue("kid"));
         Assert.Equal("expired", rejected.GetStructuredStateValue("reason"));
@@ -160,7 +160,7 @@ public class BearerTokenTests : ApiTests
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", forged);
 
-        await AssertNotAuthenticatedAsync(response);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public class BearerTokenTests : ApiTests
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", forged);
 
-        await AssertNotAuthenticatedAsync(response);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public class BearerTokenTests : ApiTests
 
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", forged);
 
-        await AssertNotAuthenticatedAsync(response);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]
@@ -191,7 +191,7 @@ public class BearerTokenTests : ApiTests
     {
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", "not-a-token");
 
-        await AssertNotAuthenticatedAsync(response);
+        await AssertChallengedAsync(response);
         var rejected = Assert.Single(Logs(), log => log.Id.Name == "AccessTokenRejected");
         Assert.Equal("malformed", rejected.GetStructuredStateValue("reason"));
     }
@@ -205,19 +205,6 @@ public class BearerTokenTests : ApiTests
         using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/workspaces", forged);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task A_token_write_ignores_the_user_id_header()
-    {
-        var ben = await CreateUserAsync();
-
-        using var response = await SendWithTokenAsync(
-            HttpMethod.Post, "/api/v1/workspaces", ben.AccessToken, new { name = "Design", visibility = "Public" },
-            userIdHeader: ActorId);
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        Assert.Equal(ben.Id, (await response.ReadEnvelope<WorkSpaceDto>()).Data!.CreatedBy);
     }
 
     private const string OtherKey = "sPrCzru4irSfWucz67ISqUecyHq28c+ty6TQ0jhRkdQ=";
@@ -260,20 +247,6 @@ public class BearerTokenTests : ApiTests
             .ExecuteUpdateAsync(session => session
                 .SetProperty(s => s.EndedAt, Time.GetUtcNow().UtcDateTime)
                 .SetProperty(s => s.EndReason, SessionEndReason.SignedOut)));
-
-    private static async Task AssertNotAuthenticatedAsync(HttpResponseMessage response)
-    {
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Equal("Bearer", Assert.Single(response.Headers.WwwAuthenticate).ToString());
-        var envelope = await response.ReadEnvelope<object>();
-        Assert.False(envelope.Success);
-        Assert.Equal("Sign in again.", envelope.Message);
-        Assert.Equal(401, envelope.StatusCode);
-        var error = Assert.Single(envelope.Errors!);
-        Assert.Equal(ErrorCodes.NotAuthenticated, error.Code);
-        Assert.Equal("Sign in again.", error.Message);
-        Assert.Null(error.Field);
-    }
 }
 
 public class AuthOptionsTests

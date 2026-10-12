@@ -184,18 +184,15 @@ public class ListCopyTests : ApiTests
     }
 
     [Fact]
-    public async Task A_copy_needs_an_actor()
+    public async Task A_copy_needs_a_token()
     {
         var board = await CreateBoardAsync((await CreateWorkspaceAsync("Design")).Id, "Roadmap");
         var source = await CreateListAsync(board.Id, "Doing");
 
-        using var response = await SendWithoutActorAsync(
+        using var response = await SendAnonymousAsync(
             HttpMethod.Post, ListCopyPath(source.Id), new { boardId = board.Id });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var error = Assert.Single(await response.ReadErrors());
-        Assert.Equal(ActorFilter.HeaderName, error.Field);
-        Assert.Equal(ErrorCodes.Required, error.Code);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]

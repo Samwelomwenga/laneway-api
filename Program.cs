@@ -2,6 +2,7 @@ using System.Text.Json;
 using Scalar.AspNetCore;
 using Laneway.Api;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,7 +20,6 @@ builder.Logging.AddFilter("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMidd
 
 builder.Services.AddControllers(options =>
     {
-        options.Filters.Add<ActorFilter>();
         options.Filters.Add<ValidationFilter>();
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
     })
@@ -34,7 +34,12 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 ValidatorOptions.Global.DisplayNameResolver = (_, member, _) =>
     member is null ? null : JsonNamingPolicy.CamelCase.ConvertName(member.Name);
 
-builder.Services.AddOpenApi(options => options.AddSchemaTransformer<EnumSchemaTransformer>());
+builder.Services.AddOpenApi(options =>
+{
+    options.AddSchemaTransformer<EnumSchemaTransformer>();
+    options.AddDocumentTransformer<BearerSchemeTransformer>();
+    options.AddOperationTransformer<BearerSchemeTransformer>();
+});
 
 builder.Services.Configure<AttachmentStorageOptions>(
     builder.Configuration.GetSection(AttachmentStorageOptions.Section));
@@ -46,6 +51,8 @@ builder.Services.AddHostedService<CopyJobWorker>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddBearerTokens();
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 builder.Services.AddSingleton<SessionSweeper>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<SessionSweeper>());
 builder.Services.AddSingleton<Passwords>();
@@ -118,15 +125,14 @@ app.RefusePlainHttp(app.Environment);
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
+    app.MapGet("/", () => Results.Redirect("/scalar/v1")).AllowAnonymous().ExcludeFromDescription();
 }
 
 app.UseAuthentication();
 app.RefuseFailedBearerTokens();
 app.UseAuthorization();
-
-app.MapGet("/", () => Results.Redirect("/scalar/v1"));
 
 app.MapControllers();
 

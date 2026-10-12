@@ -35,18 +35,6 @@ public class UsersController : ApiControllerBase
         return Ok(response);
     }
 
-    [HttpPost]
-    [NoActor]
-    public async Task<ActionResult<ApiResponse<UserDto>>> CreateUser([FromBody] CreateUserDto createUserDto)
-    {
-        var response = await _userService.CreateAsync(createUserDto);
-        if (!response.Success)
-        {
-            return ToActionResult(response);
-        }
-        return CreatedAtAction(nameof(GetUser), new { id = response.Data!.Id }, response);
-    }
-
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<UserDto>>> UpdateUser(Guid id, [FromBody] UpdateUserDto updateUserDto)
     {

@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -59,6 +60,7 @@ public class UnexpectedErrorTests : ApiTests
 
 [ApiController]
 [Route("api/v1/faults")]
+[AllowAnonymous]
 public sealed class FaultController : ControllerBase
 {
     public const string Detail = "connection to db-7 refused";

@@ -96,7 +96,7 @@ public class CommentTests : ApiTests
     }
 
     [Fact]
-    public async Task Every_write_needs_the_actor_header()
+    public async Task Every_write_needs_a_token()
     {
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
@@ -104,31 +104,27 @@ public class CommentTests : ApiTests
 
         var sends = new[]
         {
-            SendWithoutActorAsync(HttpMethod.Post, CommentPath(card.Id), new { text = "By Monday." }),
-            SendWithoutActorAsync(HttpMethod.Put, path, new { text = "By Monday." }),
-            SendWithoutActorAsync(HttpMethod.Delete, path, null)
+            SendAnonymousAsync(HttpMethod.Post, CommentPath(card.Id), new { text = "By Monday." }),
+            SendAnonymousAsync(HttpMethod.Put, path, new { text = "By Monday." }),
+            SendAnonymousAsync(HttpMethod.Delete, path, null)
         };
 
         foreach (var send in sends)
         {
             using var response = await send;
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var error = Assert.Single(await response.ReadErrors());
-            Assert.Equal(ActorFilter.HeaderName, error.Field);
-            Assert.Equal(ErrorCodes.Required, error.Code);
+            await AssertChallengedAsync(response);
         }
     }
 
     [Fact]
-    public async Task The_header_is_checked_before_the_body()
+    public async Task The_token_is_checked_before_the_body()
     {
         var card = await CardAsync();
 
-        using var response = await SendWithoutActorAsync(
+        using var response = await SendAnonymousAsync(
             HttpMethod.Post, CommentPath(card.Id), new { text = "   " });
 
-        var error = Assert.Single(await response.ReadErrors());
-        Assert.Equal(ActorFilter.HeaderName, error.Field);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]

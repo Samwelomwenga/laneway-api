@@ -97,6 +97,14 @@ public sealed class BearerEvents(
         await response.WriteAsJsonAsync(NotAuthenticated.Response<object>(), context.HttpContext.RequestAborted);
     }
 
+    public override async Task Forbidden(ForbiddenContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(NotAllowed.Response<object>(), context.HttpContext.RequestAborted);
+    }
+
     private void Reject(TokenValidatedContext context, string reason, string? kid)
     {
         _log.AccessTokenRejected(reason, KnownKid(kid));

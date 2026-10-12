@@ -29,6 +29,7 @@ public static class ErrorCodes
     public const string NotAuthor = "notAuthor";
     public const string InternalError = "internalError";
     public const string NotAuthenticated = "notAuthenticated";
+    public const string Forbidden = "forbidden";
     public const string InvalidCredentials = "invalidCredentials";
     public const string CommonPassword = "commonPassword";
     public const string ContainsContextWord = "containsContextWord";

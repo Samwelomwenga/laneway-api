@@ -110,7 +110,7 @@ public class PasswordPolicyTests : ApiTests
     [Fact]
     public async Task Sign_in_never_runs_the_breached_check()
     {
-        using var response = await SendWithoutActorAsync(
+        using var response = await SendAnonymousAsync(
             HttpMethod.Post, "/api/v1/auth/sign-in", new { email = ActorUser.User.Email, password = TestUser.Password });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

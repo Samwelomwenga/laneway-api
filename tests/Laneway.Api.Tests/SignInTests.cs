@@ -245,7 +245,7 @@ public class SignInTests : ApiTests
     [Fact]
     public async Task A_password_with_a_lone_surrogate_is_rejected_before_normalization()
     {
-        using var response = await SendWithoutActorAsync(
+        using var response = await SendAnonymousAsync(
             HttpMethod.Post,
             "/api/v1/auth/sign-in",
             new StringContent(
@@ -261,7 +261,7 @@ public class SignInTests : ApiTests
         string.Concat(Enumerable.Repeat("plum tractor ", 10))[..length];
 
     private Task<HttpResponseMessage> SignInAsync(string email, string password, string? userAgent = null) =>
-        SendWithoutActorAsync(HttpMethod.Post, "/api/v1/auth/sign-in", new { email, password }, userAgent);
+        SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/sign-in", new { email, password }, userAgent);
 
     private Task<string> OnlySessionIdAsync(Guid userId) =>
         FromDatabaseAsync(async database =>

@@ -6,7 +6,6 @@ namespace Laneway.Api
     {
         Task<PagedResponse<UserDto>> GetAllAsync(UserSearchDto searchDto);
         Task<ApiResponse<UserDto>> GetByIdAsync(Guid id);
-        Task<ApiResponse<UserDto>> CreateAsync(CreateUserDto createUserDto);
         Task<ApiResponse<UserDto>> UpdateAsync(Guid id, UpdateUserDto updateUserDto);
         Task<ApiResponse<bool>> DeleteAsync(Guid id);
         Task<ApiResponse<bool>> UserNameExistsAsync(string username);
@@ -67,19 +66,6 @@ namespace Laneway.Api
             }
             var userDto = UserView.Of(existingUser);
             return ApiResponse<UserDto>.SuccessResponse(userDto, "User retrieved successfully", 200);
-        }
-
-        public async Task<ApiResponse<UserDto>> CreateAsync(CreateUserDto createUserDto)
-        {
-            var errors = await UserRules.TakenAsync(_context, createUserDto.Username, createUserDto.Email, exceptId: null);
-            if (errors.Count > 0)
-            {
-                return UserRules.AlreadyExists<UserDto>(errors);
-            }
-            var newUser = UserRules.Create(NewUser.Of(createUserDto), "temp_hash", DateTime.UtcNow);
-            _context.Users.Add(newUser);
-            await _context.SaveChangesAsync();
-            return ApiResponse<UserDto>.SuccessResponse(UserView.Of(newUser), "User created successfully", 201);
         }
 
         public async Task<ApiResponse<UserDto>> UpdateAsync(Guid id, UpdateUserDto updateUserDto)

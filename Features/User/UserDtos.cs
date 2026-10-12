@@ -20,23 +20,6 @@ public record UserDto
     Guid? UpdatedBy
 );
 
-public record CreateUserDto
-(
-    string Username,
-    string Email,
-    string FirstName,
-    string LastName,
-    string? PhoneNumber,
-    string? Bio,
-    string Language,
-    string TimeZone,
-    string Location,
-    Uri? ProfilePictureUrl
-)
-{
-    public string Email { get; init; } = Emails.Normalize(Email);
-}
-
 public record UpdateUserDto
 (
     string Username,

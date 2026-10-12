@@ -103,7 +103,7 @@ public class SecurityHeaderTests : ApiTests
 
         using var response = await client.GetAsync(new Uri("/api/v1/no-such-route", UriKind.Relative));
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("max-age=63072000; includeSubDomains", Header(response, "Strict-Transport-Security"));
         AssertSecurityHeaders(response);
     }
@@ -116,7 +116,7 @@ public class SecurityHeaderTests : ApiTests
 
         using var response = await client.SendAsync(request);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("max-age=63072000; includeSubDomains", Header(response, "Strict-Transport-Security"));
     }
 
@@ -165,13 +165,12 @@ public class SecurityHeaderTests : ApiTests
 
     private HttpClient ProductionClient(string from, string baseAddress, string? trustedProxy = Proxy)
     {
-        return ClientFor(builder =>
+        return ProductionHost(new WebApplicationFactoryClientOptions
         {
-            builder.UseEnvironment("Production");
-            // Only Development loads the API's user secrets, and attachment storage won't start without them.
-            // They go in first, so every setting the test host gives still wins.
-            builder.ConfigureAppConfiguration(configuration => configuration.Sources.Insert(
-                0, new ConfigurationBuilder().AddUserSecrets(typeof(Program).Assembly, optional: true).Sources[0]));
+            BaseAddress = new Uri(baseAddress),
+            AllowAutoRedirect = false
+        }, builder =>
+        {
             if (trustedProxy is not null)
             {
                 builder.UseSetting("ForwardedHeaders:KnownProxies:0", trustedProxy);
@@ -179,11 +178,7 @@ public class SecurityHeaderTests : ApiTests
 
             builder.ConfigureTestServices(services =>
                 services.AddSingleton<IStartupFilter>(new RemoteAddress(IPAddress.Parse(from))));
-        }, new WebApplicationFactoryClientOptions
-        {
-            BaseAddress = new Uri(baseAddress),
-            AllowAutoRedirect = false
-        });
+        }).Client;
     }
 
     private static void AssertSecurityHeaders(HttpResponseMessage response)
