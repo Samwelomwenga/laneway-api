@@ -182,33 +182,13 @@ public sealed class AuthService(
         return NoContent("Signed out everywhere", RefreshCookieChange.Cleared);
     }
 
-    public async Task<AuthReply<bool>> ChangePasswordAsync(Guid userId, Guid sessionId, ChangePasswordWrite write)
+    public Task<AuthReply<bool>> ChangePasswordAsync(Guid userId, Guid sessionId, ChangePasswordWrite write)
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        if (write.NewPassword == write.CurrentPassword)
+        return WithPasswordAsync(userId, sessionId, write.CurrentPassword, PasswordCheckedEndpoint.ChangePassword, async now =>
         {
-            return Invalid(new ApiError(
-                "newPassword", ErrorCodes.SameAsCurrent, "'newPassword' must differ from your current password."));
-        }
-
-        var names = await database.Users
-            .Where(u => u.Id == userId)
-            .Select(u => new { u.Username, u.Email })
-            .SingleOrDefaultAsync();
-        if (names is null)
-        {
-            return AuthReply.Of(NotAuthenticated.Response<bool>());
-        }
-
-        if (await passwordPolicy.CheckAsync(write.NewPassword, names.Username, names.Email, "newPassword") is { } refused)
-        {
-            return Invalid(refused);
-        }
-
-        var newHash = passwords.Hash(write.NewPassword);
-        return await WithPasswordAsync(userId, sessionId, write.CurrentPassword, PasswordCheckedEndpoint.ChangePassword, async now =>
-        {
+            var newHash = passwords.Hash(write.NewPassword);
             await database.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u
                 .SetProperty(e => e.PasswordHash, newHash)
                 .SetProperty(e => e.UpdatedAt, now)
@@ -218,6 +198,18 @@ public sealed class AuthService(
             _log.PasswordChanged(userId, sessionId);
             LogEnded(userId, ended, SessionEndReason.PasswordChanged);
             return NoContent("Password changed", RefreshCookieChange.None);
+        },
+        refuseFirst: async user =>
+        {
+            if (write.NewPassword == write.CurrentPassword)
+            {
+                return Invalid(new ApiError(
+                    "newPassword", ErrorCodes.SameAsCurrent, "'newPassword' must differ from your current password."));
+            }
+
+            return await passwordPolicy.CheckAsync(write.NewPassword, user.Username, user.Email, "newPassword") is { } refused
+                ? Invalid(refused)
+                : null;
         });
     }
 
@@ -328,7 +320,8 @@ public sealed class AuthService(
         Guid sessionId,
         string password,
         PasswordCheckedEndpoint endpoint,
-        Func<DateTime, Task<AuthReply<bool>>> action)
+        Func<DateTime, Task<AuthReply<bool>>> action,
+        Func<User, Task<AuthReply<bool>?>>? refuseFirst = null)
     {
         var user = await database.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId);
         if (user is null)
@@ -350,21 +343,34 @@ public sealed class AuthService(
                 : PasswordCheckWrong(userId, sessionId, endpoint);
         }
 
+        if (refuseFirst is not null && await refuseFirst(user) is { } refused)
+        {
+            return await ClearFailuresAsync(user, check, now)
+                ? refused
+                : await ClearLostAsync(userId, sessionId, endpoint, now);
+        }
+
         await using var transaction = await database.Database.BeginTransactionAsync();
         if (!await ClearFailuresAsync(user, check, now))
         {
-            var blockedUntil = await database.Users
-                .Where(u => u.Id == userId)
-                .Select(u => u.SignInBlockedUntil)
-                .SingleOrDefaultAsync();
-            return blockedUntil > now
-                ? PasswordCheckBlocked(userId, sessionId, endpoint, blockedUntil.Value - now)
-                : PasswordCheckWrong(userId, sessionId, endpoint);
+            return await ClearLostAsync(userId, sessionId, endpoint, now);
         }
 
         var reply = await action(now);
         await transaction.CommitAsync();
         return reply;
+    }
+
+    private async Task<AuthReply<bool>> ClearLostAsync(
+        Guid userId, Guid sessionId, PasswordCheckedEndpoint endpoint, DateTime now)
+    {
+        var blockedUntil = await database.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.SignInBlockedUntil)
+            .SingleOrDefaultAsync();
+        return blockedUntil > now
+            ? PasswordCheckBlocked(userId, sessionId, endpoint, blockedUntil.Value - now)
+            : PasswordCheckWrong(userId, sessionId, endpoint);
     }
 
     private AuthReply<bool> PasswordCheckWrong(Guid userId, Guid sessionId, PasswordCheckedEndpoint endpoint)

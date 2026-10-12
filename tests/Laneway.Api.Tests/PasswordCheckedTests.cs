@@ -86,6 +86,28 @@ public class PasswordCheckedTests : ApiTests
         await AssertInvalidAsync(response, "newPassword", ErrorCodes.ContainsContextWord);
     }
 
+    [Theory]
+    [InlineData(WrongPassword)]
+    [InlineData("laneway lantern")]
+    public async Task Change_password_checks_the_current_password_before_the_new_one(string newPassword)
+    {
+        using var response = await ChangePasswordAsync(WrongPassword, newPassword);
+
+        await AssertInvalidAsync(response, "currentPassword", ErrorCodes.WrongPassword);
+        Assert.Equal(1, (await ActorRowAsync()).FailedSignInCount);
+    }
+
+    [Fact]
+    public async Task A_refused_new_password_still_resets_the_count()
+    {
+        await SetFailuresAsync(4);
+
+        using var response = await ChangePasswordAsync(TestUser.Password, "laneway lantern");
+
+        await AssertInvalidAsync(response, "newPassword", ErrorCodes.ContainsContextWord);
+        Assert.Equal(0, (await ActorRowAsync()).FailedSignInCount);
+    }
+
     [Fact]
     public async Task Change_password_checks_the_new_passwords_length()
     {

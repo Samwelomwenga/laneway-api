@@ -18,11 +18,11 @@ The minimum password length is 8, which meets 6.2.1 at every level, so it isn't 
   - A new password must pass a top-100k common-password list (6.2.4), a context-word check (6.2.11), and a Have I Been Pwned range lookup (6.2.12).
 - What closes it: the MFA effort.
 
-### 6.3.8, sign-up enumeration (L3)
+### 6.3.8, sign-up and change-email enumeration (L3)
 
 6.3.8 is an L3 item, so it isn't strictly owed at L2. It's listed so the email effort finds it.
 
-- What Laneway doesn't do: hide whether a username or email is taken. Sign-up answers 409 for a taken one.
-- Why: without email, sign-up has no way to tell a user their address is taken without telling everyone who tries it.
-- Mitigating controls: the `sign-up` rate limit, 10 per hour per IP. It slows harvesting from one IP and doesn't stop a botnet. Sign-in itself resists enumeration with one 401 for an unknown user or a wrong password, and a dummy hash so the timing matches.
-- What closes it: Laneway sending email. Sign-up then answers "check your email" whether the address is taken or not.
+- What Laneway doesn't do: hide whether a username or email is taken. Sign-up answers 409 for a taken one. Change email answers 409 when another user has the new email.
+- Why: without email, neither endpoint has a way to tell a user their address is taken without telling everyone who tries it.
+- Mitigating controls: the `sign-up` rate limit, 10 per hour per IP. It slows harvesting from one IP and doesn't stop a botnet. Change email gives away no more than sign-up already does. It also needs an access token and the current password, and the `password-check` limit of 5 per minute by `sub` caps it. Sign-in itself resists enumeration with one 401 for an unknown user or a wrong password, and a dummy hash so the timing matches.
+- What closes it: Laneway sending email. Sign-up then answers "check your email" whether the address is taken or not. Change email sends a confirmation link to the new address and answers the same way.
