@@ -95,7 +95,7 @@ A user who is gone for good. The work they did stays, and their activity entries
 _Avoid_: Removed user, inactive user, disabled user
 
 **Session**:
-One stretch of a user being signed in on one device. It starts when the user signs in. It ends when they sign out, sign out everywhere, or are deleted, when they change their password from another session, or when it runs out. It also ends when the user ends it from their list of sessions, or when Laneway sees one of its old refresh tokens used again. A user can have several at once.
+One stretch of a user being signed in on one device. It starts when the user signs up or signs in. It ends when they sign out, sign out everywhere, or are deleted, when they change their password from another session, or when it runs out. It also ends when the user ends it from their list of sessions, or when Laneway sees one of its old refresh tokens used again. A user can have several at once.
 _Avoid_: Login, token family
 
 **Profile**:
