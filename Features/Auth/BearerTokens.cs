@@ -75,7 +75,7 @@ public sealed class BearerEvents(
             return;
         }
 
-        actor.Resolve(userId);
+        actor.Resolve(userId, sessionId);
     }
 
     public override Task AuthenticationFailed(AuthenticationFailedContext context)

@@ -29,7 +29,7 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 
 `RefreshSuperseded` is a refresh that lost a race inside the 10-second grace window. It ends nothing. `RefreshTokenReused` is a retired token back after that window, and a `SessionEnded` with `endReason` `TokenReused` follows it.
 
-`SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment.
+`SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment. `endReason` is `SignedOut`, `SignedOutEverywhere`, `EndedFromSessionList`, or `TokenReused`. Sign-out everywhere logs one entry per session it ends. Ending a session that already ended logs nothing.
 
 `BreachedCheckUnavailable` means the Pwned Passwords check failed or took over 2 seconds, so the password was accepted without it. Each entry is one password that skipped ASVS 6.2.12.
 

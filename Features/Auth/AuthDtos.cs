@@ -43,3 +43,13 @@ public record SignedUpDto
     DateTime SessionExpiresAt,
     UserDto User
 ) : SignedInDto(AccessToken, AccessTokenExpiresAt, SessionExpiresAt);
+
+public record SessionDto
+(
+    Guid Id,
+    DateTime CreatedAt,
+    DateTime LastUsedAt,
+    DateTime ExpiresAt,
+    string UserAgent,
+    bool Current
+);

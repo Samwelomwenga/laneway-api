@@ -14,8 +14,6 @@ namespace Laneway.Api.Tests;
 [Collection(ApiCollection.Name)]
 public class RefreshTests : ApiTests
 {
-    private static readonly TimeSpan SessionLifetime = TimeSpan.FromDays(30);
-
     public RefreshTests(TestStack stack) : base(stack)
     {
     }
@@ -26,7 +24,7 @@ public class RefreshTests : ApiTests
         using var response = await Https.PostAsJsonAsync("/api/v1/auth/sign-up", SignUpBody(NewEmail()));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var token = RefreshCookieAssert.Set(response, SessionLifetime);
+        var token = RefreshCookieAssert.Set(response, Session.AbsoluteLifetime);
         Assert.DoesNotContain(token, await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         var stored = await FromDatabaseAsync(database => database.RefreshTokens.SingleAsync());
         Assert.Equal(SHA256.HashData(Encoding.ASCII.GetBytes(token)), stored.TokenHash);
@@ -41,7 +39,7 @@ public class RefreshTests : ApiTests
             "/api/v1/auth/sign-in", new { email = ActorUser.User.Email, password = TestUser.Password });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var token = RefreshCookieAssert.Set(response, SessionLifetime);
+        var token = RefreshCookieAssert.Set(response, Session.AbsoluteLifetime);
         Assert.DoesNotContain(token, await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
@@ -54,7 +52,7 @@ public class RefreshTests : ApiTests
         using var response = await RefreshAsync(first);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var second = RefreshCookieAssert.Set(response, SessionLifetime - TimeSpan.FromHours(1));
+        var second = RefreshCookieAssert.Set(response, Session.AbsoluteLifetime - TimeSpan.FromHours(1));
         Assert.NotEqual(first, second);
         var refreshed = (await response.ReadEnvelope<SignedInDto>()).Data!;
         var sid = SessionOf(signedUp.AccessToken);
@@ -88,12 +86,12 @@ public class RefreshTests : ApiTests
     {
         var (_, first) = await SignUpOverHttpsAsync();
         using var once = await RefreshAsync(first);
-        var second = RefreshCookieAssert.Set(once, SessionLifetime);
+        var second = RefreshCookieAssert.Set(once, Session.AbsoluteLifetime);
 
         using var twice = await RefreshAsync(second);
 
         Assert.Equal(HttpStatusCode.OK, twice.StatusCode);
-        Assert.NotEqual(second, RefreshCookieAssert.Set(twice, SessionLifetime));
+        Assert.NotEqual(second, RefreshCookieAssert.Set(twice, Session.AbsoluteLifetime));
     }
 
     [Fact]
@@ -124,7 +122,7 @@ public class RefreshTests : ApiTests
     {
         var (signedUp, first) = await SignUpOverHttpsAsync();
         using var winner = await RefreshAsync(first);
-        var second = RefreshCookieAssert.Set(winner, SessionLifetime);
+        var second = RefreshCookieAssert.Set(winner, Session.AbsoluteLifetime);
         Time.Advance(TimeSpan.FromSeconds(9));
 
         using var loser = await RefreshAsync(first);
@@ -147,7 +145,7 @@ public class RefreshTests : ApiTests
     {
         var (signedUp, first) = await SignUpOverHttpsAsync();
         using var winner = await RefreshAsync(first);
-        var second = RefreshCookieAssert.Set(winner, SessionLifetime);
+        var second = RefreshCookieAssert.Set(winner, Session.AbsoluteLifetime);
         var refreshed = (await winner.ReadEnvelope<SignedInDto>()).Data!;
         Time.Advance(TimeSpan.FromSeconds(10));
 
@@ -252,7 +250,7 @@ public class RefreshTests : ApiTests
         var (_, first) = await SignUpOverHttpsAsync();
         Time.Advance(TimeSpan.FromDays(7) - TimeSpan.FromMinutes(1));
         using var stillLive = await RefreshAsync(first);
-        var second = RefreshCookieAssert.Set(stillLive, SessionLifetime - TimeSpan.FromDays(7) + TimeSpan.FromMinutes(1));
+        var second = RefreshCookieAssert.Set(stillLive, Session.AbsoluteLifetime - TimeSpan.FromDays(7) + TimeSpan.FromMinutes(1));
         Time.Advance(TimeSpan.FromDays(7));
 
         using var idle = await RefreshAsync(second);
@@ -272,7 +270,7 @@ public class RefreshTests : ApiTests
         {
             Time.Advance(TimeSpan.FromDays(6));
             using var refreshed = await RefreshAsync(token);
-            token = RefreshCookieAssert.Set(refreshed, SessionLifetime - TimeSpan.FromDays(day));
+            token = RefreshCookieAssert.Set(refreshed, Session.AbsoluteLifetime - TimeSpan.FromDays(day));
         }
 
         Time.Advance(TimeSpan.FromDays(6));
@@ -338,7 +336,7 @@ public class RefreshTests : ApiTests
     {
         var (_, first) = await SignUpOverHttpsAsync();
         using var once = await RefreshAsync(first);
-        var second = RefreshCookieAssert.Set(once, SessionLifetime);
+        var second = RefreshCookieAssert.Set(once, Session.AbsoluteLifetime);
         Time.Advance(TimeSpan.FromSeconds(10));
         (await RefreshAsync(first)).Dispose();
 
@@ -348,50 +346,6 @@ public class RefreshTests : ApiTests
         Assert.DoesNotContain(Logs(), log => secrets.Any(secret =>
             log.Message.Contains(secret, StringComparison.OrdinalIgnoreCase)
             || (log.StructuredState ?? []).Any(pair => pair.Value?.Contains(secret, StringComparison.OrdinalIgnoreCase) == true)));
-    }
-
-    private static string NewEmail() => $"{Guid.NewGuid():n}@example.com";
-
-    private static Guid SessionOf(string accessToken) =>
-        Guid.Parse(new JsonWebToken(accessToken).GetPayloadValue<string>(AccessTokens.SessionClaim));
-
-    private async Task<(SignedUpDto SignedUp, string Cookie)> SignUpOverHttpsAsync()
-    {
-        using var response = await Https.PostAsJsonAsync("/api/v1/auth/sign-up", SignUpBody(NewEmail()));
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        return ((await response.ReadEnvelope<SignedUpDto>()).Data!, RefreshCookieAssert.Set(response, SessionLifetime));
-    }
-
-    private async Task<HttpResponseMessage> RefreshAsync(string? cookie)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/refresh");
-        if (cookie is not null)
-        {
-            request.Headers.Add("Cookie", $"{RefreshCookieAssert.Name}={cookie}");
-        }
-
-        return await Https.SendAsync(request);
-    }
-
-    private async Task WaitForLockWaitAsync()
-    {
-        for (var attempt = 0; attempt < 500; attempt++)
-        {
-            var waiting = await FromDatabaseAsync(database => database.Database
-                .SqlQuery<int>($"""
-                    SELECT count(*)::int AS "Value" FROM pg_stat_activity
-                    WHERE wait_event_type = 'Lock' AND datname = current_database()
-                    """)
-                .SingleAsync());
-            if (waiting > 0)
-            {
-                return;
-            }
-
-            await Task.Delay(20);
-        }
-
-        Assert.Fail("The refresh never waited on the held row lock.");
     }
 
     private static async Task AssertNotAuthenticatedAsync(HttpResponseMessage response)

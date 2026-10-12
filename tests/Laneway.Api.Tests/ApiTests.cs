@@ -5,9 +5,11 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -107,6 +109,62 @@ public abstract class ApiTests : IAsyncLifetime
         timeZone = "UTC",
         location = "Nairobi"
     };
+
+    protected static string NewEmail() => $"{Guid.NewGuid():n}@example.com";
+
+    protected static Guid SessionOf(string accessToken) =>
+        Guid.Parse(new JsonWebToken(accessToken).GetPayloadValue<string>(AccessTokens.SessionClaim));
+
+    protected async Task<(SignedUpDto SignedUp, string Cookie)> SignUpOverHttpsAsync()
+    {
+        using var response = await Https.PostAsJsonAsync("/api/v1/auth/sign-up", SignUpBody(NewEmail()));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return ((await response.ReadEnvelope<SignedUpDto>()).Data!,
+            RefreshCookieAssert.Set(response, Session.AbsoluteLifetime));
+    }
+
+    protected async Task<HttpResponseMessage> RefreshAsync(string? cookie)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/refresh");
+        if (cookie is not null)
+        {
+            request.Headers.Add("Cookie", $"{RefreshCookieAssert.Name}={cookie}");
+        }
+
+        return await Https.SendAsync(request);
+    }
+
+    protected async Task<HttpResponseMessage> SendOverHttpsAsync(HttpMethod method, string path, string? token)
+    {
+        using var request = new HttpRequestMessage(method, path);
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return await Https.SendAsync(request);
+    }
+
+    protected async Task WaitForLockWaitAsync()
+    {
+        for (var attempt = 0; attempt < 500; attempt++)
+        {
+            var waiting = await FromDatabaseAsync(database => database.Database
+                .SqlQuery<int>($"""
+                    SELECT count(*)::int AS "Value" FROM pg_stat_activity
+                    WHERE wait_event_type = 'Lock' AND datname = current_database()
+                    """)
+                .SingleAsync());
+            if (waiting > 0)
+            {
+                return;
+            }
+
+            await Task.Delay(20);
+        }
+
+        Assert.Fail("The request never waited on the held row lock.");
+    }
 
     protected Task<HttpResponseMessage> GetAsync(string path, TestUser? @as = null) =>
         SendAsync(HttpMethod.Get, path, null, @as ?? ActorUser);

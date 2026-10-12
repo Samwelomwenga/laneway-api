@@ -124,6 +124,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.RefuseFailedBearerTokens();
+app.UseAuthorization();
 
 app.MapGet("/", () => Results.Redirect("/scalar/v1"));
 

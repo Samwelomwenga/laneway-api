@@ -7,6 +7,10 @@ public interface IAuthService
     Task<AuthReply<SignedUpDto>> SignUpAsync(SignUpWrite write, string? userAgent);
     Task<AuthReply<SignedInDto>> SignInAsync(SignInWrite write, string? userAgent);
     Task<AuthReply<SignedInDto>> RefreshAsync(string? presented);
+    Task<AuthReply<bool>> SignOutAsync(Guid userId, Guid sessionId);
+    Task<AuthReply<bool>> SignOutEverywhereAsync(Guid userId);
+    Task<ApiResponse<List<SessionDto>>> ListSessionsAsync(Guid userId, Guid currentSessionId);
+    Task<AuthReply<bool>> EndSessionAsync(Guid userId, Guid currentSessionId, Guid sessionId);
 }
 
 public sealed class AuthService(
@@ -145,6 +149,86 @@ public sealed class AuthService(
         return SignedIn(session, cookie, "Refreshed");
     }
 
+    public async Task<AuthReply<bool>> SignOutAsync(Guid userId, Guid sessionId)
+    {
+        await EndAsync(userId, sessionId, SessionEndReason.SignedOut, time.GetUtcNow().UtcDateTime);
+        return SessionsEnded("Signed out", RefreshCookieChange.Cleared);
+    }
+
+    public async Task<AuthReply<bool>> SignOutEverywhereAsync(Guid userId)
+    {
+        var now = time.GetUtcNow().UtcDateTime;
+        await using var transaction = await database.Database.BeginTransactionAsync();
+        var active = await database.Sessions
+            .FromSql($"SELECT * FROM \"Sessions\" WHERE \"UserId\" = {userId} FOR UPDATE")
+            .Where(Session.ActiveAt(now))
+            .Select(s => s.Id)
+            .ToListAsync();
+        await database.Sessions
+            .Where(s => active.Contains(s.Id))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(e => e.EndedAt, now)
+                .SetProperty(e => e.EndReason, SessionEndReason.SignedOutEverywhere));
+        await transaction.CommitAsync();
+
+        foreach (var sessionId in active)
+        {
+            _log.SessionEnded(userId, sessionId, SessionEndReason.SignedOutEverywhere);
+        }
+
+        return SessionsEnded("Signed out everywhere", RefreshCookieChange.Cleared);
+    }
+
+    public async Task<ApiResponse<List<SessionDto>>> ListSessionsAsync(Guid userId, Guid currentSessionId)
+    {
+        var sessions = await database.Sessions
+            .AsNoTracking()
+            .Where(Session.ActiveAt(time.GetUtcNow().UtcDateTime))
+            .Where(s => s.UserId == userId)
+            .OrderByDescending(s => s.LastUsedAt)
+            .Select(s => new SessionDto(
+                s.Id, s.CreatedAt, s.LastUsedAt, s.ExpiresAt, s.UserAgent, s.Id == currentSessionId))
+            .ToListAsync();
+        return ApiResponse<List<SessionDto>>.SuccessResponse(sessions, "Sessions retrieved");
+    }
+
+    public async Task<AuthReply<bool>> EndSessionAsync(Guid userId, Guid currentSessionId, Guid sessionId)
+    {
+        if (!await database.Sessions.AnyAsync(s => s.Id == sessionId && s.UserId == userId))
+        {
+            return AuthReply.Of(SessionNotFound(sessionId));
+        }
+
+        await EndAsync(userId, sessionId, SessionEndReason.EndedFromSessionList, time.GetUtcNow().UtcDateTime);
+        return SessionsEnded(
+            "Session ended",
+            sessionId == currentSessionId ? RefreshCookieChange.Cleared : RefreshCookieChange.None);
+    }
+
+    private async Task EndAsync(Guid userId, Guid sessionId, SessionEndReason reason, DateTime now)
+    {
+        var ended = await database.Sessions
+            .Where(Session.ActiveAt(now))
+            .Where(s => s.Id == sessionId && s.UserId == userId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(e => e.EndedAt, now)
+                .SetProperty(e => e.EndReason, reason));
+        if (ended == 1)
+        {
+            _log.SessionEnded(userId, sessionId, reason);
+        }
+    }
+
+    private static ApiResponse<bool> SessionNotFound(Guid sessionId)
+    {
+        var message = $"Session {sessionId} does not exist.";
+        return ApiResponse<bool>.ErrorResponse(
+            message, StatusCodes.Status404NotFound, [new ApiError(null, ErrorCodes.NotFound, message)]);
+    }
+
+    private static AuthReply<bool> SessionsEnded(string message, RefreshCookieChange cookie) =>
+        new(ApiResponse<bool>.SuccessResponse(true, message, StatusCodes.Status204NoContent), cookie);
+
     private async Task<AuthReply<SignedInDto>> RetiredAsync(
         RefreshToken token, Session session, DateTime retiredAt, DateTime now)
     {
@@ -160,15 +244,7 @@ public sealed class AuthService(
 
         _log.RefreshTokenReused(session.UserId, session.Id, token.Id);
         meter.Refreshed(RefreshResult.Reused);
-        var ended = await database.Sessions
-            .Where(s => s.Id == session.Id && s.EndedAt == null)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(e => e.EndedAt, now)
-                .SetProperty(e => e.EndReason, SessionEndReason.TokenReused));
-        if (ended == 1)
-        {
-            _log.SessionEnded(session.UserId, session.Id, SessionEndReason.TokenReused);
-        }
+        await EndAsync(session.UserId, session.Id, SessionEndReason.TokenReused, now);
 
         return new AuthReply<SignedInDto>(NotAuthenticated.Response<SignedInDto>(), RefreshCookieChange.Cleared);
     }
