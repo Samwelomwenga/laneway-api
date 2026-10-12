@@ -89,6 +89,8 @@ public class CorsTests : ApiTests
     [InlineData("https://app.laneway.example/")]
     [InlineData("https://app.laneway.example/app")]
     [InlineData("http://app.laneway.example")]
+    [InlineData("http://localhost.laneway.example:3000")]
+    [InlineData("http://localhost:3000/")]
     [InlineData("app.laneway.example")]
     [InlineData("https://app.laneway.example?x=1")]
     public void A_bad_allowed_origin_stops_the_app_at_startup(string origin)
@@ -113,11 +115,14 @@ public class CorsTests : ApiTests
         Assert.True(result.Succeeded);
     }
 
-    [Fact]
-    public void A_port_is_allowed()
+    [Theory]
+    [InlineData("https://localhost:5173")]
+    [InlineData("http://localhost:3000")]
+    [InlineData("http://127.0.0.1:3000")]
+    [InlineData("http://[::1]:3000")]
+    public void A_good_allowed_origin_is_allowed(string origin)
     {
-        var result = new CorsOriginsValidator().Validate(
-            null, new CorsOrigins { AllowedOrigins = ["https://localhost:5173"] });
+        var result = new CorsOriginsValidator().Validate(null, new CorsOrigins { AllowedOrigins = [origin] });
 
         Assert.True(result.Succeeded);
     }
