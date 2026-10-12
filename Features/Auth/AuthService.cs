@@ -2,6 +2,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Laneway.Api;
 
+public interface IAuthService
+{
+    Task<AuthReply<SignedUpDto>> SignUpAsync(SignUpWrite write, string? userAgent);
+    Task<AuthReply<SignedInDto>> SignInAsync(SignInWrite write, string? userAgent);
+    Task<AuthReply<SignedInDto>> RefreshAsync(string? presented);
+}
+
 public sealed class AuthService(
     ApplicationDbContext database,
     Passwords passwords,
@@ -9,7 +16,7 @@ public sealed class AuthService(
     AccessTokens tokens,
     AuthMeter meter,
     TimeProvider time,
-    ILoggerFactory loggers)
+    ILoggerFactory loggers) : IAuthService
 {
     private const string IncorrectCredentials = "Email or password is incorrect.";
 
