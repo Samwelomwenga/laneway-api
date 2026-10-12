@@ -86,8 +86,13 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 
+builder.Services.AddHttpHardening(builder.Configuration);
+
 builder.WebHost.ConfigureKestrel(options =>
-    options.Limits.MaxRequestBodySize = FieldLimits.AttachmentBytes + (1024 * 1024));
+{
+    options.AddServerHeader = false;
+    options.Limits.MaxRequestBodySize = FieldLimits.AttachmentBytes + (1024 * 1024);
+});
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -104,15 +109,16 @@ var app = builder.Build();
 app.Services.GetRequiredService<AuthMeter>();
 app.Services.GetRequiredService<Passwords>();
 
+app.UseTrustedForwardedHeaders();
+app.UseSecurityHeaders(app.Environment);
 app.UseExceptionHandler();
+app.RefusePlainHttp(app.Environment);
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
-
-app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.RefuseFailedBearerTokens();

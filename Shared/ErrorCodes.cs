@@ -33,4 +33,5 @@ public static class ErrorCodes
     public const string CommonPassword = "commonPassword";
     public const string ContainsContextWord = "containsContextWord";
     public const string BreachedPassword = "breachedPassword";
+    public const string HttpsRequired = "httpsRequired";
 }

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -171,6 +172,13 @@ public abstract class ApiTests : IAsyncLifetime
         var client = host.CreateClient();
         _hostClients.Add(client);
         return (client, host.Services.GetFakeLogCollector());
+    }
+
+    protected HttpClient ClientFor(Action<IWebHostBuilder> configure, WebApplicationFactoryClientOptions options)
+    {
+        var client = Factory.WithWebHostBuilder(configure).CreateClient(options);
+        _hostClients.Add(client);
+        return client;
     }
 
     protected async Task<HttpResponseMessage> SendWithTokenAsync(
