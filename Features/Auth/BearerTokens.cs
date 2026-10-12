@@ -47,8 +47,6 @@ public sealed class BearerEvents(
     TimeProvider time,
     ILoggerFactory loggers) : JwtBearerEvents
 {
-    private const string SignInAgain = "Sign in again.";
-
     private readonly ILogger _log = loggers.CreateLogger(AuthLog.Category);
 
     public override async Task TokenValidated(TokenValidatedContext context)
@@ -96,10 +94,7 @@ public sealed class BearerEvents(
         var response = context.Response;
         response.StatusCode = StatusCodes.Status401Unauthorized;
         response.Headers.WWWAuthenticate = JwtBearerDefaults.AuthenticationScheme;
-        await response.WriteAsJsonAsync(
-            ApiResponse<object>.ErrorResponse(SignInAgain, StatusCodes.Status401Unauthorized,
-                [new ApiError(null, ErrorCodes.NotAuthenticated, SignInAgain)]),
-            context.HttpContext.RequestAborted);
+        await response.WriteAsJsonAsync(NotAuthenticated.Response<object>(), context.HttpContext.RequestAborted);
     }
 
     private void Reject(TokenValidatedContext context, string reason, string? kid)

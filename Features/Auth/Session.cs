@@ -44,6 +44,12 @@ public class Session
         var idleSince = now - IdleTimeout;
         return session => session.EndedAt == null && session.ExpiresAt > now && session.LastUsedAt > idleSince;
     }
+
+    public static Expression<Func<Session, bool>> FinishedBefore(DateTime cutoff)
+    {
+        var idleBefore = cutoff - IdleTimeout;
+        return session => session.EndedAt < cutoff || session.ExpiresAt < cutoff || session.LastUsedAt < idleBefore;
+    }
 }
 
 public enum SessionEndReason

@@ -19,8 +19,7 @@ public class AuthController : ApiControllerBase
     [NoActor]
     public async Task<ActionResult<ApiResponse<SignedUpDto>>> SignUp([FromBody] SignUpDto signUpDto)
     {
-        var response = await _authService.SignUpAsync(SignUpWrite.Of(signUpDto), Request.Headers.UserAgent.ToString());
-        return ToActionResult(response);
+        return Reply(await _authService.SignUpAsync(SignUpWrite.Of(signUpDto), Request.Headers.UserAgent.ToString()));
     }
 
     [HttpPost("sign-in")]
@@ -28,7 +27,20 @@ public class AuthController : ApiControllerBase
     [NoActor]
     public async Task<ActionResult<ApiResponse<SignedInDto>>> SignIn([FromBody] SignInDto signInDto)
     {
-        var response = await _authService.SignInAsync(SignInWrite.Of(signInDto), Request.Headers.UserAgent.ToString());
-        return ToActionResult(response);
+        return Reply(await _authService.SignInAsync(SignInWrite.Of(signInDto), Request.Headers.UserAgent.ToString()));
+    }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [NoActor]
+    public async Task<ActionResult<ApiResponse<SignedInDto>>> Refresh()
+    {
+        return Reply(await _authService.RefreshAsync(RefreshCookie.Read(Request)));
+    }
+
+    private ActionResult Reply<T>(AuthReply<T> reply)
+    {
+        RefreshCookie.Write(Response, reply.Cookie);
+        return ToActionResult(reply.Response);
     }
 }

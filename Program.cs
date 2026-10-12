@@ -46,6 +46,8 @@ builder.Services.AddHostedService<CopyJobWorker>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddBearerTokens();
+builder.Services.AddSingleton<SessionSweeper>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<SessionSweeper>());
 builder.Services.AddSingleton<Passwords>();
 builder.Services.AddHttpClient<BreachedPasswords>(BreachedPasswords.Configure).RemoveAllLoggers();
 builder.Services.AddScoped<PasswordPolicy>();

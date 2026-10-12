@@ -17,8 +17,19 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | 3 | `SignInSucceeded` | Information | `sub`, `sid` |
 | 4 | `SignInFailed` | Warning | `sub` when the email belongs to a user, otherwise `accountFound: false` |
 | 5 | `BreachedCheckUnavailable` | Warning | the exception from the Pwned Passwords call |
+| 6 | `SessionRefreshed` | Information | `sub`, `sid`, and `refreshTokenId` of the new token |
+| 7 | `RefreshSuperseded` | Information | `sub`, `sid` |
+| 8 | `RefreshTokenReused` | Warning | `sub`, `sid`, and `refreshTokenId` of the reused token |
+| 9 | `RefreshRejected` | Information | `reason`, and `sid` when the token was found |
+| 10 | `SessionEnded` | Information | `sub`, `sid`, `endReason` |
 
 `reason` is one of `malformed`, `expired`, `unknownKey`, `invalidSignature`, `invalidAlgorithm`, `invalidType`, `invalidIssuer`, `invalidAudience`, `sessionEnded`, or `invalid`.
+
+`RefreshRejected` has `reason` `missingCookie`, `unknownToken`, or `sessionEnded`. `sessionEnded` covers a session that ended, passed its 30-day limit, sat idle for 7 days, or belongs to a deleted user.
+
+`RefreshSuperseded` is a refresh that lost a race inside the 10-second grace window. It ends nothing. `RefreshTokenReused` is a retired token back after that window, and a `SessionEnded` with `endReason` `TokenReused` follows it.
+
+`SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment.
 
 `BreachedCheckUnavailable` means the Pwned Passwords check failed or took over 2 seconds, so the password was accepted without it. Each entry is one password that skipped ASVS 6.2.12.
 
@@ -38,6 +49,7 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 |---|---|
 | `laneway.auth.sign_in.attempts` | `result`: `succeeded`, `wrong_password`, or `unknown_account` |
 | `laneway.auth.breached_check.unavailable` | none |
+| `laneway.auth.refresh` | `result`: `rotated`, `superseded`, `reused`, or `rejected` |
 
 `laneway.auth.sign_in.attempts` includes successes, so the failure-to-success ratio is visible. A climbing ratio is the usual sign of credential stuffing.
 

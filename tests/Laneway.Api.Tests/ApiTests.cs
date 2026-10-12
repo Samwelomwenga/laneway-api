@@ -19,6 +19,7 @@ public abstract class ApiTests : IAsyncLifetime
     private ApiFactory? _factory;
     private HttpClient? _client;
     private HttpClient? _noRedirects;
+    private HttpClient? _https;
     private Guid? _databaseId;
 
     private readonly List<HttpClient> _hostClients = [];
@@ -45,6 +46,13 @@ public abstract class ApiTests : IAsyncLifetime
         _noRedirects ??= (_factory ?? throw new InvalidOperationException("The test host isn't up yet."))
             .CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
+    protected HttpClient Https =>
+        _https ??= Factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            HandleCookies = false
+        });
+
     public async Task InitializeAsync()
     {
         _databaseId = await _stack.NewDatabaseAsync();
@@ -57,6 +65,7 @@ public abstract class ApiTests : IAsyncLifetime
     {
         _client?.Dispose();
         _noRedirects?.Dispose();
+        _https?.Dispose();
         _hostClients.ForEach(client => client.Dispose());
         if (_factory is not null)
         {

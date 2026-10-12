@@ -34,4 +34,5 @@ public static class ErrorCodes
     public const string ContainsContextWord = "containsContextWord";
     public const string BreachedPassword = "breachedPassword";
     public const string HttpsRequired = "httpsRequired";
+    public const string RefreshSuperseded = "refreshSuperseded";
 }
