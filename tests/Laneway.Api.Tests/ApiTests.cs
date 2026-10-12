@@ -261,7 +261,7 @@ public abstract class ApiTests : IAsyncLifetime
         });
 
         var token = await IssueTokenAsync(user.Id, session.Id);
-        using var response = await SendWithTokenAsync(HttpMethod.Get, $"/api/v1/users/{user.Id}", token);
+        using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/profile", token);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         return new TestUser((await response.ReadEnvelope<UserDto>()).Data!, session.Id, token);

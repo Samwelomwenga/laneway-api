@@ -20,10 +20,19 @@ public record UserDto
     Guid? UpdatedBy
 );
 
-public record UpdateUserDto
+public record UserSummaryDto
+(
+    Guid Id,
+    string Username,
+    string FirstName,
+    string LastName,
+    Uri? ProfilePictureUrl,
+    string? Bio
+);
+
+public record UpdateProfileDto
 (
     string Username,
-    string Email,
     string FirstName,
     string LastName,
     string? PhoneNumber,
@@ -32,14 +41,4 @@ public record UpdateUserDto
     string TimeZone,
     string Location,
     Uri? ProfilePictureUrl
-)
-{
-    public string Email { get; init; } = Emails.Normalize(Email);
-}
-
-public record UserSearchDto
-(
-    int PageNumber = 1,
-    int PageSize = 10,
-    string? SearchTerm = null
 );

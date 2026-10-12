@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 
 namespace Laneway.Api;
 
@@ -14,31 +13,10 @@ public class UsersController : ApiControllerBase
         _userService = userService;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<PagedResponse<UserDto>>> GetUsers([FromQuery] UserSearchDto searchDto)
-    {
-        var response = await _userService.GetAllAsync(searchDto);
-        return Ok(response);
-    }
-
     [HttpGet("{id}")]
-    public async Task<ActionResult<ApiResponse<UserDto>>> GetUser(Guid id)
+    public async Task<ActionResult<ApiResponse<UserSummaryDto>>> GetUser(Guid id)
     {
-        var response = await _userService.GetByIdAsync(id);
-        return ToActionResult(response);
-    }
-
-    [HttpGet("username-exists")]
-    public async Task<ActionResult<ApiResponse<bool>>> CheckUserNameExists([FromQuery][Required] string username)
-    {
-        var response = await _userService.UserNameExistsAsync(username);
-        return Ok(response);
-    }
-
-    [HttpPut("{id}")]
-    public async Task<ActionResult<ApiResponse<UserDto>>> UpdateUser(Guid id, [FromBody] UpdateUserDto updateUserDto)
-    {
-        var response = await _userService.UpdateAsync(id, updateUserDto);
+        var response = await _userService.GetSummaryAsync(id);
         return ToActionResult(response);
     }
 

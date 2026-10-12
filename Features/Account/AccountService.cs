@@ -24,16 +24,11 @@ namespace Laneway.Api
 
         public async Task<PagedResponse<AccountDto>> GetAllAsync(AccountSearchDto searchDto)
         {
-            var query = _context.Accounts.AsQueryable();
+            var query = OwnAccounts();
 
             if (!string.IsNullOrEmpty(searchDto.SearchTerm))
             {
                 query = query.Where(a => a.Name.Contains(searchDto.SearchTerm));
-            }
-
-            if (searchDto.UserId.HasValue)
-            {
-                query = query.Where(a => a.UserId == searchDto.UserId.Value);
             }
 
             var totalCount = await query.CountAsync();
@@ -56,7 +51,7 @@ namespace Laneway.Api
 
         public async Task<ApiResponse<AccountDto>> GetByIdAsync(Guid id)
         {
-            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.Id == id);
+            var account = await OwnAccounts().FirstOrDefaultAsync(a => a.Id == id);
             if (account == null)
                 return ApiResponse<AccountDto>.ErrorResponse("Account not found", 404);
             return ApiResponse<AccountDto>.SuccessResponse(AccountView.Of(account), "Account retrieved successfully", 200);
@@ -64,11 +59,6 @@ namespace Laneway.Api
 
         public async Task<ApiResponse<AccountDto>> CreateAsync(CreateAccountDto createAccountDto)
         {
-            if (!await _context.Users.AnyAsync(u => u.Id == createAccountDto.UserId))
-            {
-                return ReferenceErrors.NotFound<AccountDto>("userId", "User", createAccountDto.UserId);
-            }
-
             var account = MapToEntity(createAccountDto, _actor.Id);
             _context.Accounts.Add(account);
             await _context.SaveChangesAsync();
@@ -77,7 +67,7 @@ namespace Laneway.Api
 
         public async Task<ApiResponse<AccountDto>> UpdateAsync(Guid id, UpdateAccountDto updateAccountDto)
         {
-            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.Id == id);
+            var account = await OwnAccounts().FirstOrDefaultAsync(a => a.Id == id);
             if (account == null)
                 return ApiResponse<AccountDto>.ErrorResponse("Account not found", 404);
             account.Name = updateAccountDto.Name;
@@ -88,7 +78,7 @@ namespace Laneway.Api
 
         public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
         {
-            var account = await _context.Accounts.FindAsync(id);
+            var account = await OwnAccounts().FirstOrDefaultAsync(a => a.Id == id);
             if (account == null)
                 return ApiResponse<bool>.ErrorResponse("Account not found", 404);
             _context.Accounts.Remove(account);
@@ -96,13 +86,15 @@ namespace Laneway.Api
             return ApiResponse<bool>.SuccessResponse(true, "Account deleted successfully", 204);
         }
 
+        private IQueryable<Account> OwnAccounts() => _context.Accounts.Where(a => a.UserId == _actor.Id);
+
         private static Account MapToEntity(CreateAccountDto dto, Guid actorId)
         {
             return new Account
             {
                 Id = Guid.NewGuid(),
                 Name = dto.Name,
-                UserId = dto.UserId,
+                UserId = actorId,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = actorId
             };

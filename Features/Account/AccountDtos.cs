@@ -11,8 +11,7 @@ public record AccountDto(
 );
 
 public record CreateAccountDto(
-    string Name,
-    Guid UserId
+    string Name
 );
 
 public record UpdateAccountDto(
@@ -22,6 +21,5 @@ public record UpdateAccountDto(
 public record AccountSearchDto(
     int PageNumber = 1,
     int PageSize = 10,
-    string? SearchTerm = null,
-    Guid? UserId = null
+    string? SearchTerm = null
 );

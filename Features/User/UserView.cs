@@ -26,4 +26,19 @@ public static class UserView
             user.UpdatedBy
         );
     }
+
+    public static UserSummaryDto SummaryOf(User user)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        return new UserSummaryDto
+        (
+            user.Id,
+            user.Username,
+            user.FirstName,
+            user.LastName,
+            user.ProfilePictureUrl,
+            user.Bio
+        );
+    }
 }

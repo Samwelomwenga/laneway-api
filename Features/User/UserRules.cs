@@ -5,7 +5,7 @@ namespace Laneway.Api;
 public static class UserRules
 {
     public static async Task<List<ApiError>> TakenAsync(
-        ApplicationDbContext context, string username, string email, Guid? exceptId)
+        ApplicationDbContext context, string username, string? email, Guid? exceptId)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -18,7 +18,7 @@ public static class UserRules
         {
             errors.Add(new ApiError("username", ErrorCodes.Duplicate, "A user with this username already exists."));
         }
-        if (takenUsers.Any(u => u.Email == email))
+        if (email is not null && takenUsers.Any(u => u.Email == email))
         {
             errors.Add(new ApiError("email", ErrorCodes.Duplicate, "A user with this email already exists."));
         }
