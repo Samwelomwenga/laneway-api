@@ -97,7 +97,52 @@ public abstract class ApiTests : IAsyncLifetime
     protected const string SignUpPassword = "plum tractor ocean";
 
     protected Task<HttpResponseMessage> SignUpAsync(object body) =>
-        SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/sign-up", body);
+        SendFromBrowserAsync("/api/v1/auth/sign-up", body);
+
+    protected static Dictionary<string, string> BrowserHeaders() => new(StringComparer.OrdinalIgnoreCase)
+    {
+        [CsrfCheck.Header] = "1",
+        ["Origin"] = ApiFactory.AllowedOrigin,
+        ["Sec-Fetch-Site"] = "same-site"
+    };
+
+    protected async Task<HttpResponseMessage> SendFromBrowserAsync(
+        string path, object? body, IReadOnlyDictionary<string, string>? headers = null, string? userAgent = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, path);
+        if (body is not null)
+        {
+            request.Content = body as HttpContent ?? JsonContent.Create(body);
+        }
+
+        AddHeaders(request, headers ?? BrowserHeaders());
+        if (userAgent is not null)
+        {
+            request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
+        }
+
+        return await Client.SendAsync(request);
+    }
+
+    protected async Task<HttpResponseMessage> PostOverHttpsAsync(string path, object body, string? userAgent = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body) };
+        AddHeaders(request, BrowserHeaders());
+        if (userAgent is not null)
+        {
+            request.Headers.UserAgent.ParseAdd(userAgent);
+        }
+
+        return await Https.SendAsync(request);
+    }
+
+    private static void AddHeaders(HttpRequestMessage request, IReadOnlyDictionary<string, string> headers)
+    {
+        foreach (var (name, value) in headers)
+        {
+            request.Headers.TryAddWithoutValidation(name, value);
+        }
+    }
 
     protected static object SignUpBody(string email, string password = SignUpPassword, string? username = null) => new
     {
@@ -118,15 +163,17 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected async Task<(SignedUpDto SignedUp, string Cookie)> SignUpOverHttpsAsync()
     {
-        using var response = await Https.PostAsJsonAsync("/api/v1/auth/sign-up", SignUpBody(NewEmail()));
+        using var response = await PostOverHttpsAsync("/api/v1/auth/sign-up", SignUpBody(NewEmail()));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return ((await response.ReadEnvelope<SignedUpDto>()).Data!,
             RefreshCookieAssert.Set(response, Session.AbsoluteLifetime));
     }
 
-    protected async Task<HttpResponseMessage> RefreshAsync(string? cookie)
+    protected async Task<HttpResponseMessage> RefreshAsync(
+        string? cookie, IReadOnlyDictionary<string, string>? headers = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/refresh");
+        AddHeaders(request, headers ?? BrowserHeaders());
         if (cookie is not null)
         {
             request.Headers.Add("Cookie", $"{RefreshCookieAssert.Name}={cookie}");

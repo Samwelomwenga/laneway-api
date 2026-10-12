@@ -21,7 +21,7 @@ public class RefreshTests : ApiTests
     [Fact]
     public async Task Sign_up_sets_the_refresh_cookie_and_stores_only_its_hash()
     {
-        using var response = await Https.PostAsJsonAsync("/api/v1/auth/sign-up", SignUpBody(NewEmail()));
+        using var response = await PostOverHttpsAsync("/api/v1/auth/sign-up", SignUpBody(NewEmail()));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var token = RefreshCookieAssert.Set(response, Session.AbsoluteLifetime);
@@ -35,7 +35,7 @@ public class RefreshTests : ApiTests
     [Fact]
     public async Task Sign_in_sets_the_refresh_cookie()
     {
-        using var response = await Https.PostAsJsonAsync(
+        using var response = await PostOverHttpsAsync(
             "/api/v1/auth/sign-in", new { email = ActorUser.User.Email, password = TestUser.Password });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

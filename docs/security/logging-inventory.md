@@ -22,6 +22,7 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | 8 | `RefreshTokenReused` | Warning | `sub`, `sid`, and `refreshTokenId` of the reused token |
 | 9 | `RefreshRejected` | Information | `reason`, and `sid` when the token was found |
 | 10 | `SessionEnded` | Information | `sub`, `sid`, `endReason` |
+| 11 | `CsrfRejected` | Warning | `check` |
 
 `reason` is one of `malformed`, `expired`, `unknownKey`, `invalidSignature`, `invalidAlgorithm`, `invalidType`, `invalidIssuer`, `invalidAudience`, `sessionEnded`, or `invalid`.
 
@@ -30,6 +31,8 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 `RefreshSuperseded` is a refresh that lost a race inside the 10-second grace window. It ends nothing. `RefreshTokenReused` is a retired token back after that window, and a `SessionEnded` with `endReason` `TokenReused` follows it.
 
 `SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment. `endReason` is `SignedOut`, `SignedOutEverywhere`, `EndedFromSessionList`, or `TokenReused`. Sign-out everywhere logs one entry per session it ends. Ending a session that already ended logs nothing.
+
+`CsrfRejected` is a sign-up, sign-in, or refresh that failed a CSRF check. `check` names the first one that failed: `header` when `X-Laneway-Csrf: 1` is missing, `origin` when `Origin` isn't in `Cors:AllowedOrigins`, or `fetch-site` when `Sec-Fetch-Site` is `cross-site`. The 403 body is the same for all three.
 
 `BreachedCheckUnavailable` means the Pwned Passwords check failed or took over 2 seconds, so the password was accepted without it. Each entry is one password that skipped ASVS 6.2.12.
 
@@ -50,6 +53,7 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 | `laneway.auth.sign_in.attempts` | `result`: `succeeded`, `wrong_password`, or `unknown_account` |
 | `laneway.auth.breached_check.unavailable` | none |
 | `laneway.auth.refresh` | `result`: `rotated`, `superseded`, `reused`, or `rejected` |
+| `laneway.auth.csrf.rejections` | `check`: `header`, `origin`, or `fetch_site` |
 
 `laneway.auth.sign_in.attempts` includes successes, so the failure-to-success ratio is visible. A climbing ratio is the usual sign of credential stuffing.
 

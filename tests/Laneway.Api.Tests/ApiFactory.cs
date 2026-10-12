@@ -18,6 +18,8 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
 
     public const string Audience = "laneway-api";
 
+    public const string AllowedOrigin = "https://app.laneway.example";
+
     private readonly string _connectionString;
 
     public ApiFactory(string connectionString) => _connectionString = connectionString;
@@ -51,7 +53,8 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
             {
                 ["Supabase:BucketName"] = TestStack.BucketName,
                 ["Auth:SigningKeys:0:Id"] = SigningKeyId,
-                ["Auth:SigningKeys:0:Key"] = SigningKey
+                ["Auth:SigningKeys:0:Key"] = SigningKey,
+                ["Cors:AllowedOrigins:0"] = AllowedOrigin
             }));
         builder.ConfigureLogging(logging => logging.AddFakeLogging());
         builder.ConfigureTestServices(services =>

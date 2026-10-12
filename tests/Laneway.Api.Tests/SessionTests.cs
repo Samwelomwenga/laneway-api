@@ -260,12 +260,8 @@ public class SessionTests : ApiTests
     private async Task<(SignedInDto SignedIn, string Cookie)> SignInOverHttpsAsync(
         string email, string userAgent = "Laneway.Api.Tests")
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/sign-in")
-        {
-            Content = JsonContent.Create(new { email, password = SignUpPassword })
-        };
-        request.Headers.UserAgent.ParseAdd(userAgent);
-        using var response = await Https.SendAsync(request);
+        using var response = await PostOverHttpsAsync(
+            "/api/v1/auth/sign-in", new { email, password = SignUpPassword }, userAgent);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return ((await response.ReadEnvelope<SignedInDto>()).Data!,
             RefreshCookieAssert.Set(response, Session.AbsoluteLifetime));

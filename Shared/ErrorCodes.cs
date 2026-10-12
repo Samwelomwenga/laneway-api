@@ -36,4 +36,5 @@ public static class ErrorCodes
     public const string BreachedPassword = "breachedPassword";
     public const string HttpsRequired = "httpsRequired";
     public const string RefreshSuperseded = "refreshSuperseded";
+    public const string CsrfRejected = "csrfRejected";
 }

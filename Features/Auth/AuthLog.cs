@@ -71,6 +71,11 @@ public static class AuthLog
         LoggerMessage.Define<Guid, Guid, SessionEndReason>(
             LogLevel.Information, SessionEndedId, "Session ended: sub {sub}, sid {sid}, endReason {endReason}");
 
+    private static readonly EventId CsrfRejectedId = new(11, "CsrfRejected");
+
+    private static readonly Action<ILogger, string, Exception?> CsrfRejectedEvent =
+        LoggerMessage.Define<string>(LogLevel.Warning, CsrfRejectedId, "CSRF check failed: {check}");
+
     public static void SignUp(this ILogger logger, Guid userId, Guid sessionId) =>
         SignUpEvent(logger, userId, sessionId, null);
 
@@ -115,6 +120,15 @@ public static class AuthLog
 
     public static void SessionEnded(this ILogger logger, Guid userId, Guid sessionId, SessionEndReason reason) =>
         SessionEndedEvent(logger, userId, sessionId, reason, null);
+
+    public static void CsrfRejected(this ILogger logger, FailedCsrfCheck check) =>
+        CsrfRejectedEvent(logger, check switch
+        {
+            FailedCsrfCheck.Header => "header",
+            FailedCsrfCheck.Origin => "origin",
+            FailedCsrfCheck.FetchSite => "fetch-site",
+            _ => throw new ArgumentOutOfRangeException(nameof(check), check, null)
+        }, null);
 
     public static void AccessTokenRejected(this ILogger logger, string reason, string? knownKid)
     {

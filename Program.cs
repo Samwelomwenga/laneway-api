@@ -96,6 +96,7 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 builder.Services.AddHttpHardening(builder.Configuration);
+builder.Services.AddBrowserCors();
 
 builder.WebHost.ConfigureKestrel(options =>
 {
@@ -130,6 +131,7 @@ if (app.Environment.IsDevelopment())
     app.MapGet("/", () => Results.Redirect("/scalar/v1")).AllowAnonymous().ExcludeFromDescription();
 }
 
+app.UseCors();
 app.UseAuthentication();
 app.RefuseFailedBearerTokens();
 app.UseAuthorization();

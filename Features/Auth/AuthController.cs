@@ -18,6 +18,7 @@ public class AuthController : ApiControllerBase
 
     [HttpPost("sign-up")]
     [AllowAnonymous]
+    [CsrfChecked]
     public async Task<ActionResult<ApiResponse<SignedUpDto>>> SignUp([FromBody] SignUpDto signUpDto)
     {
         return Reply(await _authService.SignUpAsync(SignUpWrite.Of(signUpDto), Request.Headers.UserAgent.ToString()));
@@ -25,6 +26,7 @@ public class AuthController : ApiControllerBase
 
     [HttpPost("sign-in")]
     [AllowAnonymous]
+    [CsrfChecked]
     public async Task<ActionResult<ApiResponse<SignedInDto>>> SignIn([FromBody] SignInDto signInDto)
     {
         return Reply(await _authService.SignInAsync(SignInWrite.Of(signInDto), Request.Headers.UserAgent.ToString()));
@@ -32,6 +34,7 @@ public class AuthController : ApiControllerBase
 
     [HttpPost("refresh")]
     [AllowAnonymous]
+    [CsrfChecked]
     public async Task<ActionResult<ApiResponse<SignedInDto>>> Refresh()
     {
         return Reply(await _authService.RefreshAsync(RefreshCookie.Read(Request)));

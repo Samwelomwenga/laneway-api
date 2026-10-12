@@ -12,11 +12,15 @@ public sealed class AuthMeter
 
     public const string RefreshName = "laneway.auth.refresh";
 
+    public const string CsrfRejectionsName = "laneway.auth.csrf.rejections";
+
     private readonly Counter<long> _signInAttempts;
 
     private readonly Counter<long> _breachedCheckUnavailable;
 
     private readonly Counter<long> _refresh;
+
+    private readonly Counter<long> _csrfRejections;
 
     public AuthMeter(IMeterFactory factory)
     {
@@ -26,6 +30,7 @@ public sealed class AuthMeter
         _signInAttempts = Meter.CreateCounter<long>(SignInAttemptsName);
         _breachedCheckUnavailable = Meter.CreateCounter<long>(BreachedCheckUnavailableName);
         _refresh = Meter.CreateCounter<long>(RefreshName);
+        _csrfRejections = Meter.CreateCounter<long>(CsrfRejectionsName);
     }
 
     public Meter Meter { get; }
@@ -49,6 +54,15 @@ public sealed class AuthMeter
             RefreshResult.Reused => "reused",
             RefreshResult.Rejected => "rejected",
             _ => throw new ArgumentOutOfRangeException(nameof(result), result, null)
+        }));
+
+    public void CsrfRejected(FailedCsrfCheck check) =>
+        _csrfRejections.Add(1, new KeyValuePair<string, object?>("check", check switch
+        {
+            FailedCsrfCheck.Header => "header",
+            FailedCsrfCheck.Origin => "origin",
+            FailedCsrfCheck.FetchSite => "fetch_site",
+            _ => throw new ArgumentOutOfRangeException(nameof(check), check, null)
         }));
 }
 
