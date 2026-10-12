@@ -123,7 +123,6 @@ app.Services.GetRequiredService<Passwords>();
 app.UseTrustedForwardedHeaders();
 app.UseSecurityHeaders(app.Environment);
 app.UseExceptionHandler();
-app.RefusePlainHttp(app.Environment);
 
 if (app.Environment.IsDevelopment())
 {
@@ -135,6 +134,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseAuthentication();
 app.UseRateLimiter();
+app.RefusePlainHttp(app.Environment);
 app.RefuseFailedBearerTokens();
 app.UseAuthorization();
 

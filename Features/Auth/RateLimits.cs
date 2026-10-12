@@ -24,57 +24,63 @@ public static class RateLimits
 
     private const string NoIp = "none";
 
-    private static readonly RateLimit SignInLimit = new(SignIn, 10, TimeSpan.FromMinutes(1), CountsBy.Ip);
-
-    private static readonly RateLimit SignUpLimit = new(SignUp, 10, TimeSpan.FromHours(1), CountsBy.Ip);
-
-    private static readonly RateLimit RefreshLimit = new(Refresh, 60, TimeSpan.FromMinutes(1), CountsBy.Ip);
-
-    private static readonly RateLimit PasswordCheckLimit = new(PasswordCheck, 5, TimeSpan.FromMinutes(1), CountsBy.Sub);
-
     private static readonly RateLimit SignedInLimit = new(SignedIn, 300, TimeSpan.FromMinutes(1), CountsBy.Sub);
 
     private static readonly RateLimit AnonymousLimit = new(Anonymous, 60, TimeSpan.FromMinutes(1), CountsBy.Ip);
 
-    private static readonly HashSet<string> AnonymousAuthPolicies = [SignIn, SignUp, Refresh];
+    private static readonly Dictionary<string, RateLimit> RouteLimits = new RateLimit[]
+    {
+        new(SignIn, 10, TimeSpan.FromMinutes(1), CountsBy.Ip),
+        new(SignUp, 10, TimeSpan.FromHours(1), CountsBy.Ip),
+        new(Refresh, 60, TimeSpan.FromMinutes(1), CountsBy.Ip),
+        new(PasswordCheck, 5, TimeSpan.FromMinutes(1), CountsBy.Sub)
+    }.ToDictionary(limit => limit.Policy, StringComparer.Ordinal);
 
     public static IServiceCollection AddRateLimits(this IServiceCollection services) =>
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(GlobalPartition);
-            options.OnRejected = (context, cancellationToken) => RejectAsync(
-                context, ActorOf(context.HttpContext) is null ? AnonymousLimit : SignedInLimit, cancellationToken);
-            options.AddPolicy(SignIn, new RateLimitPolicy(SignInLimit));
-            options.AddPolicy(SignUp, new RateLimitPolicy(SignUpLimit));
-            options.AddPolicy(Refresh, new RateLimitPolicy(RefreshLimit));
-            options.AddPolicy(PasswordCheck, new RateLimitPolicy(PasswordCheckLimit));
+            options.GlobalLimiter = new StackedRateLimiter(Buckets);
+            options.OnRejected = RejectAsync;
         });
 
-    private static RateLimitPartition<string> GlobalPartition(HttpContext context)
+    private static IEnumerable<Bucket> Buckets(HttpContext context)
     {
-        if (ActorOf(context) is { } userId)
+        var userId = ActorOf(context);
+        var route = context.GetEndpoint()?.Metadata.GetMetadata<RateLimitedAttribute>() is { } attribute
+            ? RouteLimits[attribute.Policy]
+            : null;
+
+        var routeKey = route?.CountsBy == CountsBy.Sub ? userId?.ToString() : IpKey(context);
+        if (route is not null && routeKey is not null)
         {
-            return SignedInLimit.Partition($"sub:{userId}");
+            yield return new Bucket(route, routeKey);
         }
 
-        var policy = context.GetEndpoint()?.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
-        return policy is not null && AnonymousAuthPolicies.Contains(policy)
-            ? RateLimitPartition.GetNoLimiter(string.Empty)
-            : AnonymousLimit.Partition($"ip:{IpKey(context)}");
+        if (userId is { } id)
+        {
+            yield return new Bucket(SignedInLimit, id.ToString());
+        }
+        else if (route is not { CountsBy: CountsBy.Ip })
+        {
+            yield return new Bucket(AnonymousLimit, IpKey(context));
+        }
     }
 
-    internal static async ValueTask RejectAsync(
-        OnRejectedContext context, RateLimit limit, CancellationToken cancellationToken)
+    private static async ValueTask RejectAsync(OnRejectedContext context, CancellationToken cancellationToken)
     {
+        if (!context.Lease.TryGetMetadata(RefusedLease.RefusedBy, out var limit) || limit is null)
+        {
+            throw new InvalidOperationException("A refused lease didn't name its rate limit.");
+        }
+
         var http = context.HttpContext;
         var services = http.RequestServices;
         services.GetRequiredService<ILoggerFactory>().CreateLogger(AuthLog.Category)
             .RateLimited(limit.Policy, limit.CountsBy == CountsBy.Sub ? ActorOf(http) : null);
         services.GetRequiredService<AuthMeter>().RateLimited(limit.Policy);
 
-        var retryAfter = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var given) ? given : limit.Segment;
-        http.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+        http.Response.Headers.RetryAfter = Math.Ceiling(limit.Segment.TotalSeconds).ToString(CultureInfo.InvariantCulture);
         await http.Response.WriteAsJsonAsync(
             ApiResponse<object>.ErrorResponse(
                 TryLater,
@@ -82,9 +88,6 @@ public static class RateLimits
                 [new ApiError(null, ErrorCodes.TooManyRequests, TryLater)]),
             cancellationToken);
     }
-
-    internal static string? PartitionKey(HttpContext context, CountsBy countsBy) =>
-        countsBy == CountsBy.Sub ? ActorOf(context)?.ToString() : IpKey(context);
 
     private static Guid? ActorOf(HttpContext context)
     {
@@ -109,6 +112,12 @@ public static class RateLimits
     }
 }
 
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class RateLimitedAttribute(string policy) : Attribute
+{
+    public string Policy { get; } = policy;
+}
+
 internal enum CountsBy
 {
     Ip,
@@ -131,16 +140,103 @@ internal sealed record RateLimit(string Policy, int PermitLimit, TimeSpan Window
         });
 }
 
-internal sealed class RateLimitPolicy(RateLimit limit) : IRateLimiterPolicy<string>
+internal sealed record Bucket(RateLimit Limit, string Key);
+
+// A window limiter keeps a permit after its lease is disposed, so taking one bucket's permit and then
+// failing on the next would spend it for nothing.
+internal sealed class StackedRateLimiter(Func<HttpContext, IEnumerable<Bucket>> buckets)
+    : PartitionedRateLimiter<HttpContext>
 {
-    private static readonly RateLimitPartition<string> AlreadyCountedAsAnonymous =
-        RateLimitPartition.GetNoLimiter(string.Empty);
+    private readonly Lock _gate = new();
 
-    public Func<OnRejectedContext, CancellationToken, ValueTask> OnRejected =>
-        (context, cancellationToken) => RateLimits.RejectAsync(context, limit, cancellationToken);
+    private readonly Dictionary<RateLimit, PartitionedRateLimiter<string>> _limiters = [];
 
-    public RateLimitPartition<string> GetPartition(HttpContext httpContext) =>
-        RateLimits.PartitionKey(httpContext, limit.CountsBy) is { } partitionKey
-            ? limit.Partition(partitionKey)
-            : AlreadyCountedAsAnonymous;
+    public override RateLimiterStatistics? GetStatistics(HttpContext resource) => null;
+
+    protected override RateLimitLease AttemptAcquireCore(HttpContext resource, int permitCount)
+    {
+        var wanted = buckets(resource).ToList();
+        lock (_gate)
+        {
+            if (wanted.Find(bucket => !Has(bucket, permitCount)) is { } full)
+            {
+                return new RefusedLease(full.Limit);
+            }
+
+            foreach (var bucket in wanted)
+            {
+                using var lease = LimiterFor(bucket.Limit).AttemptAcquire(bucket.Key, permitCount);
+                if (!lease.IsAcquired)
+                {
+                    throw new InvalidOperationException($"The {bucket.Limit.Policy} limit had a permit and then refused it.");
+                }
+            }
+        }
+
+        return GrantedLease.Instance;
+    }
+
+    protected override ValueTask<RateLimitLease> AcquireAsyncCore(
+        HttpContext resource, int permitCount, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(AttemptAcquireCore(resource, permitCount));
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            lock (_gate)
+            {
+                foreach (var limiter in _limiters.Values)
+                {
+                    limiter.Dispose();
+                }
+            }
+        }
+
+        base.Dispose(disposing);
+    }
+
+    private bool Has(Bucket bucket, int permitCount) =>
+        LimiterFor(bucket.Limit).GetStatistics(bucket.Key)?.CurrentAvailablePermits >= permitCount;
+
+    private PartitionedRateLimiter<string> LimiterFor(RateLimit limit)
+    {
+        if (!_limiters.TryGetValue(limit, out var limiter))
+        {
+            limiter = PartitionedRateLimiter.Create<string, string>(limit.Partition);
+            _limiters[limit] = limiter;
+        }
+
+        return limiter;
+    }
+}
+
+internal sealed class GrantedLease : RateLimitLease
+{
+    public static readonly GrantedLease Instance = new();
+
+    public override bool IsAcquired => true;
+
+    public override IEnumerable<string> MetadataNames => [];
+
+    public override bool TryGetMetadata(string metadataName, out object? metadata)
+    {
+        metadata = null;
+        return false;
+    }
+}
+
+internal sealed class RefusedLease(RateLimit limit) : RateLimitLease
+{
+    public static readonly MetadataName<RateLimit> RefusedBy = new("laneway.refused-by");
+
+    public override bool IsAcquired => false;
+
+    public override IEnumerable<string> MetadataNames => [RefusedBy.Name];
+
+    public override bool TryGetMetadata(string metadataName, out object? metadata)
+    {
+        metadata = metadataName == RefusedBy.Name ? limit : null;
+        return metadata is not null;
+    }
 }

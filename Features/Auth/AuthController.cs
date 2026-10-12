@@ -1,7 +1,6 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.RateLimiting;
 
 namespace Laneway.Api;
 
@@ -19,7 +18,7 @@ public class AuthController : ApiControllerBase
     }
 
     [HttpPost("sign-up")]
-    [EnableRateLimiting(RateLimits.SignUp)]
+    [RateLimited(RateLimits.SignUp)]
     [AllowAnonymous]
     [CsrfChecked]
     public async Task<ActionResult<ApiResponse<SignedUpDto>>> SignUp([FromBody] SignUpDto signUpDto)
@@ -28,7 +27,7 @@ public class AuthController : ApiControllerBase
     }
 
     [HttpPost("sign-in")]
-    [EnableRateLimiting(RateLimits.SignIn)]
+    [RateLimited(RateLimits.SignIn)]
     [AllowAnonymous]
     [CsrfChecked]
     public async Task<ActionResult<ApiResponse<SignedInDto>>> SignIn([FromBody] SignInDto signInDto)
@@ -37,7 +36,7 @@ public class AuthController : ApiControllerBase
     }
 
     [HttpPost("refresh")]
-    [EnableRateLimiting(RateLimits.Refresh)]
+    [RateLimited(RateLimits.Refresh)]
     [AllowAnonymous]
     [CsrfChecked]
     public async Task<ActionResult<ApiResponse<SignedInDto>>> Refresh()
@@ -74,7 +73,7 @@ public class AuthController : ApiControllerBase
     }
 
     [HttpPost("change-password")]
-    [EnableRateLimiting(RateLimits.PasswordCheck)]
+    [RateLimited(RateLimits.PasswordCheck)]
     [Authorize]
     public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordDto changePasswordDto)
     {
@@ -83,7 +82,7 @@ public class AuthController : ApiControllerBase
     }
 
     [HttpPost("change-email")]
-    [EnableRateLimiting(RateLimits.PasswordCheck)]
+    [RateLimited(RateLimits.PasswordCheck)]
     [Authorize]
     public async Task<ActionResult> ChangeEmail([FromBody] ChangeEmailDto changeEmailDto)
     {
@@ -91,7 +90,7 @@ public class AuthController : ApiControllerBase
     }
 
     [HttpPost("delete-user")]
-    [EnableRateLimiting(RateLimits.PasswordCheck)]
+    [RateLimited(RateLimits.PasswordCheck)]
     [Authorize]
     public async Task<ActionResult> DeleteUser([FromBody] DeleteUserDto deleteUserDto)
     {

@@ -1,5 +1,6 @@
 using System.Diagnostics.Metrics;
 using System.Net;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging;
@@ -84,6 +85,52 @@ public class RateLimitTests : ApiTests
         await AssertTooManyRequestsAsync(response, "10");
         var limited = Assert.Single(Logs(), log => log.Id.Name == "RateLimited");
         Assert.Equal("signed-in", limited.GetStructuredStateValue("policy"));
+    }
+
+    [Fact]
+    public async Task A_refused_password_check_spends_no_signed_in_permit()
+    {
+        await SendTimesAsync(5, () => ChangeEmailAsync(ActorUser));
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            using var refused = await ChangeEmailAsync(ActorUser);
+            Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+        }
+
+        await SendTimesAsync(300 - ProfileReadsInCreateUser - 5, () => GetAsync("/api/v1/profile"));
+        using var response = await GetAsync("/api/v1/profile");
+
+        await AssertTooManyRequestsAsync(response, "10");
+    }
+
+    [Fact]
+    public async Task Outside_development_plain_http_counts_toward_the_anonymous_limit()
+    {
+        var (client, _) = ProductionHost(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("http://localhost"),
+            AllowAutoRedirect = false
+        });
+        using var first = await client.GetAsync(new Uri("/api/v1/workspaces", UriKind.Relative));
+        Assert.Equal(ErrorCodes.HttpsRequired, Assert.Single(await first.ReadErrors()).Code);
+        await SendTimesAsync(59, () => client.GetAsync(new Uri("/api/v1/workspaces", UriKind.Relative)));
+
+        using var response = await client.GetAsync(new Uri("/api/v1/workspaces", UriKind.Relative));
+
+        await AssertTooManyRequestsAsync(response, "10");
+    }
+
+    [Fact]
+    public async Task A_429_to_an_allowed_origin_carries_the_cors_headers()
+    {
+        await SendTimesAsync(60, () => SendAnonymousAsync(HttpMethod.Get, "/api/v1/workspaces", body: null));
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/workspaces");
+        request.Headers.Add("Origin", ApiFactory.AllowedOrigin);
+
+        using var response = await Https.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+        Assert.Equal(ApiFactory.AllowedOrigin, Assert.Single(response.Headers.GetValues("Access-Control-Allow-Origin")));
     }
 
     [Fact]
