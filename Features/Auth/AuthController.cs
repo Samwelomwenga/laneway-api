@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -68,9 +69,36 @@ public class AuthController : ApiControllerBase
         return Reply(await _authService.EndSessionAsync(_actor.Id, _actor.SessionId, sessionId));
     }
 
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordDto changePasswordDto)
+    {
+        return Reply(await _authService.ChangePasswordAsync(
+            _actor.Id, _actor.SessionId, ChangePasswordWrite.Of(changePasswordDto)));
+    }
+
+    [HttpPost("change-email")]
+    [Authorize]
+    public async Task<ActionResult> ChangeEmail([FromBody] ChangeEmailDto changeEmailDto)
+    {
+        return Reply(await _authService.ChangeEmailAsync(_actor.Id, _actor.SessionId, ChangeEmailWrite.Of(changeEmailDto)));
+    }
+
+    [HttpPost("delete-user")]
+    [Authorize]
+    public async Task<ActionResult> DeleteUser([FromBody] DeleteUserDto deleteUserDto)
+    {
+        return Reply(await _authService.DeleteUserAsync(_actor.Id, _actor.SessionId, DeleteUserWrite.Of(deleteUserDto)));
+    }
+
     private ActionResult Reply<T>(AuthReply<T> reply)
     {
         RefreshCookie.Write(Response, reply.Cookie);
+        if (reply.RetryAfter is { } retryAfter)
+        {
+            Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+        }
+
         return ToActionResult(reply.Response);
     }
 }

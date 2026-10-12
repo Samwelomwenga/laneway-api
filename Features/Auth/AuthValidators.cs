@@ -25,3 +25,29 @@ public sealed class SignInDtoValidator : AbstractValidator<SignInDto>
         RuleFor(x => x.Password).Required().PasswordWithinMaximum();
     }
 }
+
+public sealed class ChangePasswordDtoValidator : AbstractValidator<ChangePasswordDto>
+{
+    public ChangePasswordDtoValidator()
+    {
+        RuleFor(x => x.CurrentPassword).Required().PasswordWithinMaximum();
+        RuleFor(x => x.NewPassword).NewPassword();
+    }
+}
+
+public sealed class ChangeEmailDtoValidator : AbstractValidator<ChangeEmailDto>
+{
+    public ChangeEmailDtoValidator()
+    {
+        RuleFor(x => x.Password).Required().PasswordWithinMaximum();
+        RuleFor(x => x.NewEmail).Required();
+    }
+}
+
+public sealed class DeleteUserDtoValidator : AbstractValidator<DeleteUserDto>
+{
+    public DeleteUserDtoValidator()
+    {
+        RuleFor(x => x.Password).Required().PasswordWithinMaximum();
+    }
+}

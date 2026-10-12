@@ -11,6 +11,9 @@ public interface IAuthService
     Task<AuthReply<bool>> SignOutEverywhereAsync(Guid userId);
     Task<ApiResponse<List<SessionDto>>> ListSessionsAsync(Guid userId, Guid currentSessionId);
     Task<AuthReply<bool>> EndSessionAsync(Guid userId, Guid currentSessionId, Guid sessionId);
+    Task<AuthReply<bool>> ChangePasswordAsync(Guid userId, Guid sessionId, ChangePasswordWrite write);
+    Task<AuthReply<bool>> ChangeEmailAsync(Guid userId, Guid sessionId, ChangeEmailWrite write);
+    Task<AuthReply<bool>> DeleteUserAsync(Guid userId, Guid sessionId, DeleteUserWrite write);
 }
 
 public sealed class AuthService(
@@ -25,6 +28,8 @@ public sealed class AuthService(
     private const string IncorrectCredentials = "Email or password is incorrect.";
 
     private const string RefreshedElsewhere = "Another request refreshed this session. Retry with its cookie.";
+
+    private const string TooManyWrongPasswords = "Too many wrong passwords. Try again after the Retry-After delay.";
 
     private readonly ILogger _log = loggers.CreateLogger(AuthLog.Category);
 
@@ -81,21 +86,13 @@ public sealed class AuthService(
 
         if (!check.Matched)
         {
-            return await WrongPasswordAsync(user, now);
+            return await CountFailureAsync(user, now) is null
+                ? Rejected(user.Id, SignInResult.WrongPassword)
+                : Rejected(user.Id, SignInResult.Blocked);
         }
 
         await using var transaction = await database.Database.BeginTransactionAsync();
-        var checkedHash = user.PasswordHash;
-        var cleared = await database.Users
-            .Where(u => u.Id == user.Id
-                && u.PasswordHash == checkedHash
-                && (u.SignInBlockedUntil == null || u.SignInBlockedUntil <= now))
-            .ExecuteUpdateAsync(u => u
-                .SetProperty(e => e.PasswordHash, check.HashToStore)
-                .SetProperty(e => e.FailedSignInCount, 0)
-                .SetProperty(e => e.LastFailedSignInAt, (DateTime?)null)
-                .SetProperty(e => e.SignInBlockedUntil, (DateTime?)null));
-        if (cleared == 0)
+        if (!await ClearFailuresAsync(user, check, now))
         {
             return Rejected(user.Id, SignInResult.Blocked);
         }
@@ -174,31 +171,94 @@ public sealed class AuthService(
     public async Task<AuthReply<bool>> SignOutAsync(Guid userId, Guid sessionId)
     {
         await EndAsync(userId, sessionId, SessionEndReason.SignedOut, time.GetUtcNow().UtcDateTime);
-        return SessionsEnded("Signed out", RefreshCookieChange.Cleared);
+        return NoContent("Signed out", RefreshCookieChange.Cleared);
     }
 
     public async Task<AuthReply<bool>> SignOutEverywhereAsync(Guid userId)
     {
-        var now = time.GetUtcNow().UtcDateTime;
-        await database.Sessions
-            .Where(Session.ActiveAt(now))
-            .Where(s => s.UserId == userId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(e => e.EndedAt, now)
-                .SetProperty(e => e.EndReason, SessionEndReason.SignedOutEverywhere));
-        var ended = await database.Sessions
-            .Where(s => s.UserId == userId
-                && s.EndedAt == now
-                && s.EndReason == SessionEndReason.SignedOutEverywhere)
-            .Select(s => s.Id)
-            .ToListAsync();
+        var ended = await EndAllAsync(
+            userId, keep: null, SessionEndReason.SignedOutEverywhere, time.GetUtcNow().UtcDateTime);
+        LogEnded(userId, ended, SessionEndReason.SignedOutEverywhere);
+        return NoContent("Signed out everywhere", RefreshCookieChange.Cleared);
+    }
 
-        foreach (var sessionId in ended)
+    public async Task<AuthReply<bool>> ChangePasswordAsync(Guid userId, Guid sessionId, ChangePasswordWrite write)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+
+        if (write.NewPassword == write.CurrentPassword)
         {
-            _log.SessionEnded(userId, sessionId, SessionEndReason.SignedOutEverywhere);
+            return Invalid(new ApiError(
+                "newPassword", ErrorCodes.SameAsCurrent, "'newPassword' must differ from your current password."));
         }
 
-        return SessionsEnded("Signed out everywhere", RefreshCookieChange.Cleared);
+        var names = await database.Users
+            .Where(u => u.Id == userId)
+            .Select(u => new { u.Username, u.Email })
+            .SingleOrDefaultAsync();
+        if (names is null)
+        {
+            return AuthReply.Of(NotAuthenticated.Response<bool>());
+        }
+
+        if (await passwordPolicy.CheckAsync(write.NewPassword, names.Username, names.Email, "newPassword") is { } refused)
+        {
+            return Invalid(refused);
+        }
+
+        var newHash = passwords.Hash(write.NewPassword);
+        return await WithPasswordAsync(userId, sessionId, write.CurrentPassword, PasswordCheckedEndpoint.ChangePassword, async now =>
+        {
+            await database.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u
+                .SetProperty(e => e.PasswordHash, newHash)
+                .SetProperty(e => e.UpdatedAt, now)
+                .SetProperty(e => e.UpdatedBy, userId));
+            var ended = await EndAllAsync(userId, keep: sessionId, SessionEndReason.PasswordChanged, now);
+
+            _log.PasswordChanged(userId, sessionId);
+            LogEnded(userId, ended, SessionEndReason.PasswordChanged);
+            return NoContent("Password changed", RefreshCookieChange.None);
+        });
+    }
+
+    public Task<AuthReply<bool>> ChangeEmailAsync(Guid userId, Guid sessionId, ChangeEmailWrite write)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+
+        return WithPasswordAsync(userId, sessionId, write.Password, PasswordCheckedEndpoint.ChangeEmail, async now =>
+        {
+            if (await database.Users.AnyAsync(u => u.Id != userId && u.Email == write.NewEmail))
+            {
+                return AuthReply.Of(UserRules.AlreadyExists<bool>(
+                    [new ApiError("newEmail", ErrorCodes.Duplicate, "A user with this email already exists.")]));
+            }
+
+            await database.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u
+                .SetProperty(e => e.Email, write.NewEmail)
+                .SetProperty(e => e.UpdatedAt, now)
+                .SetProperty(e => e.UpdatedBy, userId));
+
+            _log.EmailChanged(userId, sessionId);
+            return NoContent("Email changed", RefreshCookieChange.None);
+        });
+    }
+
+    public Task<AuthReply<bool>> DeleteUserAsync(Guid userId, Guid sessionId, DeleteUserWrite write)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+
+        return WithPasswordAsync(userId, sessionId, write.Password, PasswordCheckedEndpoint.DeleteUser, async now =>
+        {
+            await database.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u
+                .SetProperty(e => e.DeletedAt, now)
+                .SetProperty(e => e.UpdatedAt, now)
+                .SetProperty(e => e.UpdatedBy, userId));
+            var ended = await EndAllAsync(userId, keep: null, SessionEndReason.UserDeleted, now);
+
+            _log.UserDeleted(userId, sessionId);
+            LogEnded(userId, ended, SessionEndReason.UserDeleted);
+            return NoContent("User deleted", RefreshCookieChange.Cleared);
+        });
     }
 
     public async Task<ApiResponse<List<SessionDto>>> ListSessionsAsync(Guid userId, Guid currentSessionId)
@@ -222,7 +282,7 @@ public sealed class AuthService(
         }
 
         await EndAsync(userId, sessionId, SessionEndReason.EndedFromSessionList, time.GetUtcNow().UtcDateTime);
-        return SessionsEnded(
+        return NoContent(
             "Session ended",
             sessionId == currentSessionId ? RefreshCookieChange.Cleared : RefreshCookieChange.None);
     }
@@ -241,6 +301,97 @@ public sealed class AuthService(
         }
     }
 
+    private async Task<List<Guid>> EndAllAsync(Guid userId, Guid? keep, SessionEndReason reason, DateTime now)
+    {
+        await database.Sessions
+            .Where(Session.ActiveAt(now))
+            .Where(s => s.UserId == userId && s.Id != keep)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(e => e.EndedAt, now)
+                .SetProperty(e => e.EndReason, reason));
+        return await database.Sessions
+            .Where(s => s.UserId == userId && s.EndedAt == now && s.EndReason == reason)
+            .Select(s => s.Id)
+            .ToListAsync();
+    }
+
+    private void LogEnded(Guid userId, List<Guid> sessionIds, SessionEndReason reason)
+    {
+        foreach (var sessionId in sessionIds)
+        {
+            _log.SessionEnded(userId, sessionId, reason);
+        }
+    }
+
+    private async Task<AuthReply<bool>> WithPasswordAsync(
+        Guid userId,
+        Guid sessionId,
+        string password,
+        PasswordCheckedEndpoint endpoint,
+        Func<DateTime, Task<AuthReply<bool>>> action)
+    {
+        var user = await database.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId);
+        if (user is null)
+        {
+            return AuthReply.Of(NotAuthenticated.Response<bool>());
+        }
+
+        var now = time.GetUtcNow().UtcDateTime;
+        if (user.SignInBlockedUntil is { } runningBlock && SignInBlock.IsBlocked(user, now))
+        {
+            return PasswordCheckBlocked(userId, sessionId, endpoint, runningBlock - now);
+        }
+
+        var check = passwords.Verify(user, password);
+        if (!check.Matched)
+        {
+            return await CountFailureAsync(user, now) is { } blockedUntil
+                ? PasswordCheckBlocked(userId, sessionId, endpoint, blockedUntil - now)
+                : PasswordCheckWrong(userId, sessionId, endpoint);
+        }
+
+        await using var transaction = await database.Database.BeginTransactionAsync();
+        if (!await ClearFailuresAsync(user, check, now))
+        {
+            var blockedUntil = await database.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.SignInBlockedUntil)
+                .SingleOrDefaultAsync();
+            return blockedUntil > now
+                ? PasswordCheckBlocked(userId, sessionId, endpoint, blockedUntil.Value - now)
+                : PasswordCheckWrong(userId, sessionId, endpoint);
+        }
+
+        var reply = await action(now);
+        await transaction.CommitAsync();
+        return reply;
+    }
+
+    private AuthReply<bool> PasswordCheckWrong(Guid userId, Guid sessionId, PasswordCheckedEndpoint endpoint)
+    {
+        _log.PasswordCheckFailed(userId, sessionId, blocked: false);
+        meter.PasswordCheckFailed(endpoint, blocked: false);
+        var field = endpoint == PasswordCheckedEndpoint.ChangePassword ? "currentPassword" : "password";
+        return Invalid(new ApiError(field, ErrorCodes.WrongPassword, $"'{field}' is wrong."));
+    }
+
+    private AuthReply<bool> PasswordCheckBlocked(
+        Guid userId, Guid sessionId, PasswordCheckedEndpoint endpoint, TimeSpan retryAfter)
+    {
+        _log.PasswordCheckFailed(userId, sessionId, blocked: true);
+        meter.PasswordCheckFailed(endpoint, blocked: true);
+        return new AuthReply<bool>(
+            ApiResponse<bool>.ErrorResponse(
+                TooManyWrongPasswords,
+                StatusCodes.Status429TooManyRequests,
+                [new ApiError(null, ErrorCodes.TooManyRequests, TooManyWrongPasswords)]),
+            RefreshCookieChange.None,
+            retryAfter);
+    }
+
+    private static AuthReply<bool> Invalid(ApiError error) =>
+        AuthReply.Of(ApiResponse<bool>.ErrorResponse("Invalid data", StatusCodes.Status400BadRequest, [error]));
+
     private static ApiResponse<bool> SessionNotFound(Guid sessionId)
     {
         var message = $"Session {sessionId} does not exist.";
@@ -248,7 +399,7 @@ public sealed class AuthService(
             message, StatusCodes.Status404NotFound, [new ApiError(null, ErrorCodes.NotFound, message)]);
     }
 
-    private static AuthReply<bool> SessionsEnded(string message, RefreshCookieChange cookie) =>
+    private static AuthReply<bool> NoContent(string message, RefreshCookieChange cookie) =>
         new(ApiResponse<bool>.SuccessResponse(true, message, StatusCodes.Status204NoContent), cookie);
 
     private async Task<AuthReply<SignedInDto>> RetiredAsync(
@@ -294,13 +445,13 @@ public sealed class AuthService(
             cookie);
     }
 
-    private async Task<AuthReply<SignedInDto>> WrongPasswordAsync(User user, DateTime now)
+    private async Task<DateTime?> CountFailureAsync(User user, DateTime now)
     {
         while (true)
         {
             if (SignInBlock.IsBlocked(user, now))
             {
-                return Rejected(user.Id, SignInResult.Blocked);
+                return user.SignInBlockedUntil;
             }
 
             var (userId, readCount, readLastFailedAt) = (user.Id, user.FailedSignInCount, user.LastFailedSignInAt);
@@ -320,16 +471,31 @@ public sealed class AuthService(
                     meter.SignInBlockStarted();
                 }
 
-                return Rejected(userId, SignInResult.WrongPassword);
+                return null;
             }
 
             if (await database.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId) is not { } reread)
             {
-                return Rejected(userId, SignInResult.WrongPassword);
+                return null;
             }
 
             user = reread;
         }
+    }
+
+    private async Task<bool> ClearFailuresAsync(User user, PasswordCheck check, DateTime now)
+    {
+        var (userId, checkedHash) = (user.Id, user.PasswordHash);
+        var cleared = await database.Users
+            .Where(u => u.Id == userId
+                && u.PasswordHash == checkedHash
+                && (u.SignInBlockedUntil == null || u.SignInBlockedUntil <= now))
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(e => e.PasswordHash, check.HashToStore)
+                .SetProperty(e => e.FailedSignInCount, 0)
+                .SetProperty(e => e.LastFailedSignInAt, (DateTime?)null)
+                .SetProperty(e => e.SignInBlockedUntil, (DateTime?)null));
+        return cleared == 1;
     }
 
     private AuthReply<SignedInDto> Rejected(Guid? userId, SignInResult result)

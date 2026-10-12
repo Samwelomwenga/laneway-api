@@ -7,7 +7,6 @@ namespace Laneway.Api
         Task<ApiResponse<UserDto>> GetProfileAsync();
         Task<ApiResponse<UserDto>> UpdateProfileAsync(UpdateProfileDto updateProfileDto);
         Task<ApiResponse<UserSummaryDto>> GetSummaryAsync(Guid id);
-        Task<ApiResponse<bool>> DeleteAsync(Guid id);
     }
 
     public class UserService : IUserService
@@ -68,18 +67,5 @@ namespace Laneway.Api
             _context.Users
                 .Include(u => u.Accounts)
                 .FirstOrDefaultAsync(u => u.Id == _actor.Id);
-
-        public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
-        {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
-            if (user == null)
-            {
-                return ApiResponse<bool>.ErrorResponse("User not found", 404);
-            }
-
-            user.DeletedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-            return ApiResponse<bool>.SuccessResponse(true, "User deleted successfully", 204);
-        }
     }
 }

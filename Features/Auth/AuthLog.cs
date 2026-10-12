@@ -86,6 +86,27 @@ public static class AuthLog
             SignInBlockStartedId,
             "Sign-in block started: sub {sub}, failureCount {failureCount}, blockedUntil {blockedUntil}");
 
+    private static readonly EventId PasswordCheckFailedId = new(13, "PasswordCheckFailed");
+
+    private static readonly Action<ILogger, Guid, Guid, bool, Exception?> PasswordCheckFailedEvent =
+        LoggerMessage.Define<Guid, Guid, bool>(
+            LogLevel.Warning, PasswordCheckFailedId, "Password check failed: sub {sub}, sid {sid}, blocked {blocked}");
+
+    private static readonly EventId PasswordChangedId = new(14, "PasswordChanged");
+
+    private static readonly Action<ILogger, Guid, Guid, Exception?> PasswordChangedEvent =
+        LoggerMessage.Define<Guid, Guid>(LogLevel.Information, PasswordChangedId, "Password changed: sub {sub}, sid {sid}");
+
+    private static readonly EventId EmailChangedId = new(15, "EmailChanged");
+
+    private static readonly Action<ILogger, Guid, Guid, Exception?> EmailChangedEvent =
+        LoggerMessage.Define<Guid, Guid>(LogLevel.Information, EmailChangedId, "Email changed: sub {sub}, sid {sid}");
+
+    private static readonly EventId UserDeletedId = new(16, "UserDeleted");
+
+    private static readonly Action<ILogger, Guid, Guid, Exception?> UserDeletedEvent =
+        LoggerMessage.Define<Guid, Guid>(LogLevel.Information, UserDeletedId, "User deleted: sub {sub}, sid {sid}");
+
     public static void SignUp(this ILogger logger, Guid userId, Guid sessionId) =>
         SignUpEvent(logger, userId, sessionId, null);
 
@@ -106,6 +127,18 @@ public static class AuthLog
 
     public static void SignInBlockStarted(this ILogger logger, Guid userId, int failureCount, DateTime blockedUntil) =>
         SignInBlockStartedEvent(logger, userId, failureCount, blockedUntil, null);
+
+    public static void PasswordCheckFailed(this ILogger logger, Guid userId, Guid sessionId, bool blocked) =>
+        PasswordCheckFailedEvent(logger, userId, sessionId, blocked, null);
+
+    public static void PasswordChanged(this ILogger logger, Guid userId, Guid sessionId) =>
+        PasswordChangedEvent(logger, userId, sessionId, null);
+
+    public static void EmailChanged(this ILogger logger, Guid userId, Guid sessionId) =>
+        EmailChangedEvent(logger, userId, sessionId, null);
+
+    public static void UserDeleted(this ILogger logger, Guid userId, Guid sessionId) =>
+        UserDeletedEvent(logger, userId, sessionId, null);
 
     public static void BreachedCheckUnavailable(this ILogger logger, Exception exception) =>
         BreachedCheckUnavailableEvent(logger, exception);

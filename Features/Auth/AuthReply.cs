@@ -1,6 +1,6 @@
 namespace Laneway.Api;
 
-public sealed record AuthReply<T>(ApiResponse<T> Response, RefreshCookieChange Cookie);
+public sealed record AuthReply<T>(ApiResponse<T> Response, RefreshCookieChange Cookie, TimeSpan? RetryAfter = null);
 
 public static class AuthReply
 {

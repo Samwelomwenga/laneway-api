@@ -19,11 +19,4 @@ public class UsersController : ApiControllerBase
         var response = await _userService.GetSummaryAsync(id);
         return ToActionResult(response);
     }
-
-    [HttpDelete("{id}")]
-    public async Task<ActionResult<ApiResponse<bool>>> DeleteUser(Guid id)
-    {
-        var response = await _userService.DeleteAsync(id);
-        return ToActionResult(response);
-    }
 }

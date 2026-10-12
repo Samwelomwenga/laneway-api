@@ -37,4 +37,7 @@ public static class ErrorCodes
     public const string HttpsRequired = "httpsRequired";
     public const string RefreshSuperseded = "refreshSuperseded";
     public const string CsrfRejected = "csrfRejected";
+    public const string WrongPassword = "wrongPassword";
+    public const string SameAsCurrent = "sameAsCurrent";
+    public const string TooManyRequests = "tooManyRequests";
 }

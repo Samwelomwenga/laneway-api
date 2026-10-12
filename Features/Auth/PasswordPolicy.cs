@@ -4,11 +4,9 @@ public sealed class PasswordPolicy(BreachedPasswords breached, AuthMeter meter, 
 {
     public const int ContextWordMinimumLength = 4;
 
-    private const string Field = "password";
-
     private readonly ILogger _log = loggers.CreateLogger(AuthLog.Category);
 
-    public async Task<ApiError?> CheckAsync(string password, string username, string email)
+    public async Task<ApiError?> CheckAsync(string password, string username, string email, string field = "password")
     {
         ArgumentNullException.ThrowIfNull(password);
         ArgumentNullException.ThrowIfNull(username);
@@ -17,21 +15,21 @@ public sealed class PasswordPolicy(BreachedPasswords breached, AuthMeter meter, 
         if (CommonPasswords.Contains(password))
         {
             return new ApiError(
-                Field, ErrorCodes.CommonPassword, "'password' is on a list of common passwords.");
+                field, ErrorCodes.CommonPassword, $"'{field}' is on a list of common passwords.");
         }
 
         if (ContextWords(username, email).Any(word => password.Contains(word, StringComparison.OrdinalIgnoreCase)))
         {
             return new ApiError(
-                Field,
+                field,
                 ErrorCodes.ContainsContextWord,
-                "'password' can't contain your username, the part of your email before the @, or 'laneway'.");
+                $"'{field}' can't contain your username, the part of your email before the @, or 'laneway'.");
         }
 
         if (await IsBreachedAsync(password))
         {
             return new ApiError(
-                Field, ErrorCodes.BreachedPassword, "'password' appears in a known data breach.");
+                field, ErrorCodes.BreachedPassword, $"'{field}' appears in a known data breach.");
         }
 
         return null;

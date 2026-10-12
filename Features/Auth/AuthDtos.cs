@@ -29,6 +29,34 @@ public record SignInDto
     public string? Password { get; init; } = Passwords.Normalize(Password);
 }
 
+public record ChangePasswordDto
+(
+    string? CurrentPassword,
+    string? NewPassword
+)
+{
+    public string? CurrentPassword { get; init; } = Passwords.Normalize(CurrentPassword);
+    public string? NewPassword { get; init; } = Passwords.Normalize(NewPassword);
+}
+
+public record ChangeEmailDto
+(
+    string? Password,
+    string? NewEmail
+)
+{
+    public string? Password { get; init; } = Passwords.Normalize(Password);
+    public string? NewEmail { get; init; } = Emails.Normalize(NewEmail);
+}
+
+public record DeleteUserDto
+(
+    string? Password
+)
+{
+    public string? Password { get; init; } = Passwords.Normalize(Password);
+}
+
 public record SignedInDto
 (
     string AccessToken,

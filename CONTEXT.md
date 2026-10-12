@@ -103,5 +103,5 @@ The signed-in user's own data, which only they can see or change. Other users se
 _Avoid_: Me, account
 
 **Sign-in block**:
-A stretch of time when a user can't sign in, because someone typed the wrong password for them too many times. It ends on its own, and it gets longer the more wrong passwords keep coming. The user's existing sessions keep working.
+A stretch of time when a user can't sign in, because someone typed the wrong password for them too many times. Wrong passwords count the same whether they come from signing in, changing the password or email, or deleting the user, and a block stops all four. It ends on its own, and it gets longer the more wrong passwords keep coming. The user's existing sessions keep working.
 _Avoid_: Lockout, locked account, suspended user
