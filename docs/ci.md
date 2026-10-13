@@ -115,7 +115,7 @@ The title must look like `<type>[(scope)][!]: <subject>`, such as `ci: lint the 
 
 The check lives in its own workflow, `pr-title.yml`, which also runs when you edit the PR. Fixing a title reruns only this check. Editing the PR body reruns it too. It reruns nothing in `CI`. A new edit or push cancels the title run still going.
 
-Dependabot's PRs pass without edits. `.github/dependabot.yml` gives NuGet and SDK updates the `chore(deps)` prefix and action updates `ci(deps)`.
+Dependabot's PRs pass without edits. `.github/dependabot.yml` sets `include: scope` on every entry. SDK updates come out as `chore(deps): bump ...` and action updates as `ci(deps): ...`. NuGet updates come out as `chore: Bump ...` with no scope, because the NuGet updater ignores `include: scope` ([dependabot-core#15158](https://github.com/dependabot/dependabot-core/issues/15158)). The scope is optional, and an uppercase subject only warns, so these titles pass too.
 
 To check a title locally, install husky first. `husky exec` won't run without it.
 
