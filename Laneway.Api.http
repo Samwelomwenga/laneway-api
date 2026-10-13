@@ -1,7 +1,6 @@
 @Laneway_Api_HostAddress = https://localhost:7287
 @WebAppOrigin = https://localhost:3000
 
-# An access token lasts 15 minutes. Once requests start coming back 401, rerun the last sign-in near the top.
 # If the client rejects the dev certificate, set SSLConfiguration.verifyHostCertificate to false in http-client.private.env.json.
 
 ### Sign up the actor every request below runs as. 201 with an access token, the user, and the refresh cookie. The password is a fresh UUID, so it passes the breached-password check.
