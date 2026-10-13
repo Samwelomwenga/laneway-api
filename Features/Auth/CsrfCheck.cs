@@ -53,7 +53,7 @@ public sealed class CsrfCheck(IOptions<CorsOptions> cors, AuthMeter meter, ILogg
             return FailedCsrfCheck.Header;
         }
 
-        if (headers.Origin.Count > 0 && !AllowedOrigin(headers.Origin.ToString()))
+        if (headers.Origin.Count > 0 && !AllowedOrigin(request, headers.Origin.ToString()))
         {
             return FailedCsrfCheck.Origin;
         }
@@ -66,8 +66,9 @@ public sealed class CsrfCheck(IOptions<CorsOptions> cors, AuthMeter meter, ILogg
         return null;
     }
 
-    private bool AllowedOrigin(string origin) =>
-        cors.Value.GetPolicy(cors.Value.DefaultPolicyName)?.IsOriginAllowed(origin) == true;
+    private bool AllowedOrigin(HttpRequest request, string origin) =>
+        string.Equals(origin, $"{request.Scheme}://{request.Host}", StringComparison.OrdinalIgnoreCase)
+        || cors.Value.GetPolicy(cors.Value.DefaultPolicyName)?.IsOriginAllowed(origin) == true;
 }
 
 public enum FailedCsrfCheck

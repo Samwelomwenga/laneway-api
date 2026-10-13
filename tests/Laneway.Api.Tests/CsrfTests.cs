@@ -80,6 +80,31 @@ public class CsrfTests : ApiTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    [Fact]
+    public async Task The_apis_own_origin_passes()
+    {
+        var headers = BrowserHeaders();
+        headers["Origin"] = "http://localhost";
+        headers["Sec-Fetch-Site"] = "same-origin";
+
+        using var response = await SendFromBrowserAsync(
+            "/api/v1/auth/sign-in", new { email = ActorUser.User.Email, password = TestUser.Password }, headers);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Theory]
+    [MemberData(nameof(CookieRoutes))]
+    public async Task Another_port_on_the_apis_host_gets_403(string path)
+    {
+        var headers = BrowserHeaders();
+        headers["Origin"] = "http://localhost:3001";
+
+        using var response = await SendAsync(path, headers);
+
+        await AssertRejectedAsync(response, "origin");
+    }
+
     [Theory]
     [InlineData("same-origin")]
     [InlineData("none")]
