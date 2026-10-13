@@ -2,13 +2,24 @@ using System.Text.Json;
 using Scalar.AspNetCore;
 using Laneway.Api;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.AddJsonConsole(options =>
+{
+    options.IncludeScopes = true;
+    options.UseUtcTimestamp = true;
+    options.TimestampFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
+});
+
+// .NET 9's ExceptionHandlerMiddleware logs every exception before ApiExceptionHandler sees it, and has no
+// SuppressDiagnosticsCallback until .NET 10.
+builder.Logging.AddFilter("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware", LogLevel.None);
+
 builder.Services.AddControllers(options =>
     {
-        options.Filters.Add<ActorFilter>();
         options.Filters.Add<ValidationFilter>();
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
     })
@@ -23,7 +34,12 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 ValidatorOptions.Global.DisplayNameResolver = (_, member, _) =>
     member is null ? null : JsonNamingPolicy.CamelCase.ConvertName(member.Name);
 
-builder.Services.AddOpenApi(options => options.AddSchemaTransformer<EnumSchemaTransformer>());
+builder.Services.AddOpenApi(options =>
+{
+    options.AddSchemaTransformer<EnumSchemaTransformer>();
+    options.AddDocumentTransformer<BearerSchemeTransformer>();
+    options.AddOperationTransformer<BearerSchemeTransformer>();
+});
 
 builder.Services.Configure<AttachmentStorageOptions>(
     builder.Configuration.GetSection(AttachmentStorageOptions.Section));
@@ -32,6 +48,16 @@ builder.Services.AddHostedService<PendingObjectDrainer>();
 builder.Services.AddSingleton<CopyJobSignal>();
 builder.Services.AddSingleton<CopyJobClaims>();
 builder.Services.AddHostedService<CopyJobWorker>();
+
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddBearerTokens();
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddSingleton<SessionSweeper>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<SessionSweeper>());
+builder.Services.AddSingleton<Passwords>();
+builder.Services.AddHttpClient<BreachedPasswords>(BreachedPasswords.Configure).RemoveAllLoggers();
+builder.Services.AddScoped<PasswordPolicy>();
 
 builder.Services.AddScoped<Actor>();
 builder.Services.AddScoped<ActivityWriter>();
@@ -65,11 +91,19 @@ builder.Services.AddScoped<ICopyJobRunner, BoardCopyRunner>();
 builder.Services.AddScoped<IWorkSpaceService, WorkSpaceService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 
+builder.Services.AddHttpHardening(builder.Configuration);
+builder.Services.AddBrowserCors();
+builder.Services.AddRateLimits();
+
 builder.WebHost.ConfigureKestrel(options =>
-    options.Limits.MaxRequestBodySize = FieldLimits.AttachmentBytes + (1024 * 1024));
+{
+    options.AddServerHeader = false;
+    options.Limits.MaxRequestBodySize = FieldLimits.AttachmentBytes + (1024 * 1024);
+});
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -83,18 +117,26 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 
 var app = builder.Build();
+app.Services.GetRequiredService<AuthMeter>();
+app.Services.GetRequiredService<Passwords>();
 
+app.UseTrustedForwardedHeaders();
+app.UseSecurityHeaders(app.Environment);
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
+    app.MapGet("/", () => Results.Redirect("/scalar/v1")).AllowAnonymous().ExcludeFromDescription();
 }
 
-app.UseHttpsRedirection();
-
-app.MapGet("/", () => Results.Redirect("/scalar/v1"));
+app.UseCors();
+app.UseAuthentication();
+app.UseRateLimiter();
+app.RefusePlainHttp(app.Environment);
+app.RefuseFailedBearerTokens();
+app.UseAuthorization();
 
 app.MapControllers();
 

@@ -4,12 +4,9 @@ namespace Laneway.Api
 {
     public interface IUserService
     {
-        Task<PagedResponse<UserDto>> GetAllAsync(UserSearchDto searchDto);
-        Task<ApiResponse<UserDto>> GetByIdAsync(Guid id);
-        Task<ApiResponse<UserDto>> CreateAsync(CreateUserDto createUserDto);
-        Task<ApiResponse<UserDto>> UpdateAsync(Guid id, UpdateUserDto updateUserDto);
-        Task<ApiResponse<bool>> DeleteAsync(Guid id);
-        Task<ApiResponse<bool>> UserNameExistsAsync(string username);
+        Task<ApiResponse<UserDto>> GetProfileAsync();
+        Task<ApiResponse<UserDto>> UpdateProfileAsync(UpdateProfileDto updateProfileDto);
+        Task<ApiResponse<UserSummaryDto>> GetSummaryAsync(Guid id);
     }
 
     public class UserService : IUserService
@@ -23,187 +20,52 @@ namespace Laneway.Api
             _actor = actor;
         }
 
-        public async Task<PagedResponse<UserDto>> GetAllAsync(UserSearchDto searchDto)
+        public async Task<ApiResponse<UserDto>> GetProfileAsync()
         {
-            var query = _context.Users.AsQueryable();
-
-            if (!string.IsNullOrEmpty(searchDto.SearchTerm))
-            {
-                query = query.Where(u => u.Username.Contains(searchDto.SearchTerm) ||
-                                        u.Email.Contains(searchDto.SearchTerm) ||
-                                        u.FirstName.Contains(searchDto.SearchTerm) ||
-                                        u.LastName.Contains(searchDto.SearchTerm));
-
-            }
-
-            var totalCount = await query.CountAsync();
-            var users = await query
-                .OrderByDescending(u => u.CreatedAt)
-                .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-                .Take(searchDto.PageSize)
-                .Include(u => u.Accounts)
-                .ToListAsync();
-
-            var userDtos = users.Select(MapToDto).ToList();
-
-            return PagedResponse<UserDto>.SuccessResponse(
-                userDtos,
-                totalCount,
-                searchDto.PageSize,
-                searchDto.PageNumber,
-                "Users retrieved successfully"
-            );
-        }
-
-        public async Task<ApiResponse<UserDto>> GetByIdAsync(Guid id)
-        {
-            var existingUser = await _context.Users
-                .Include(u => u.Accounts)
-                .Where(u => u.Id == id)
-                .FirstOrDefaultAsync();
-            if (existingUser is null)
+            var user = await ProfileAsync();
+            if (user is null)
             {
                 return ApiResponse<UserDto>.ErrorResponse("User not found", 404);
             }
-            var userDto = MapToDto(existingUser);
-            return ApiResponse<UserDto>.SuccessResponse(userDto, "User retrieved successfully", 200);
+            return ApiResponse<UserDto>.SuccessResponse(UserView.Of(user), "Profile retrieved successfully", 200);
         }
 
-        public async Task<ApiResponse<UserDto>> CreateAsync(CreateUserDto createUserDto)
+        public async Task<ApiResponse<UserDto>> UpdateProfileAsync(UpdateProfileDto updateProfileDto)
         {
-            var errors = await TakenAsync(createUserDto.Username, createUserDto.Email, exceptId: null);
-            if (errors.Count > 0)
-            {
-                return ApiResponse<UserDto>.ErrorResponse("User already exists", 409, errors);
-            }
-            var newUser = MapToEntity(createUserDto);
-            _context.Users.Add(newUser);
-
-            var newAccount = new Account
-            {
-                Id = Guid.NewGuid(),
-                Name = $"{newUser.Username}'s Account",
-                UserId = newUser.Id,
-                CreatedAt = newUser.CreatedAt,
-                CreatedBy = newUser.CreatedBy
-            };
-            _context.Accounts.Add(newAccount);
-            await _context.SaveChangesAsync();
-            return ApiResponse<UserDto>.SuccessResponse(MapToDto(newUser), "User created successfully", 201);
-        }
-
-        public async Task<ApiResponse<UserDto>> UpdateAsync(Guid id, UpdateUserDto updateUserDto)
-        {
-            var existingUser = await _context.Users
-                .Include(u => u.Accounts)
-                .FirstOrDefaultAsync(u => u.Id == id);
-            if (existingUser is null)
+            var user = await ProfileAsync();
+            if (user is null)
             {
                 return ApiResponse<UserDto>.ErrorResponse("User not found", 404);
             }
 
-            var errors = await TakenAsync(updateUserDto.Username, updateUserDto.Email, exceptId: id);
+            var errors = await UserRules.TakenAsync(_context, updateProfileDto.Username, email: null, exceptId: user.Id);
             if (errors.Count > 0)
             {
-                return ApiResponse<UserDto>.ErrorResponse("User already exists", 409, errors);
+                return UserRules.AlreadyExists<UserDto>(errors);
             }
 
-            existingUser.Username = updateUserDto.Username;
-            existingUser.Email = updateUserDto.Email;
-            existingUser.FirstName = updateUserDto.FirstName;
-            existingUser.LastName = updateUserDto.LastName;
-            existingUser.PhoneNumber = updateUserDto.PhoneNumber;
-            existingUser.Bio = updateUserDto.Bio;
-            existingUser.Language = updateUserDto.Language;
-            existingUser.TimeZone = updateUserDto.TimeZone;
-            existingUser.Location = updateUserDto.Location;
-            existingUser.ProfilePictureUrl = updateUserDto.ProfilePictureUrl;
-            _context.StampChange(existingUser, _actor);
+            user.Apply(updateProfileDto);
+            _context.StampChange(user, _actor);
 
             await _context.SaveChangesAsync();
 
-            return ApiResponse<UserDto>.SuccessResponse(MapToDto(existingUser), "User updated successfully", 200);
+            return ApiResponse<UserDto>.SuccessResponse(UserView.Of(user), "Profile updated successfully", 200);
         }
 
-        public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
+        public async Task<ApiResponse<UserSummaryDto>> GetSummaryAsync(Guid id)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
-            if (user == null)
+            if (user is null)
             {
-                return ApiResponse<bool>.ErrorResponse("User not found", 404);
+                return ApiResponse<UserSummaryDto>.ErrorResponse("User not found", 404);
             }
-
-            user.DeletedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-            return ApiResponse<bool>.SuccessResponse(true, "User deleted successfully", 204);
-        }
-        public async Task<ApiResponse<bool>> UserNameExistsAsync(string username)
-        {
-            var exists = await _context.Users.AnyAsync(u => u.Username == username);
-            return ApiResponse<bool>.SuccessResponse(exists, "Username existence checked successfully", 200);
+            return ApiResponse<UserSummaryDto>.SuccessResponse(
+                UserView.SummaryOf(user), "User retrieved successfully", 200);
         }
 
-        private async Task<List<ApiError>> TakenAsync(string username, string email, Guid? exceptId)
-        {
-            var takenUsers = await _context.Users
-                .Where(u => u.Id != exceptId && (u.Username == username || u.Email == email))
-                .Select(u => new { u.Username, u.Email })
-                .ToListAsync();
-            List<ApiError> errors = [];
-            if (takenUsers.Any(u => u.Username == username))
-            {
-                errors.Add(new ApiError("username", ErrorCodes.Duplicate, "A user with this username already exists."));
-            }
-            if (takenUsers.Any(u => u.Email == email))
-            {
-                errors.Add(new ApiError("email", ErrorCodes.Duplicate, "A user with this email already exists."));
-            }
-            return errors;
-        }
-
-        private static UserDto MapToDto(User user)
-        {
-            return new UserDto
-            (
-                user.Id,
-                user.Username,
-                user.Email,
-                user.FirstName,
-                user.LastName,
-                user.PhoneNumber,
-                user.Bio,
-                user.Language,
-                user.TimeZone,
-                user.Location,
-                user.ProfilePictureUrl,
-                user.Accounts?.Select(AccountView.Of).ToList() ?? [],
-                user.CreatedAt,
-                user.UpdatedAt,
-                user.CreatedBy,
-                user.UpdatedBy
-            );
-        }
-
-        private static User MapToEntity(CreateUserDto createUserDto)
-        {
-            var id = Guid.NewGuid();
-            return new User
-            {
-                Id = id,
-                Username = createUserDto.Username,
-                Email = createUserDto.Email,
-                FirstName = createUserDto.FirstName,
-                LastName = createUserDto.LastName,
-                PhoneNumber = createUserDto.PhoneNumber,
-                Bio = createUserDto.Bio,
-                Language = createUserDto.Language,
-                TimeZone = createUserDto.TimeZone,
-                Location = createUserDto.Location,
-                ProfilePictureUrl = createUserDto.ProfilePictureUrl,
-                PasswordHash = "temp_hash",
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = id
-            };
-        }
+        private Task<User?> ProfileAsync() =>
+            _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == _actor.Id);
     }
 }

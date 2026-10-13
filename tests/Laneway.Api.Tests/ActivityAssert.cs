@@ -25,15 +25,15 @@ public static class ActivityAssert
         Assert.Equal(fromListId, entry.FromListId);
     }
 
-    public static void Actor(ActivityEntryDto entry, UserDto actor)
+    public static void Actor(ActivityEntryDto entry, TestUser actor)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(actor);
 
         Assert.Equal(actor.Id, entry.CreatedBy);
         Assert.Equal(actor.Id, entry.Data.Id("actor.id"));
-        Assert.Equal(actor.Username, entry.Data.Text("actor.username"));
-        Assert.Equal(actor.FirstName, entry.Data.Text("actor.firstName"));
-        Assert.Equal(actor.LastName, entry.Data.Text("actor.lastName"));
+        Assert.Equal(actor.User.Username, entry.Data.Text("actor.username"));
+        Assert.Equal(actor.User.FirstName, entry.Data.Text("actor.firstName"));
+        Assert.Equal(actor.User.LastName, entry.Data.Text("actor.lastName"));
     }
 }

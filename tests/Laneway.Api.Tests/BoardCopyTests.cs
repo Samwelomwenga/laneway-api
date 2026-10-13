@@ -352,18 +352,15 @@ public class BoardCopyTests : ApiTests
     }
 
     [Fact]
-    public async Task A_copy_needs_an_actor()
+    public async Task A_copy_needs_a_token()
     {
         var workspace = await CreateWorkspaceAsync("Design");
         var source = await CreateBoardAsync(workspace.Id, "Sprint 14");
 
-        using var response = await SendWithoutActorAsync(
+        using var response = await SendAnonymousAsync(
             HttpMethod.Post, BoardCopyPath(source.Id), new { workspaceId = workspace.Id });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var error = Assert.Single(await response.ReadErrors());
-        Assert.Equal(ActorFilter.HeaderName, error.Field);
-        Assert.Equal(ErrorCodes.Required, error.Code);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]

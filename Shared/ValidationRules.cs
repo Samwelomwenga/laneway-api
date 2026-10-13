@@ -23,4 +23,16 @@ public static class ValidationRules
         rule.NotNull()
             .WithErrorCode(ErrorCodes.InvalidFormat)
             .WithMessage("'{PropertyName}[{CollectionIndex}]' isn't in a valid format.");
+
+    public static IRuleBuilderOptions<T, string?> NewPassword<T>(this IRuleBuilder<T, string?> rule) =>
+        rule.Required()
+            .Must(password => string.IsNullOrEmpty(password) || Passwords.Length(password) >= Passwords.MinimumLength)
+            .WithErrorCode(ErrorCodes.TooShort)
+            .WithMessage($"'{{PropertyName}}' must be at least {Passwords.MinimumLength} characters.")
+            .PasswordWithinMaximum();
+
+    public static IRuleBuilderOptions<T, string?> PasswordWithinMaximum<T>(this IRuleBuilder<T, string?> rule) =>
+        rule.Must(password => password is null || Passwords.Length(password) <= Passwords.MaximumLength)
+            .WithErrorCode(ErrorCodes.TooLong)
+            .WithMessage($"'{{PropertyName}}' must be {Passwords.MaximumLength} characters or fewer.");
 }

@@ -96,7 +96,7 @@ public class CommentTests : ApiTests
     }
 
     [Fact]
-    public async Task Every_write_needs_the_actor_header()
+    public async Task Every_write_needs_a_token()
     {
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
@@ -104,31 +104,27 @@ public class CommentTests : ApiTests
 
         var sends = new[]
         {
-            SendWithoutActorAsync(HttpMethod.Post, CommentPath(card.Id), new { text = "By Monday." }),
-            SendWithoutActorAsync(HttpMethod.Put, path, new { text = "By Monday." }),
-            SendWithoutActorAsync(HttpMethod.Delete, path, null)
+            SendAnonymousAsync(HttpMethod.Post, CommentPath(card.Id), new { text = "By Monday." }),
+            SendAnonymousAsync(HttpMethod.Put, path, new { text = "By Monday." }),
+            SendAnonymousAsync(HttpMethod.Delete, path, null)
         };
 
         foreach (var send in sends)
         {
             using var response = await send;
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var error = Assert.Single(await response.ReadErrors());
-            Assert.Equal(ActorFilter.HeaderName, error.Field);
-            Assert.Equal(ErrorCodes.Required, error.Code);
+            await AssertChallengedAsync(response);
         }
     }
 
     [Fact]
-    public async Task The_header_is_checked_before_the_body()
+    public async Task The_token_is_checked_before_the_body()
     {
         var card = await CardAsync();
 
-        using var response = await SendWithoutActorAsync(
+        using var response = await SendAnonymousAsync(
             HttpMethod.Post, CommentPath(card.Id), new { text = "   " });
 
-        var error = Assert.Single(await response.ReadErrors());
-        Assert.Equal(ActorFilter.HeaderName, error.Field);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]
@@ -206,8 +202,8 @@ public class CommentTests : ApiTests
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
         var ben = await CreateUserAsync();
 
-        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." }, ben.Id);
-        using var removed = await RemoveCommentAsync(card.Id, comment.Id, ben.Id);
+        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." }, ben);
+        using var removed = await RemoveCommentAsync(card.Id, comment.Id, ben);
 
         foreach (var response in new[] { edited, removed })
         {
@@ -228,7 +224,7 @@ public class CommentTests : ApiTests
         await CreateCommentAsync(card.Id, "By Friday.");
         var ben = await CreateUserAsync();
 
-        var comment = await CreateCommentAsync(card.Id, "I'll take it.", ben.Id);
+        var comment = await CreateCommentAsync(card.Id, "I'll take it.", ben);
 
         Assert.Equal(ben.Id, comment.CreatedBy);
         Assert.Equal(2, (await ActivityAsync($"cardId={card.Id}&type=comment")).TotalCount);
@@ -292,7 +288,7 @@ public class CommentTests : ApiTests
         var ben = await CreateUserAsync();
 
         using var response = await EditCommentAsync(
-            card.Id, Guid.NewGuid(), new { text = "By Monday." }, ben.Id);
+            card.Id, Guid.NewGuid(), new { text = "By Monday." }, ben);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -305,8 +301,8 @@ public class CommentTests : ApiTests
         await SetCardArchivedAsync(card.Id, true);
         var ben = await CreateUserAsync();
 
-        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." }, ben.Id);
-        using var removed = await RemoveCommentAsync(card.Id, comment.Id, ben.Id);
+        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." }, ben);
+        using var removed = await RemoveCommentAsync(card.Id, comment.Id, ben);
 
         Assert.Equal(HttpStatusCode.Forbidden, edited.StatusCode);
         Assert.Equal(ErrorCodes.NotAuthor, Assert.Single(await edited.ReadErrors()).Code);

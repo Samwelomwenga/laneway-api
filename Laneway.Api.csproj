@@ -13,12 +13,17 @@
     </ItemGroup>
 
     <ItemGroup>
+        <EmbeddedResource Include="Features/Auth/CommonPasswords/common-passwords.txt" LogicalName="Laneway.Api.CommonPasswords.txt" />
+    </ItemGroup>
+
+    <ItemGroup>
         <InternalsVisibleTo Include="Laneway.Api.Tests" />
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="FluentValidation" />
         <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />

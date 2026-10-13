@@ -4,6 +4,7 @@ public static class ErrorCodes
 {
     public const string Required = "required";
     public const string TooLong = "tooLong";
+    public const string TooShort = "tooShort";
     public const string InvalidFormat = "invalidFormat";
     public const string UnknownValue = "unknownValue";
     public const string OutOfRange = "outOfRange";
@@ -27,4 +28,16 @@ public static class ErrorCodes
     public const string NotImage = "notImage";
     public const string NotAuthor = "notAuthor";
     public const string InternalError = "internalError";
+    public const string NotAuthenticated = "notAuthenticated";
+    public const string Forbidden = "forbidden";
+    public const string InvalidCredentials = "invalidCredentials";
+    public const string CommonPassword = "commonPassword";
+    public const string ContainsContextWord = "containsContextWord";
+    public const string BreachedPassword = "breachedPassword";
+    public const string HttpsRequired = "httpsRequired";
+    public const string RefreshSuperseded = "refreshSuperseded";
+    public const string CsrfRejected = "csrfRejected";
+    public const string WrongPassword = "wrongPassword";
+    public const string SameAsCurrent = "sameAsCurrent";
+    public const string TooManyRequests = "tooManyRequests";
 }

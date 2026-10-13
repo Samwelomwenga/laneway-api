@@ -14,5 +14,8 @@ public class User : BaseEntity
     public required string TimeZone { get; set; }
     public required string Location { get; set; }
     public DateTime? DeletedAt { get; set; }
+    public int FailedSignInCount { get; set; }
+    public DateTime? LastFailedSignInAt { get; set; }
+    public DateTime? SignInBlockedUntil { get; set; }
     public ICollection<Account>? Accounts { get; set; }
 }

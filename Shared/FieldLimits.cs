@@ -23,4 +23,5 @@ public static class FieldLimits
     public const int CommentText = 10000;
     public const int CardsPerCopy = 5000;
     public const int FilesPerCopy = 5000;
+    public const int SessionUserAgent = 256;
 }

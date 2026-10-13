@@ -126,12 +126,7 @@ public class CardService : ICardService
 
         var watch = TouchesCompletion(card, write) ? await _completion.WatchAsync(id) : null;
 
-        card.Title = write.Title;
-        card.Description = write.Description;
-        card.DueDate = write.DueDate;
-        card.IsDueComplete = write.IsDueComplete;
-        card.StartDate = write.StartDate;
-        card.DueReminderMinutes = write.DueReminderMinutes;
+        card.Apply(write);
 
         var labelsChanged = !card.Labels.Select(label => label.Id).ToHashSet().SetEquals(labels.Select(label => label.Id));
         var oldLabels = labelsChanged ? LabelRefs(card.Labels) : null;

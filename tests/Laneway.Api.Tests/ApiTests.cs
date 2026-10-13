@@ -1,8 +1,16 @@
 using System.Globalization;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Testing;
+using Microsoft.Extensions.Time.Testing;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -14,13 +22,25 @@ public abstract class ApiTests : IAsyncLifetime
     private ApiFactory? _factory;
     private HttpClient? _client;
     private HttpClient? _noRedirects;
+    private HttpClient? _https;
     private Guid? _databaseId;
+
+    private readonly List<HttpClient> _hostClients = [];
 
     protected ApiTests(TestStack stack) => _stack = stack;
 
-    protected UserDto ActorUser { get; private set; } = null!;
+    private static readonly Lazy<string> SeededPasswordHash = new(() => new Passwords().Hash(TestUser.Password));
+
+    protected TestUser ActorUser { get; private set; } = null!;
 
     protected Guid ActorId => ActorUser.Id;
+
+    protected FakeTimeProvider Time => Factory.Time;
+
+    internal PwnedPasswordsStub PwnedPasswords => Factory.PwnedPasswords;
+
+    private ApiFactory Factory =>
+        _factory ?? throw new InvalidOperationException("The test host isn't up yet.");
 
     private HttpClient Client =>
         _client ?? throw new InvalidOperationException("The test host isn't up yet.");
@@ -28,6 +48,13 @@ public abstract class ApiTests : IAsyncLifetime
     private HttpClient NoRedirects =>
         _noRedirects ??= (_factory ?? throw new InvalidOperationException("The test host isn't up yet."))
             .CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+    protected HttpClient Https =>
+        _https ??= Factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            HandleCookies = false
+        });
 
     public async Task InitializeAsync()
     {
@@ -41,6 +68,8 @@ public abstract class ApiTests : IAsyncLifetime
     {
         _client?.Dispose();
         _noRedirects?.Dispose();
+        _https?.Dispose();
+        _hostClients.ForEach(client => client.Dispose());
         if (_factory is not null)
         {
             await _factory.DisposeAsync();
@@ -52,37 +81,259 @@ public abstract class ApiTests : IAsyncLifetime
         }
     }
 
-    protected Task<HttpResponseMessage> PostAsync(string path, object body, Guid? actor = null) =>
-        SendAsync(HttpMethod.Post, path, body, (actor ?? ActorId).ToString());
+    protected Task<HttpResponseMessage> PostAsync(string path, object body, TestUser? @as = null) =>
+        SendAsync(HttpMethod.Post, path, body, @as ?? ActorUser);
 
-    protected Task<HttpResponseMessage> PutAsync(string path, object body, Guid? actor = null) =>
-        SendAsync(HttpMethod.Put, path, body, (actor ?? ActorId).ToString());
+    protected Task<HttpResponseMessage> PutAsync(string path, object body, TestUser? @as = null) =>
+        SendAsync(HttpMethod.Put, path, body, @as ?? ActorUser);
 
-    protected Task<HttpResponseMessage> DeleteAsync(string path, Guid? actor = null) =>
-        SendAsync(HttpMethod.Delete, path, null, (actor ?? ActorId).ToString());
+    protected Task<HttpResponseMessage> DeleteAsync(string path, TestUser? @as = null) =>
+        SendAsync(HttpMethod.Delete, path, null, @as ?? ActorUser);
 
-    protected Task<HttpResponseMessage> SendWithoutActorAsync(HttpMethod method, string path, object? body) =>
-        SendAsync(method, path, body, actorHeader: null);
+    protected Task<HttpResponseMessage> SendAnonymousAsync(
+        HttpMethod method, string path, object? body, string? userAgent = null) =>
+        SendAsync(method, path, body, user: null, userAgent);
 
-    protected Task<HttpResponseMessage> GetAsync(string path, string? actorHeader = null) =>
-        SendAsync(HttpMethod.Get, path, null, actorHeader);
+    protected const string SignUpPassword = "plum tractor ocean";
 
-    protected async Task<UserDto> CreateUserAsync()
+    protected Task<HttpResponseMessage> SignUpAsync(object body) =>
+        SendFromBrowserAsync("/api/v1/auth/sign-up", body);
+
+    protected static Dictionary<string, string> BrowserHeaders() => new(StringComparer.OrdinalIgnoreCase)
+    {
+        [CsrfCheck.Header] = "1",
+        ["Origin"] = ApiFactory.AllowedOrigin,
+        ["Sec-Fetch-Site"] = "same-site"
+    };
+
+    protected async Task<HttpResponseMessage> SendFromBrowserAsync(
+        string path, object? body, IReadOnlyDictionary<string, string>? headers = null, string? userAgent = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, path);
+        if (body is not null)
+        {
+            request.Content = body as HttpContent ?? JsonContent.Create(body);
+        }
+
+        AddHeaders(request, headers ?? BrowserHeaders());
+        if (userAgent is not null)
+        {
+            request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
+        }
+
+        return await Client.SendAsync(request);
+    }
+
+    protected async Task<HttpResponseMessage> PostOverHttpsAsync(string path, object body, string? userAgent = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body) };
+        AddHeaders(request, BrowserHeaders());
+        if (userAgent is not null)
+        {
+            request.Headers.UserAgent.ParseAdd(userAgent);
+        }
+
+        return await Https.SendAsync(request);
+    }
+
+    private static void AddHeaders(HttpRequestMessage request, IReadOnlyDictionary<string, string> headers)
+    {
+        foreach (var (name, value) in headers)
+        {
+            request.Headers.TryAddWithoutValidation(name, value);
+        }
+    }
+
+    protected static object SignUpBody(string email, string password = SignUpPassword, string? username = null) => new
+    {
+        username = username ?? $"ana-{Guid.NewGuid():n}"[..20],
+        email,
+        password,
+        firstName = "Ana",
+        lastName = "Waweru",
+        language = "en-US",
+        timeZone = "UTC",
+        location = "Nairobi"
+    };
+
+    protected static string NewEmail() => $"{Guid.NewGuid():n}@example.com";
+
+    protected static Guid SessionOf(string accessToken) =>
+        Guid.Parse(new JsonWebToken(accessToken).GetPayloadValue<string>(AccessTokens.SessionClaim));
+
+    protected async Task<(SignedUpDto SignedUp, string Cookie)> SignUpOverHttpsAsync()
+    {
+        using var response = await PostOverHttpsAsync("/api/v1/auth/sign-up", SignUpBody(NewEmail()));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return ((await response.ReadEnvelope<SignedUpDto>()).Data!,
+            RefreshCookieAssert.Set(response, Session.AbsoluteLifetime));
+    }
+
+    protected async Task<HttpResponseMessage> RefreshAsync(
+        string? cookie, IReadOnlyDictionary<string, string>? headers = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/refresh");
+        AddHeaders(request, headers ?? BrowserHeaders());
+        if (cookie is not null)
+        {
+            request.Headers.Add("Cookie", $"{RefreshCookieAssert.Name}={cookie}");
+        }
+
+        return await Https.SendAsync(request);
+    }
+
+    protected async Task<HttpResponseMessage> SendOverHttpsAsync(HttpMethod method, string path, string? token)
+    {
+        using var request = new HttpRequestMessage(method, path);
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return await Https.SendAsync(request);
+    }
+
+    protected async Task WaitForLockWaitAsync()
+    {
+        for (var attempt = 0; attempt < 500; attempt++)
+        {
+            var waiting = await FromDatabaseAsync(database => database.Database
+                .SqlQuery<int>($"""
+                    SELECT count(*)::int AS "Value" FROM pg_stat_activity
+                    WHERE wait_event_type = 'Lock' AND datname = current_database()
+                    """)
+                .SingleAsync());
+            if (waiting > 0)
+            {
+                return;
+            }
+
+            await Task.Delay(20);
+        }
+
+        Assert.Fail("The request never waited on the held row lock.");
+    }
+
+    protected Task<HttpResponseMessage> GetAsync(string path, TestUser? @as = null) =>
+        SendAsync(HttpMethod.Get, path, null, @as ?? ActorUser);
+
+    protected async Task<TestUser> CreateUserAsync()
     {
         var tag = Guid.NewGuid().ToString("n")[..12];
-        using var response = await SendAsync(HttpMethod.Post, "/api/v1/users", new
+        var now = Time.GetUtcNow().UtcDateTime;
+        var user = new User
         {
-            username = $"actor-{tag}",
-            email = $"{tag}@example.com",
-            firstName = "Ana",
-            lastName = "Waweru",
-            language = "en-US",
-            timeZone = "UTC",
-            location = "Nairobi"
-        }, actorHeader: null);
+            Id = Guid.NewGuid(),
+            Username = $"actor-{tag}",
+            Email = $"{tag}@example.com",
+            PasswordHash = SeededPasswordHash.Value,
+            FirstName = "Ana",
+            LastName = "Waweru",
+            Language = "en-US",
+            TimeZone = "UTC",
+            Location = "Nairobi",
+            CreatedAt = now
+        };
+        user.CreatedBy = user.Id;
+        var session = new Session
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            CreatedAt = now,
+            LastUsedAt = now,
+            ExpiresAt = now + Session.AbsoluteLifetime,
+            UserAgent = "Laneway.Api.Tests"
+        };
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        return (await response.ReadEnvelope<UserDto>()).Data!;
+        await FromDatabaseAsync(async database =>
+        {
+            database.Users.Add(user);
+            database.Accounts.Add(new Account
+            {
+                Id = Guid.NewGuid(),
+                Name = $"{user.Username}'s Account",
+                UserId = user.Id,
+                CreatedAt = now,
+                CreatedBy = user.Id
+            });
+            database.Sessions.Add(session);
+            return await database.SaveChangesAsync();
+        });
+
+        var token = await IssueTokenAsync(user.Id, session.Id);
+        using var response = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/profile", token);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        return new TestUser((await response.ReadEnvelope<UserDto>()).Data!, session.Id, token);
+    }
+
+    protected Task<string> IssueTokenAsync(TestUser user)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        return IssueTokenAsync(user.Id, user.SessionId);
+    }
+
+    private Task<string> IssueTokenAsync(Guid userId, Guid sessionId) =>
+        FromServicesAsync(services =>
+            Task.FromResult(services.GetRequiredService<AccessTokens>().Issue(userId, sessionId).Value));
+
+    protected IServiceProvider Services => Factory.Services;
+
+    protected IReadOnlyList<FakeLogRecord> Logs() => Factory.Services.GetFakeLogCollector().GetSnapshot();
+
+    protected (HttpClient Client, FakeLogCollector Collector) HostWith(Action<IServiceCollection> services)
+    {
+        var host = Factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services));
+        var client = host.CreateClient();
+        _hostClients.Add(client);
+        return (client, host.Services.GetFakeLogCollector());
+    }
+
+    protected (HttpClient Client, IServiceProvider Services) ProductionHost(
+        WebApplicationFactoryClientOptions options, Action<IWebHostBuilder>? configure = null)
+    {
+        var host = Factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            // Only Development loads the API's user secrets, and attachment storage won't start without them.
+            // They go in first, so every setting the test host gives still wins.
+            builder.ConfigureAppConfiguration(configuration => configuration.Sources.Insert(
+                0, new ConfigurationBuilder().AddUserSecrets(typeof(Program).Assembly, optional: true).Sources[0]));
+            configure?.Invoke(builder);
+        });
+        var client = host.CreateClient(options);
+        _hostClients.Add(client);
+        return (client, host.Services);
+    }
+
+    protected static async Task AssertChallengedAsync(HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("Bearer", Assert.Single(response.Headers.WwwAuthenticate).ToString());
+        var envelope = await response.ReadEnvelope<object>();
+        Assert.False(envelope.Success);
+        Assert.Equal("Sign in again.", envelope.Message);
+        Assert.Equal(401, envelope.StatusCode);
+        var error = Assert.Single(envelope.Errors!);
+        Assert.Equal(ErrorCodes.NotAuthenticated, error.Code);
+        Assert.Equal("Sign in again.", error.Message);
+        Assert.Null(error.Field);
+    }
+
+    protected async Task<HttpResponseMessage> SendWithTokenAsync(
+        HttpMethod method, string path, string token, object? body = null)
+    {
+        using var request = new HttpRequestMessage(method, path);
+        if (body is not null)
+        {
+            request.Content = JsonContent.Create(body);
+        }
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        return await Client.SendAsync(request);
     }
 
     protected async Task<WorkSpaceDto> CreateWorkspaceAsync(
@@ -362,22 +613,22 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected static string CommentPath(Guid cardId) => $"/api/v1/cards/{cardId}/comments";
 
-    protected async Task<ActivityEntryDto> CreateCommentAsync(Guid cardId, string text, Guid? actor = null)
+    protected async Task<ActivityEntryDto> CreateCommentAsync(Guid cardId, string text, TestUser? @as = null)
     {
-        using var response = await SendCommentAsync(cardId, new { text }, actor);
+        using var response = await SendCommentAsync(cardId, new { text }, @as);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await response.ReadEnvelope<ActivityEntryDto>()).Data!;
     }
 
-    protected Task<HttpResponseMessage> SendCommentAsync(Guid cardId, object body, Guid? actor = null) =>
-        PostAsync(CommentPath(cardId), body, actor);
+    protected Task<HttpResponseMessage> SendCommentAsync(Guid cardId, object body, TestUser? @as = null) =>
+        PostAsync(CommentPath(cardId), body, @as);
 
     protected Task<HttpResponseMessage> EditCommentAsync(
-        Guid cardId, Guid id, object body, Guid? actor = null) =>
-        PutAsync($"{CommentPath(cardId)}/{id}", body, actor);
+        Guid cardId, Guid id, object body, TestUser? @as = null) =>
+        PutAsync($"{CommentPath(cardId)}/{id}", body, @as);
 
-    protected Task<HttpResponseMessage> RemoveCommentAsync(Guid cardId, Guid id, Guid? actor = null) =>
-        DeleteAsync($"{CommentPath(cardId)}/{id}", actor);
+    protected Task<HttpResponseMessage> RemoveCommentAsync(Guid cardId, Guid id, TestUser? @as = null) =>
+        DeleteAsync($"{CommentPath(cardId)}/{id}", @as);
 
     protected async Task<T> FromDatabaseAsync<T>(Func<ApplicationDbContext, Task<T>> read)
     {
@@ -405,11 +656,11 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected static string CopyJobPath(Guid id) => $"/api/v1/copy-jobs/{id}";
 
-    protected Task<HttpResponseMessage> SendCardCopyAsync(Guid id, object body, Guid? actor = null) =>
-        PostAsync(CopyPath(id), body, actor);
+    protected Task<HttpResponseMessage> SendCardCopyAsync(Guid id, object body, TestUser? @as = null) =>
+        PostAsync(CopyPath(id), body, @as);
 
-    protected Task<HttpResponseMessage> SendListCopyAsync(Guid id, object body, Guid? actor = null) =>
-        PostAsync(ListCopyPath(id), body, actor);
+    protected Task<HttpResponseMessage> SendListCopyAsync(Guid id, object body, TestUser? @as = null) =>
+        PostAsync(ListCopyPath(id), body, @as);
 
     protected async Task<CopyJobDto> CopyListAsync(
         Guid id,
@@ -419,25 +670,25 @@ public abstract class ApiTests : IAsyncLifetime
         object? position = null,
         Guid? before = null,
         Guid? after = null,
-        Guid? actor = null)
+        TestUser? @as = null)
     {
         using var response = await SendListCopyAsync(
-            id, new { boardId, name, keep, position, before, after }, actor);
+            id, new { boardId, name, keep, position, before, after }, @as);
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         return (await response.ReadEnvelope<CopyJobDto>()).Data!;
     }
 
-    protected Task<HttpResponseMessage> SendBoardCopyAsync(Guid id, object body, Guid? actor = null) =>
-        PostAsync(BoardCopyPath(id), body, actor);
+    protected Task<HttpResponseMessage> SendBoardCopyAsync(Guid id, object body, TestUser? @as = null) =>
+        PostAsync(BoardCopyPath(id), body, @as);
 
     protected async Task<CopyJobDto> CopyBoardAsync(
         Guid id,
         Guid workspaceId,
         string? name = null,
         IEnumerable<string>? keep = null,
-        Guid? actor = null)
+        TestUser? @as = null)
     {
-        using var response = await SendBoardCopyAsync(id, new { workspaceId, name, keep }, actor);
+        using var response = await SendBoardCopyAsync(id, new { workspaceId, name, keep }, @as);
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         return (await response.ReadEnvelope<CopyJobDto>()).Data!;
     }
@@ -507,7 +758,9 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected async Task<byte[]> DownloadAttachmentAsync(Guid cardId, Guid id)
     {
-        using var response = await NoRedirects.GetAsync($"{AttachmentPath(cardId)}/{id}/content");
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{AttachmentPath(cardId)}/{id}/content");
+        request.Headers.Authorization = Bearer(ActorUser);
+        using var response = await NoRedirects.SendAsync(request);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
         using var storage = new HttpClient();
@@ -548,7 +801,7 @@ public abstract class ApiTests : IAsyncLifetime
 
         form.Add(new ByteArrayContent(FileBytes(fileName)), "file", fileName);
         request.Content = form;
-        request.Headers.Add(ActorFilter.HeaderName, ActorId.ToString());
+        request.Headers.Authorization = Bearer(ActorUser);
 
         return await Client.SendAsync(request);
     }
@@ -584,18 +837,24 @@ public abstract class ApiTests : IAsyncLifetime
     }
 
     private async Task<HttpResponseMessage> SendAsync(
-        HttpMethod method, string path, object? body, string? actorHeader)
+        HttpMethod method, string path, object? body, TestUser? user, string? userAgent = null)
     {
         using var request = new HttpRequestMessage(method, path);
         if (body is not null)
         {
-            request.Content = JsonContent.Create(body);
+            request.Content = body as HttpContent ?? JsonContent.Create(body);
         }
-        if (actorHeader is not null)
+        if (user is not null)
         {
-            request.Headers.Add(ActorFilter.HeaderName, actorHeader);
+            request.Headers.Authorization = Bearer(user);
+        }
+        if (userAgent is not null)
+        {
+            request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
         }
 
         return await Client.SendAsync(request);
     }
+
+    private static AuthenticationHeaderValue Bearer(TestUser user) => new("Bearer", user.AccessToken);
 }

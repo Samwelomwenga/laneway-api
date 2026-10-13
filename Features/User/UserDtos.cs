@@ -20,10 +20,19 @@ public record UserDto
     Guid? UpdatedBy
 );
 
-public record CreateUserDto
+public record UserSummaryDto
+(
+    Guid Id,
+    string Username,
+    string FirstName,
+    string LastName,
+    Uri? ProfilePictureUrl,
+    string? Bio
+);
+
+public record UpdateProfileDto
 (
     string Username,
-    string Email,
     string FirstName,
     string LastName,
     string? PhoneNumber,
@@ -32,25 +41,4 @@ public record CreateUserDto
     string TimeZone,
     string Location,
     Uri? ProfilePictureUrl
-);
-
-public record UpdateUserDto
-(
-    string Username,
-    string Email,
-    string FirstName,
-    string LastName,
-    string? PhoneNumber,
-    string? Bio,
-    string Language,
-    string TimeZone,
-    string Location,
-    Uri? ProfilePictureUrl
-);
-
-public record UserSearchDto
-(
-    int PageNumber = 1,
-    int PageSize = 10,
-    string? SearchTerm = null
 );

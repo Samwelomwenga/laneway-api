@@ -96,15 +96,15 @@ public class ListCopyTests : ApiTests
     }
 
     [Fact]
-    public async Task The_job_route_ignores_the_actor_header()
+    public async Task The_job_route_rejects_a_malformed_token()
     {
         var board = await CreateBoardAsync((await CreateWorkspaceAsync("Design")).Id, "Roadmap");
         var source = await CreateListAsync(board.Id, "Doing");
         var job = await CopyListAsync(source.Id, board.Id);
 
-        using var response = await GetAsync(CopyJobPath(job.Id), "not-a-user-id");
+        using var response = await SendWithTokenAsync(HttpMethod.Get, CopyJobPath(job.Id), "not-a-token");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -184,18 +184,15 @@ public class ListCopyTests : ApiTests
     }
 
     [Fact]
-    public async Task A_copy_needs_an_actor()
+    public async Task A_copy_needs_a_token()
     {
         var board = await CreateBoardAsync((await CreateWorkspaceAsync("Design")).Id, "Roadmap");
         var source = await CreateListAsync(board.Id, "Doing");
 
-        using var response = await SendWithoutActorAsync(
+        using var response = await SendAnonymousAsync(
             HttpMethod.Post, ListCopyPath(source.Id), new { boardId = board.Id });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var error = Assert.Single(await response.ReadErrors());
-        Assert.Equal(ActorFilter.HeaderName, error.Field);
-        Assert.Equal(ErrorCodes.Required, error.Code);
+        await AssertChallengedAsync(response);
     }
 
     [Fact]

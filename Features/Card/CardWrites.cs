@@ -95,3 +95,19 @@ public sealed record CopyCardWrite(
             dto.After);
     }
 }
+
+public static class CardWrites
+{
+    public static void Apply(this Card card, UpdateCardWrite write)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        ArgumentNullException.ThrowIfNull(write);
+
+        card.Title = write.Title;
+        card.Description = write.Description;
+        card.DueDate = write.DueDate;
+        card.IsDueComplete = write.IsDueComplete;
+        card.StartDate = write.StartDate;
+        card.DueReminderMinutes = write.DueReminderMinutes;
+    }
+}
