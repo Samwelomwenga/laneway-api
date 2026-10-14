@@ -31,6 +31,35 @@ public static class CardView
         );
     }
 
+    public static BoardCardDto OnBoard(CardDto card)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+
+        return new BoardCardDto
+        (
+            card.Id,
+            card.Title,
+            card.Description.Length > 0,
+            card.DueDate,
+            card.Position,
+            card.ListId,
+            card.IsDueComplete,
+            card.StartDate,
+            card.DueReminderMinutes,
+            card.IsArchived,
+            card.LabelIds,
+            card.CheckItemCount,
+            card.CheckedItemCount,
+            card.AttachmentCount,
+            card.CommentCount,
+            card.Cover,
+            card.CreatedAt,
+            card.UpdatedAt,
+            card.CreatedBy,
+            card.UpdatedBy
+        );
+    }
+
     private static CardCoverDto? CoverOf(Card card) => card switch
     {
         { CoverAttachmentId: { } attachmentId } =>

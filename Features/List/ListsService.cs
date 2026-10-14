@@ -80,7 +80,7 @@ public class ListService : IListService
             actor => new CreateListData(actor, chain.Workspace, chain.Board, ListRef.Of(list)));
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
-        var listDto = MapToDto(list);
+        var listDto = ListView.Of(list);
 
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List created successfully", 201);
     }
@@ -114,7 +114,7 @@ public class ListService : IListService
         }
 
         await _context.SaveChangesAsync();
-        var listDto = MapToDto(list);
+        var listDto = ListView.Of(list);
 
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List updated successfully", 200);
     }
@@ -205,7 +205,7 @@ public class ListService : IListService
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
-        var listDto = MapToDto(list);
+        var listDto = ListView.Of(list);
 
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List moved successfully", 200);
     }
@@ -281,7 +281,7 @@ public class ListService : IListService
             return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
         }
 
-        var listDto = MapToDto(list);
+        var listDto = ListView.Of(list);
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List retrieved successfully", 200);
     }
 
@@ -306,7 +306,7 @@ public class ListService : IListService
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var listDtos = lists.Select(MapToDto).ToList();
+        var listDtos = lists.Select(ListView.Of).ToList();
 
         return PagedResponse<ListDto>.SuccessResponse(
             listDtos,
@@ -314,22 +314,6 @@ public class ListService : IListService
             pageSize: searchDto.PageSize,
             currentPage: searchDto.PageNumber,
             message: "Lists retrieved successfully"
-        );
-    }
-
-    private static ListDto MapToDto(List list)
-    {
-        return new ListDto(
-            list.Id,
-            list.Name,
-            list.Position,
-            list.BoardId,
-            list.Color,
-            list.IsArchived,
-            list.CreatedAt,
-            list.UpdatedAt,
-            list.CreatedBy,
-            list.UpdatedBy
         );
     }
 

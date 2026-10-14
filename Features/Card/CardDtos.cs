@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Laneway.Api;
@@ -26,6 +27,30 @@ public record CardDto
      Guid? UpdatedBy
 );
 
+public record BoardCardDto
+(
+    Guid Id,
+    string Title,
+    bool HasDescription,
+    DateTime? DueDate,
+    double Position,
+    Guid ListId,
+    bool IsDueComplete,
+    DateTime? StartDate,
+    int? DueReminderMinutes,
+    bool IsArchived,
+    List<Guid> LabelIds,
+    int CheckItemCount,
+    int CheckedItemCount,
+    int AttachmentCount,
+    int CommentCount,
+    CardCoverDto? Cover,
+    DateTime CreatedAt,
+    DateTime? UpdatedAt,
+    Guid CreatedBy,
+    Guid? UpdatedBy
+);
+
 public record CardViewDto : CardDto
 {
     public CardViewDto(CardDto card, List<ChecklistDto> checklists, List<AttachmentDto> attachments) : base(card)
@@ -34,8 +59,10 @@ public record CardViewDto : CardDto
         Attachments = attachments;
     }
 
+    [JsonPropertyOrder(1)]
     public List<ChecklistDto> Checklists { get; init; }
 
+    [JsonPropertyOrder(1)]
     public List<AttachmentDto> Attachments { get; init; }
 }
 

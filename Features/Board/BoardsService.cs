@@ -5,7 +5,7 @@ namespace Laneway.Api;
 public interface IBoardService
 {
     Task<ApiResponse<List<BoardDto>>> GetAllAsync(Guid workspaceId, BoardSearchDto searchDto);
-    Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id);
+    Task<ApiResponse<BoardViewDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardWrite write);
     Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardWrite write);
     Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardWrite write);
@@ -20,19 +20,22 @@ public class BoardService : IBoardService
     private readonly ArchiveGuard _archive;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly CardReads _cards;
 
     public BoardService(
         ApplicationDbContext context,
         Actor actor,
         ArchiveGuard archive,
         ActivityWriter activity,
-        ActivityTree tree)
+        ActivityTree tree,
+        CardReads cards)
     {
         _context = context;
         _actor = actor;
         _archive = archive;
         _activity = activity;
         _tree = tree;
+        _cards = cards;
     }
 
     public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(Guid workspaceId, BoardSearchDto searchDto)
@@ -73,15 +76,32 @@ public class BoardService : IBoardService
         );
     }
 
-    public async Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id)
+    public async Task<ApiResponse<BoardViewDto>> GetByIdAsync(Guid id)
     {
         var existingBoard = await _context.Boards.FirstOrDefaultAsync(b => b.Id == id);
         if (existingBoard == null)
         {
-            return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
+            return ApiResponse<BoardViewDto>.ErrorResponse("Board not found", 404);
         }
-        var boardDto = MapToDto(existingBoard);
-        return ApiResponse<BoardDto>.SuccessResponse(boardDto, "Board retrieved successfully", 200);
+
+        var labels = await _context.Labels.Where(l => l.BoardId == id).InNameOrder().ToListAsync();
+        var lists = await ArchiveView.Lists(_context.Lists.Where(l => l.BoardId == id), ArchiveFilter.Exclude)
+            .InSortOrder()
+            .ToListAsync();
+        var listIds = lists.ConvertAll(l => l.Id);
+        var cards = await ArchiveView.Cards(_context.Cards.Where(c => listIds.Contains(c.ListId)), ArchiveFilter.Exclude)
+            .InSortOrder()
+            .Include(c => c.Labels)
+            .ToListAsync();
+        var cardsByList = (await _cards.OfAsync(cards)).ToLookup(card => card.ListId);
+
+        var boardView = new BoardViewDto(
+            MapToDto(existingBoard),
+            labels.ConvertAll(LabelView.Of),
+            lists.ConvertAll(list => new BoardListDto(
+                ListView.Of(list),
+                cardsByList[list.Id].Select(CardView.OnBoard).ToList())));
+        return ApiResponse<BoardViewDto>.SuccessResponse(boardView, "Board retrieved successfully", 200);
     }
 
     public async Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardWrite write)

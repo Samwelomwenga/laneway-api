@@ -50,11 +50,11 @@ public class LabelService : ILabelService
         }
 
         var (labels, totalCount) = await PagedQuery.ReadAsync(
-            query.OrderBy(l => l.Name).ThenBy(l => l.Color).ThenBy(l => l.CreatedAt).ThenBy(l => l.Id),
+            query.InNameOrder(),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var labelDtos = labels.Select(MapToDto).ToList();
+        var labelDtos = labels.Select(LabelView.Of).ToList();
 
         return PagedResponse<LabelDto>.SuccessResponse(
             labelDtos,
@@ -72,7 +72,7 @@ public class LabelService : ILabelService
         {
             return ApiResponse<LabelDto>.ErrorResponse("Label not found", 404);
         }
-        var labelDto = MapToDto(label);
+        var labelDto = LabelView.Of(label);
         return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label retrieved successfully", 200);
     }
 
@@ -111,7 +111,7 @@ public class LabelService : ILabelService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var labelDto = MapToDto(newLabel);
+        var labelDto = LabelView.Of(newLabel);
         return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label created successfully", 201);
     }
 
@@ -156,7 +156,7 @@ public class LabelService : ILabelService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var labelDto = MapToDto(existingLabel);
+        var labelDto = LabelView.Of(existingLabel);
         return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label updated successfully", 200);
     }
 
@@ -209,21 +209,6 @@ public class LabelService : ILabelService
             ? ApiResponse<LabelDto>.ErrorResponse("Label with the same color already exists", 409,
                 [new ApiError("color", ErrorCodes.Duplicate, "This board already has an unnamed label in this color.")])
             : null;
-    }
-
-    private static LabelDto MapToDto(Label label)
-    {
-        return new LabelDto
-        (
-            label.Id,
-            label.Name,
-            label.BoardId,
-            label.Color,
-            label.CreatedAt,
-            label.UpdatedAt,
-            label.CreatedBy,
-            label.UpdatedBy
-        );
     }
 
     private static Label MapToEntity(CreateLabelWrite write, Guid actorId)

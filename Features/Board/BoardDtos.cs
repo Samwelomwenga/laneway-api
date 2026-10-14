@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Laneway.Api;
@@ -15,6 +16,21 @@ public record BoardDto
     Guid CreatedBy,
     Guid? UpdatedBy
 );
+
+public record BoardViewDto : BoardDto
+{
+    public BoardViewDto(BoardDto board, List<LabelDto> labels, List<BoardListDto> lists) : base(board)
+    {
+        Labels = labels;
+        Lists = lists;
+    }
+
+    [JsonPropertyOrder(1)]
+    public List<LabelDto> Labels { get; init; }
+
+    [JsonPropertyOrder(1)]
+    public List<BoardListDto> Lists { get; init; }
+}
 
 public record CreateBoardDto
 (

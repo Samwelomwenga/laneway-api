@@ -26,8 +26,7 @@ public class CardService : ICardService
     private readonly LabelMatching _labelMatching;
     private readonly BoardCaps _caps;
     private readonly CardCompletion _completion;
-    private readonly AttachmentCounts _attachments;
-    private readonly CommentCounts _comments;
+    private readonly CardReads _reads;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
 
@@ -39,8 +38,7 @@ public class CardService : ICardService
         LabelMatching labelMatching,
         BoardCaps caps,
         CardCompletion completion,
-        AttachmentCounts attachments,
-        CommentCounts comments,
+        CardReads reads,
         ActivityWriter activity,
         ActivityTree tree)
     {
@@ -51,8 +49,7 @@ public class CardService : ICardService
         _labelMatching = labelMatching;
         _caps = caps;
         _completion = completion;
-        _attachments = attachments;
-        _comments = comments;
+        _reads = reads;
         _activity = activity;
         _tree = tree;
     }
@@ -166,11 +163,7 @@ public class CardService : ICardService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var cardDto = CardView.Of(
-            card,
-            await _completion.TallyAsync(id),
-            await _attachments.OnCardAsync(id),
-            await _comments.OnCardAsync(id));
+        var cardDto = await _reads.OfAsync(card);
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card updated successfully");
     }
@@ -295,11 +288,7 @@ public class CardService : ICardService
         await transaction.CommitAsync();
 
         return ApiResponse<CardDto>.SuccessResponse(
-            CardView.Of(
-                card,
-                await _completion.TallyAsync(id),
-                await _attachments.OnCardAsync(id),
-                await _comments.OnCardAsync(id)),
+            await _reads.OfAsync(card),
             "Card moved successfully");
     }
 
@@ -324,11 +313,7 @@ public class CardService : ICardService
             .ToListAsync();
 
         var cardView = new CardViewDto(
-            CardView.Of(
-                card,
-                await _completion.TallyAsync(id),
-                await _attachments.OnCardAsync(id),
-                await _comments.OnCardAsync(id)),
+            await _reads.OfAsync(card),
             checklists.ConvertAll(ChecklistView.Of),
             attachments.ConvertAll(AttachmentView.Of));
 
@@ -380,17 +365,8 @@ public class CardService : ICardService
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var cardIds = cards.ConvertAll(c => c.Id);
-        var tallies = await _completion.TallyAsync(cardIds);
-        var attachmentCounts = await _attachments.OnCardsAsync(cardIds);
-        var commentCounts = await _comments.OnCardsAsync(cardIds);
-
         return PagedResponse<CardDto>.SuccessResponse(
-            cards.ConvertAll(card => CardView.Of(
-                card,
-                tallies.GetValueOrDefault(card.Id),
-                attachmentCounts.GetValueOrDefault(card.Id),
-                commentCounts.GetValueOrDefault(card.Id))),
+            await _reads.OfAsync(cards),
             totalCount,
             pageSize: searchDto.PageSize,
             currentPage: searchDto.PageNumber,

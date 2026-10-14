@@ -24,7 +24,8 @@ public class BoardsController : ApiControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<ApiResponse<BoardDto>>> GetBoard(Guid id)
+    [NoQuery]
+    public async Task<ActionResult<ApiResponse<BoardViewDto>>> GetBoard(Guid id)
     {
         var response = await _boardService.GetByIdAsync(id);
         return ToActionResult(response);

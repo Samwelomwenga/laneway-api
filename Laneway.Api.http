@@ -255,6 +255,18 @@ Authorization: Bearer {{accessToken}}
 GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards?dueDate=2026-10-01
 Authorization: Bearer {{accessToken}}
 
+### Read the board view. labels holds both labels by name, and lists holds both lists in position order, each with its open cards. Cards carry hasDescription in place of description.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}
+Authorization: Bearer {{accessToken}}
+
+### Ask the board view for archived lists. 400 unknownField on archived, because the view takes no query keys. Archived lists come from GET /boards/{boardId}/lists?archived=only.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}?archived=only
+Authorization: Bearer {{accessToken}}
+
+### Read the card view. It has every card field, plus checklists and attachments, both empty here. It has no comments.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{cardId}}
+Authorization: Bearer {{accessToken}}
+
 ### Create a workspace with a padded name, a padded description, and a lowercase visibility. The name comes back trimmed, the description comes back as sent, and visibility comes back as "Public".
 POST {{Laneway_Api_HostAddress}}/api/v1/workspaces
 Authorization: Bearer {{accessToken}}

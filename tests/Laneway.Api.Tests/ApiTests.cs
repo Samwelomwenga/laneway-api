@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -636,6 +637,24 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected Task<HttpResponseMessage> RemoveCommentAsync(Guid id, TestUser? @as = null) =>
         DeleteAsync($"/api/v1/comments/{id}", @as);
+
+    protected static async Task AssertLacksAsync(Func<Task<HttpResponseMessage>> send, params string[] fields)
+    {
+        ArgumentNullException.ThrowIfNull(send);
+        ArgumentNullException.ThrowIfNull(fields);
+
+        using var response = await send();
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.True(response.IsSuccessStatusCode, $"{response.StatusCode}: {body}");
+        using var json = JsonDocument.Parse(body);
+        var data = json.RootElement.GetProperty("data");
+        var items = data.ValueKind == JsonValueKind.Array ? data.EnumerateArray().ToList() : [data];
+        Assert.NotEmpty(items);
+        foreach (var field in fields)
+        {
+            Assert.All(items, item => Assert.False(item.Has(field), item.GetRawText()));
+        }
+    }
 
     protected async Task<T> FromDatabaseAsync<T>(Func<ApplicationDbContext, Task<T>> read)
     {

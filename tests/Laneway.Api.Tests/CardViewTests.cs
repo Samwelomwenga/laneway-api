@@ -60,27 +60,29 @@ public class CardViewTests : ApiTests
     }
 
     [Fact]
+    public async Task The_card_view_takes_no_archived_param()
+    {
+        var card = await NewCardAsync();
+
+        using var response = await GetAsync($"/api/v1/cards/{card.Id}?archived=only");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = Assert.Single(await response.ReadErrors());
+        Assert.Equal("archived", error.Field);
+        Assert.Equal(ErrorCodes.UnknownField, error.Code);
+    }
+
+    [Fact]
     public async Task Card_writes_return_the_plain_card()
     {
         var card = await NewCardAsync();
         await CreateChecklistAsync(card.Id, "Plan");
         await CreateLinkAttachmentAsync(card.Id, "https://example.com/spec", "Spec");
 
-        await AssertPlainAsync(() => PostAsync(CardsPath(card.ListId), new { title = "Book the studio", isDueComplete = false }));
-        await AssertPlainAsync(() => UpdateCardAsync(card.Id, "Write the long brief"));
-        await AssertPlainAsync(() => MoveCardAsync(card.Id, card.ListId, position: "top"));
-        await AssertPlainAsync(() => PostAsync(CopyPath(card.Id), new { listId = card.ListId }));
-    }
-
-    private static async Task AssertPlainAsync(Func<Task<HttpResponseMessage>> send)
-    {
-        using var response = await send();
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.True(response.IsSuccessStatusCode, $"{response.StatusCode}: {body}");
-        using var json = JsonDocument.Parse(body);
-        var data = json.RootElement.GetProperty("data");
-        Assert.False(data.Has("checklists"), data.GetRawText());
-        Assert.False(data.Has("attachments"), data.GetRawText());
+        await AssertLacksAsync(() => PostAsync(CardsPath(card.ListId), new { title = "Book the studio", isDueComplete = false }), "checklists", "attachments");
+        await AssertLacksAsync(() => UpdateCardAsync(card.Id, "Write the long brief"), "checklists", "attachments");
+        await AssertLacksAsync(() => MoveCardAsync(card.Id, card.ListId, position: "top"), "checklists", "attachments");
+        await AssertLacksAsync(() => PostAsync(CopyPath(card.Id), new { listId = card.ListId }), "checklists", "attachments");
     }
 
     private async Task<CardDto> NewCardAsync()
@@ -91,15 +93,15 @@ public class CardViewTests : ApiTests
         return await CreateCardAsync(list.Id, "Write the brief");
     }
 
-    private async Task<CardView> ReadCardViewAsync(Guid id)
+    private async Task<CardViewReply> ReadCardViewAsync(Guid id)
     {
         using var response = await GetAsync($"/api/v1/cards/{id}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return (await response.ReadEnvelope<CardView>()).Data!;
+        return (await response.ReadEnvelope<CardViewReply>()).Data!;
     }
 }
 
-public sealed record CardView(
+public sealed record CardViewReply(
     Guid Id,
     string Title,
     List<ChecklistDto> Checklists,

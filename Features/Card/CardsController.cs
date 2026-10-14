@@ -24,6 +24,7 @@ public class CardsController : ApiControllerBase
     }
 
     [HttpGet("{id}")]
+    [NoQuery]
     public async Task<ActionResult<ApiResponse<CardViewDto>>> GetCard(Guid id)
     {
         var response = await _cardService.GetByIdAsync(id);
