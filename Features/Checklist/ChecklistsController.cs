@@ -13,11 +13,11 @@ public class ChecklistsController : ApiControllerBase
         _checklistService = checklistService;
     }
 
-    [HttpGet]
+    [HttpGet("/api/v1/cards/{cardId}/checklists")]
     public async Task<ActionResult<PagedResponse<ChecklistDto>>> GetChecklists(
-        [FromQuery] ChecklistSearchDto searchDto)
+        Guid cardId, [FromQuery] ChecklistSearchDto searchDto)
     {
-        var response = await _checklistService.GetAllAsync(searchDto);
+        var response = await _checklistService.GetAllAsync(cardId, searchDto);
         return ToActionResult(response);
     }
 
@@ -28,11 +28,11 @@ public class ChecklistsController : ApiControllerBase
         return ToActionResult(response);
     }
 
-    [HttpPost]
+    [HttpPost("/api/v1/cards/{cardId}/checklists")]
     public async Task<ActionResult<ApiResponse<ChecklistDto>>> CreateChecklist(
-        [FromBody] CreateChecklistDto createChecklistDto)
+        Guid cardId, [FromBody] CreateChecklistDto createChecklistDto)
     {
-        var response = await _checklistService.CreateAsync(CreateChecklistWrite.Of(createChecklistDto));
+        var response = await _checklistService.CreateAsync(CreateChecklistWrite.Of(cardId, createChecklistDto));
         if (!response.Success)
         {
             return ToActionResult(response);

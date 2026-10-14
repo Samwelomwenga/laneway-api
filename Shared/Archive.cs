@@ -84,15 +84,8 @@ public static class ArchiveView
     public static IQueryable<Card> Cards(IQueryable<Card> cards, ArchiveFilter filter) =>
         Apply(cards, filter, card => !card.IsArchived);
 
-    public static IQueryable<Checklist> Checklists(
-        IQueryable<Checklist> checklists, ArchiveFilter filter, ApplicationDbContext context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        return Apply(checklists, filter, checklist => !checklist.IsArchived
-            && context.Cards.Any(card => card.Id == checklist.CardId && !card.IsArchived
-                && context.Lists.Any(list => list.Id == card.ListId && !list.IsArchived
-                    && context.Boards.Any(board => board.Id == list.BoardId && !board.IsArchived))));
-    }
+    public static IQueryable<Checklist> Checklists(IQueryable<Checklist> checklists, ArchiveFilter filter) =>
+        Apply(checklists, filter, checklist => !checklist.IsArchived);
 
     public static IQueryable<CheckItem> CheckItems(
         IQueryable<CheckItem> checkItems, CheckItemArchiveFilter filter, ApplicationDbContext context)
@@ -105,7 +98,10 @@ public static class ArchiveView
             return checkItems;
         }
 
-        var visible = Checklists(context.Checklists, ArchiveFilter.Exclude, context);
+        var visible = context.Checklists.Where(checklist => !checklist.IsArchived
+            && context.Cards.Any(card => card.Id == checklist.CardId && !card.IsArchived
+                && context.Lists.Any(list => list.Id == card.ListId && !list.IsArchived
+                    && context.Boards.Any(board => board.Id == list.BoardId && !board.IsArchived))));
         return checkItems.Where(checkItem => visible.Any(checklist => checklist.Id == checkItem.ChecklistId));
     }
 

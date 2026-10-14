@@ -10,7 +10,7 @@ public interface IChecklistService
     Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
     Task<ApiResponse<ChecklistDto>> GetByIdAsync(Guid id);
-    Task<ApiResponse<List<ChecklistDto>>> GetAllAsync(ChecklistSearchDto searchDto);
+    Task<ApiResponse<List<ChecklistDto>>> GetAllAsync(Guid cardId, ChecklistSearchDto searchDto);
 }
 
 public class ChecklistService : IChecklistService
@@ -48,7 +48,7 @@ public class ChecklistService : IChecklistService
 
         if (!await _context.Cards.AnyAsync(c => c.Id == cardId))
         {
-            return ReferenceErrors.NotFound<ChecklistDto>("cardId", "Card", cardId);
+            return ReferenceErrors.ParentNotFound<ChecklistDto>("Card");
         }
 
         var placed = await _placements.ResolveOnCardAsync(cardId, Placement.Of(write));
@@ -59,7 +59,7 @@ public class ChecklistService : IChecklistService
 
         if (await _archive.OnCardAsync(cardId) is { } archived)
         {
-            return ArchiveErrors.NoCreate<ChecklistDto>(archived, "cardId", TreeItem.Checklist);
+            return ArchiveErrors.NoCreate<ChecklistDto>(archived, null, TreeItem.Checklist);
         }
 
         var checklist = MapToEntity(write, _actor.Id, placed.Position);
@@ -264,23 +264,16 @@ public class ChecklistService : IChecklistService
         return ApiResponse<ChecklistDto>.SuccessResponse(checklistDto, "Checklist retrieved successfully", 200);
     }
 
-    public async Task<ApiResponse<List<ChecklistDto>>> GetAllAsync(ChecklistSearchDto searchDto)
+    public async Task<ApiResponse<List<ChecklistDto>>> GetAllAsync(Guid cardId, ChecklistSearchDto searchDto)
     {
         ArgumentNullException.ThrowIfNull(searchDto);
 
-        if (searchDto.CardId is { } filterCardId && !await _context.Cards.AnyAsync(c => c.Id == filterCardId))
+        if (!await _context.Cards.AnyAsync(c => c.Id == cardId))
         {
-            return ReferenceErrors.NotFound<List<ChecklistDto>>("cardId", "Card", filterCardId);
+            return ReferenceErrors.ParentNotFound<List<ChecklistDto>>("Card");
         }
 
-        var query = _context.Checklists.AsQueryable();
-
-        if (searchDto.CardId is { } cardId)
-        {
-            query = query.Where(c => c.CardId == cardId);
-        }
-
-        query = ArchiveView.Checklists(query, searchDto.Archived, _context);
+        var query = ArchiveView.Checklists(_context.Checklists.Where(c => c.CardId == cardId), searchDto.Archived);
 
         var (checklists, totalCount) = await PagedQuery.ReadAsync(
             query.InSortOrder().Include(c => c.CheckItems),

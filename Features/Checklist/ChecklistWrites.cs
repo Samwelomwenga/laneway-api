@@ -7,13 +7,13 @@ public sealed record CreateChecklistWrite(
     Guid? Before,
     Guid? After) : IPlacing
 {
-    public static CreateChecklistWrite Of(CreateChecklistDto dto)
+    public static CreateChecklistWrite Of(Guid cardId, CreateChecklistDto dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
         return new CreateChecklistWrite(
             Writes.Required(dto.Name, "name"),
-            Writes.Required(dto.CardId, "cardId"),
+            cardId,
             dto.Position,
             dto.Before,
             dto.After);

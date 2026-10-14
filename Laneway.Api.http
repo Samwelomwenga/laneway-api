@@ -4190,221 +4190,226 @@ Content-Type: application/json
 > {% client.global.set("checklistOtherCardId", response.body.data.id); %}
 
 ### Create a checklist with a padded name and no placement. 201, the name comes back trimmed, position is 65536, isArchived is false, and checkItems is empty until check items land.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "  Release  ",
-  "cardId": "{{checklistCardId}}"
+  "name": "  Release  "
 }
 
 > {% client.global.set("checklistRelease", response.body.data.id); %}
 
 ### Create a second checklist with no placement. It goes to the bottom, 65536 + 65536 = 131072.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Follow-up",
-  "cardId": "{{checklistCardId}}"
+  "name": "Follow-up"
 }
 
 > {% client.global.set("checklistFollowUp", response.body.data.id); %}
 
 ### Create a checklist at the top. The smallest sibling halves, so it's 32768.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Warm-up",
-  "position": "top",
-  "cardId": "{{checklistCardId}}"
+  "position": "top"
 }
 
 > {% client.global.set("checklistWarmUp", response.body.data.id); %}
 
 ### Create a checklist between two siblings. The midpoint of 32768 and 65536 is 49152.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Between",
   "after": "{{checklistWarmUp}}",
-  "before": "{{checklistRelease}}",
-  "cardId": "{{checklistCardId}}"
+  "before": "{{checklistRelease}}"
 }
 
 > {% client.global.set("checklistBetween", response.body.data.id); %}
 
 ### Create a checklist at a number the client picked. It's stored as sent.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Numbered",
-  "position": 200000,
-  "cardId": "{{checklistCardId}}"
+  "position": 200000
 }
 
 > {% client.global.set("checklistNumbered", response.body.data.id); %}
 
 ### Create a second checklist called Follow-up on the same card. 201, because checklist names don't have to be unique.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Follow-up",
-  "cardId": "{{checklistCardId}}"
+  "name": "Follow-up"
 }
 
 > {% client.global.set("checklistSecondFollowUp", response.body.data.id); %}
 
 ### Create a checklist on the other card, for the anchor checks below.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistOtherCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Elsewhere",
-  "cardId": "{{checklistOtherCardId}}"
+  "name": "Elsewhere"
 }
 
 > {% client.global.set("checklistElsewhere", response.body.data.id); %}
 
-### Create a checklist from an empty object. 400 required on name and cardId. Placement is optional.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+### Create a checklist from an empty object. 400 required on name. Placement is optional.
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {}
 
 ### Create a checklist with a blank name. 400 required on name, because the name is trimmed first.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "   ",
-  "cardId": "{{checklistCardId}}"
+  "name": "   "
 }
 
 ### Create a checklist with a name of 101 characters. 400 tooLong on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
-  "cardId": "{{checklistCardId}}"
+  "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
 }
 
 ### Create a checklist with a padded name of 100 characters. 201, so the column takes the full limit.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "  nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn  ",
-  "cardId": "{{checklistCardId}}"
+  "name": "  nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn  "
 }
 
-### Create a checklist on a card that doesn't exist. 400 notFound on cardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+### Create a checklist on a card that doesn't exist. 404 "Card not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{$uuid}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Orphan",
-  "cardId": "{{$uuid}}"
+  "name": "Orphan"
 }
 
 ### Create a checklist with a position and an anchor. 400 mutuallyExclusive with a null field.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Both",
   "position": "top",
-  "before": "{{checklistRelease}}",
-  "cardId": "{{checklistCardId}}"
+  "before": "{{checklistRelease}}"
 }
 
 ### Create a checklist at a position name that doesn't exist. 400 unknownValue on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Middling",
-  "position": "middle",
-  "cardId": "{{checklistCardId}}"
+  "position": "middle"
 }
 
 ### Create a checklist at position 0. 400 outOfRange on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Zeroed",
-  "position": 0,
-  "cardId": "{{checklistCardId}}"
+  "position": 0
 }
 
 ### Create a checklist before an anchor that doesn't exist. 400 notFound on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Anchored",
-  "before": "{{$uuid}}",
-  "cardId": "{{checklistCardId}}"
+  "before": "{{$uuid}}"
 }
 
 ### Create a checklist before a checklist on another card. 400 notSibling on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Anchored",
-  "before": "{{checklistElsewhere}}",
-  "cardId": "{{checklistCardId}}"
+  "before": "{{checklistElsewhere}}"
 }
 
 ### Create a checklist that is already archived. 400 unknownField on isArchived, because a new checklist always starts unarchived.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Born archived",
-  "isArchived": true,
-  "cardId": "{{checklistCardId}}"
+  "isArchived": true
 }
 
 ### Read the card's checklists. 200 in position order: Warm-up, Between, Release, Follow-up, Numbered, Follow-up, and the long one. Each carries an empty checkItems.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 
 ### Read the first page of two. 200 with two checklists, totalCount 7, and totalPages 4.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&pageNumber=1&pageSize=2
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?pageNumber=1&pageSize=2
 Authorization: Bearer {{accessToken}}
 
-### Filter by a card that doesn't exist. 400 notFound on cardId.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{$uuid}}
+### List the checklists of a card that doesn't exist. 404 "Card not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{$uuid}}/checklists
 Authorization: Bearer {{accessToken}}
 
-### Search checklists by name. 400 unknownField on searchTerm, because checklist search takes cardId and archived only.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?searchTerm=Release
+### Send a bad query to a card that doesn't exist. 400 unknownValue on archived, because query errors come before the card lookup.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{$uuid}}/checklists?archived=nope
+Authorization: Bearer {{accessToken}}
+
+### Search checklists by name. 400 unknownField on searchTerm, because checklist search takes archived only.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?searchTerm=Release
+Authorization: Bearer {{accessToken}}
+
+### Send cardId in the query as well. 400 unknownField on cardId.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?cardId={{checklistCardId}}
+Authorization: Bearer {{accessToken}}
+
+### Send cardId in the create body. 400 unknownField on cardId, because the path names the card.
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Doubled",
+  "cardId": "{{checklistCardId}}"
+}
+
+### Search the old flat checklist route. 404, because the route is gone.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}
 Authorization: Bearer {{accessToken}}
 
 ### Read one checklist. 200.
@@ -4593,19 +4598,19 @@ Content-Type: application/json
 }
 
 ### Read the card's checklists with the default filter. 200, and the archived Follow-up is gone.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 
 ### Read only the archived ones. 200 with the one archived checklist.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&archived=only
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Read every checklist on the card. 200 with all seven.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&archived=include
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?archived=include
 Authorization: Bearer {{accessToken}}
 
 ### Filter by an archived value that doesn't exist. 400 unknownValue on archived, and the message lists Exclude, Only, and Include.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&archived=nope
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?archived=nope
 Authorization: Bearer {{accessToken}}
 
 ### Restore the checklist. 204.
@@ -4679,13 +4684,12 @@ Content-Type: application/json
 > {% client.global.set("checklistCardTwo", response.body.data.id); %}
 
 ### Create the checklist the ancestor checks write to.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Steps",
-  "cardId": "{{checklistCardTwo}}"
+  "name": "Steps"
 }
 
 > {% client.global.set("checklistSteps", response.body.data.id); %}
@@ -4699,14 +4703,13 @@ Content-Type: application/json
   "value": true
 }
 
-### Create a checklist on the archived card. 409 archived on cardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+### Create a checklist on the archived card. 409 archived with a null field.
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "More steps",
-  "cardId": "{{checklistCardTwo}}"
+  "name": "More steps"
 }
 
 ### Rename the checklist on the archived card. 409 archived with a null field, "The card this checklist is on is archived."
@@ -4731,12 +4734,12 @@ Content-Type: application/json
 DELETE {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checklistSteps}}
 Authorization: Bearer {{accessToken}}
 
-### Read the archived card's checklists. 200 with empty data, because exclude hides checklists on hidden cards.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardTwo}}
+### Read the archived card's checklists. 200 with Steps, because an archived card still lists its checklists.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/checklists
 Authorization: Bearer {{accessToken}}
 
 ### Read them with archived=include. 200 with Steps, whose own flag is still off.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardTwo}}&archived=include
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/checklists?archived=include
 Authorization: Bearer {{accessToken}}
 
 ### Restore the card.
@@ -4793,14 +4796,13 @@ Content-Type: application/json
   "name": "Steps renamed"
 }
 
-### Create a checklist on a card whose board is archived. 409 archived on cardId, naming the board.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+### Create a checklist on a card whose board is archived. 409 archived with a null field, naming the board.
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "More steps",
-  "cardId": "{{checklistCardTwo}}"
+  "name": "More steps"
 }
 
 ### Restore the board.
@@ -4850,13 +4852,12 @@ Content-Type: application/json
 > {% client.global.set("checklistCascadeCard", response.body.data.id); %}
 
 ### Create the checklist the card takes with it.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCascadeCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Goes with the card",
-  "cardId": "{{checklistCascadeCard}}"
+  "name": "Goes with the card"
 }
 
 > {% client.global.set("checklistCascade", response.body.data.id); %}
@@ -4902,37 +4903,34 @@ Content-Type: application/json
 > {% client.global.set("checkItemCardId", response.body.data.id); %}
 
 ### Create the checklist the ordering checks run in.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Release",
-  "cardId": "{{checkItemCardId}}"
+  "name": "Release"
 }
 
 > {% client.global.set("checkItemRelease", response.body.data.id); %}
 
 ### Create the checklist a check item moves into.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Follow-up",
-  "cardId": "{{checkItemCardId}}"
+  "name": "Follow-up"
 }
 
 > {% client.global.set("checkItemFollowUp", response.body.data.id); %}
 
 ### Create the checklist the odd check items go in, so Release keeps its six.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Spare",
-  "cardId": "{{checkItemCardId}}"
+  "name": "Spare"
 }
 
 > {% client.global.set("checkItemSpare", response.body.data.id); %}
@@ -4950,13 +4948,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemOtherCard", response.body.data.id); %}
 
 ### Create the checklist on the other card.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemOtherCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Elsewhere",
-  "cardId": "{{checkItemOtherCard}}"
+  "name": "Elsewhere"
 }
 
 > {% client.global.set("checkItemElsewhere", response.body.data.id); %}
@@ -5207,7 +5204,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the card's checklists. 200 with Release carrying six, Follow-up none, and Spare two.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checkItemCardId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 
 ### Rename a check item with a padded name. 200, the name comes back trimmed and updatedBy becomes the actor.
@@ -5476,13 +5473,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Create its first checklist.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemDueCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Release",
-  "cardId": "{{checkItemDueCard}}"
+  "name": "Release"
 }
 
 > {% client.global.set("checkItemDueRelease", response.body.data.id); %}
@@ -5528,13 +5524,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Add a second checklist to the same card.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemDueCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Follow-up",
-  "cardId": "{{checkItemDueCard}}"
+  "name": "Follow-up"
 }
 
 > {% client.global.set("checkItemDueFollowUp", response.body.data.id); %}
@@ -5636,13 +5631,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemUndatedCard", response.body.data.id); %}
 
 ### Give it a checklist.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemUndatedCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Steps",
-  "cardId": "{{checkItemUndatedCard}}"
+  "name": "Steps"
 }
 
 > {% client.global.set("checkItemUndatedList", response.body.data.id); %}
@@ -5676,13 +5670,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemCopyCard", response.body.data.id); %}
 
 ### Give it a checklist.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCopyCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Steps",
-  "cardId": "{{checkItemCopyCard}}"
+  "name": "Steps"
 }
 
 > {% client.global.set("checkItemCopyList", response.body.data.id); %}
@@ -5726,13 +5719,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemArchiveCard", response.body.data.id); %}
 
 ### Give it a checklist.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemArchiveCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Steps",
-  "cardId": "{{checkItemArchiveCard}}"
+  "name": "Steps"
 }
 
 > {% client.global.set("checkItemArchiveList", response.body.data.id); %}
@@ -5775,13 +5767,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemKeepCard", response.body.data.id); %}
 
 ### Give it a live checklist with an open check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemKeepCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Live",
-  "cardId": "{{checkItemKeepCard}}"
+  "name": "Live"
 }
 
 > {% client.global.set("checkItemKeepLive", response.body.data.id); %}
@@ -5797,13 +5788,12 @@ Content-Type: application/json
 }
 
 ### Give it a second checklist, which gets archived and deleted.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemKeepCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Doomed",
-  "cardId": "{{checkItemKeepCard}}"
+  "name": "Doomed"
 }
 
 > {% client.global.set("checkItemKeepArchived", response.body.data.id); %}
@@ -5857,13 +5847,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemHiddenCard", response.body.data.id); %}
 
 ### Give it the checklist that gets archived.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemHiddenCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Put away",
-  "cardId": "{{checkItemHiddenCard}}"
+  "name": "Put away"
 }
 
 > {% client.global.set("checkItemHiddenList", response.body.data.id); %}
@@ -5881,13 +5870,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemHidden", response.body.data.id); %}
 
 ### Give the card a second checklist that stays live.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemHiddenCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Still live",
-  "cardId": "{{checkItemHiddenCard}}"
+  "name": "Still live"
 }
 
 > {% client.global.set("checkItemLiveList", response.body.data.id); %}
@@ -6023,13 +6011,12 @@ DELETE {{Laneway_Api_HostAddress}}/api/v1/check-items/{{checkItemLive}}
 Authorization: Bearer {{accessToken}}
 
 ### Create the checklist the cascade check deletes.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Goes with the checklist",
-  "cardId": "{{checkItemCardId}}"
+  "name": "Goes with the checklist"
 }
 
 > {% client.global.set("checkItemCascadeList", response.body.data.id); %}
