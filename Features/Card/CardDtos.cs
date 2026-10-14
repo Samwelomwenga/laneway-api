@@ -26,6 +26,19 @@ public record CardDto
      Guid? UpdatedBy
 );
 
+public record CardViewDto : CardDto
+{
+    public CardViewDto(CardDto card, List<ChecklistDto> checklists, List<AttachmentDto> attachments) : base(card)
+    {
+        Checklists = checklists;
+        Attachments = attachments;
+    }
+
+    public List<ChecklistDto> Checklists { get; init; }
+
+    public List<AttachmentDto> Attachments { get; init; }
+}
+
 public record CardCoverDto
 (
     Guid? AttachmentId,

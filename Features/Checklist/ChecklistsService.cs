@@ -73,7 +73,7 @@ public class ChecklistService : IChecklistService
                 actor, chain.Workspace, chain.Board, chain.List, chain.Card, ChecklistRef.Of(checklist)));
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
-        var checklistDto = MapToDto(checklist);
+        var checklistDto = ChecklistView.Of(checklist);
 
         return ApiResponse<ChecklistDto>.SuccessResponse(checklistDto, "Checklist created successfully", 201);
     }
@@ -113,7 +113,7 @@ public class ChecklistService : IChecklistService
         }
 
         await _context.SaveChangesAsync();
-        var checklistDto = MapToDto(checklist);
+        var checklistDto = ChecklistView.Of(checklist);
 
         return ApiResponse<ChecklistDto>.SuccessResponse(checklistDto, "Checklist updated successfully", 200);
     }
@@ -163,7 +163,7 @@ public class ChecklistService : IChecklistService
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
-        var checklistDto = MapToDto(checklist);
+        var checklistDto = ChecklistView.Of(checklist);
 
         return ApiResponse<ChecklistDto>.SuccessResponse(checklistDto, "Checklist moved successfully", 200);
     }
@@ -260,7 +260,7 @@ public class ChecklistService : IChecklistService
             return ApiResponse<ChecklistDto>.ErrorResponse("Checklist not found", 404);
         }
 
-        var checklistDto = MapToDto(checklist);
+        var checklistDto = ChecklistView.Of(checklist);
         return ApiResponse<ChecklistDto>.SuccessResponse(checklistDto, "Checklist retrieved successfully", 200);
     }
 
@@ -281,7 +281,7 @@ public class ChecklistService : IChecklistService
             pageSize: searchDto.PageSize);
 
         return PagedResponse<ChecklistDto>.SuccessResponse(
-            checklists.Select(MapToDto).ToList(),
+            checklists.Select(ChecklistView.Of).ToList(),
             totalCount,
             pageSize: searchDto.PageSize,
             currentPage: searchDto.PageNumber,
@@ -291,22 +291,6 @@ public class ChecklistService : IChecklistService
 
     private async Task<Checklist?> WithCheckItemsAsync(Guid id) =>
         await _context.Checklists.Include(c => c.CheckItems).FirstOrDefaultAsync(c => c.Id == id);
-
-    private static ChecklistDto MapToDto(Checklist checklist)
-    {
-        return new ChecklistDto(
-            checklist.Id,
-            checklist.CardId,
-            checklist.Name,
-            checklist.Position,
-            checklist.IsArchived,
-            CheckItemView.Sorted(checklist.CheckItems),
-            checklist.CreatedAt,
-            checklist.UpdatedAt,
-            checklist.CreatedBy,
-            checklist.UpdatedBy
-        );
-    }
 
     private static Checklist MapToEntity(CreateChecklistWrite write, Guid actorId, double position)
     {

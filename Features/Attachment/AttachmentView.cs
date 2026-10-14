@@ -25,6 +25,11 @@ public static class AttachmentView
         );
     }
 
+    public static IOrderedQueryable<Attachment> NewestFirst(this IQueryable<Attachment> attachments) =>
+        attachments
+            .OrderByDescending(attachment => attachment.CreatedAt)
+            .ThenByDescending(attachment => attachment.Id);
+
     public static string ContentPath(Guid attachmentId) =>
         $"/api/v1/attachments/{attachmentId}/content";
 }

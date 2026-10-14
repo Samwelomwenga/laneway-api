@@ -7,7 +7,7 @@ public interface ICardService
     Task<ApiResponse<CardDto>> CreateAsync(CreateCardWrite write);
     Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardWrite write);
     Task<ApiResponse<CardDto>> MoveAsync(Guid id, MoveCardWrite write);
-    Task<ApiResponse<CardDto>> GetByIdAsync(Guid id);
+    Task<ApiResponse<CardViewDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<List<CardDto>>> GetAllAsync(Guid listId, CardSearchDto searchDto);
     Task<ApiResponse<bool>> AddLabelAsync(Guid cardId, Guid labelId);
     Task<ApiResponse<bool>> RemoveLabelAsync(Guid cardId, Guid labelId);
@@ -303,23 +303,36 @@ public class CardService : ICardService
             "Card moved successfully");
     }
 
-    public async Task<ApiResponse<CardDto>> GetByIdAsync(Guid id)
+    public async Task<ApiResponse<CardViewDto>> GetByIdAsync(Guid id)
     {
         var card = await _context.Cards
             .Include(c => c.Labels)
             .FirstOrDefaultAsync(c => c.Id == id);
         if (card == null)
         {
-            return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
+            return ApiResponse<CardViewDto>.ErrorResponse("Card not found", 404);
         }
 
-        var cardDto = CardView.Of(
-            card,
-            await _completion.TallyAsync(id),
-            await _attachments.OnCardAsync(id),
-            await _comments.OnCardAsync(id));
+        var checklists = await ArchiveView.Checklists(
+                _context.Checklists.Where(c => c.CardId == id), ArchiveFilter.Exclude)
+            .InSortOrder()
+            .Include(c => c.CheckItems)
+            .ToListAsync();
+        var attachments = await _context.Attachments
+            .Where(attachment => attachment.CardId == id)
+            .NewestFirst()
+            .ToListAsync();
 
-        return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card retrieved successfully");
+        var cardView = new CardViewDto(
+            CardView.Of(
+                card,
+                await _completion.TallyAsync(id),
+                await _attachments.OnCardAsync(id),
+                await _comments.OnCardAsync(id)),
+            checklists.ConvertAll(ChecklistView.Of),
+            attachments.ConvertAll(AttachmentView.Of));
+
+        return ApiResponse<CardViewDto>.SuccessResponse(cardView, "Card retrieved successfully");
     }
     public async Task<ApiResponse<List<CardDto>>> GetAllAsync(Guid listId, CardSearchDto searchDto)
     {

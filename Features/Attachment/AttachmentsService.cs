@@ -244,8 +244,7 @@ public class AttachmentService : IAttachmentService
 
         var attachments = await _context.Attachments
             .Where(attachment => attachment.CardId == cardId)
-            .OrderByDescending(attachment => attachment.CreatedAt)
-            .ThenByDescending(attachment => attachment.Id)
+            .NewestFirst()
             .ToListAsync();
 
         return ApiResponse<List<AttachmentDto>>.SuccessResponse(
