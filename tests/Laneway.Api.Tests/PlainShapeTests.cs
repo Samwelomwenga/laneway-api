@@ -47,11 +47,11 @@ public class PlainShapeTests : ApiTests
         var list = await CreateListAsync(board.Id, "To do");
         await CreateCardAsync(list.Id, "Write the brief");
 
-        await AssertNoIdArrayAsync("cardIds", () => PostAsync("/api/v1/lists", new { name = "Doing", boardId = board.Id }));
+        await AssertNoIdArrayAsync("cardIds", () => PostAsync(ListsPath(board.Id), new { name = "Doing" }));
         await AssertNoIdArrayAsync("cardIds", () => GetAsync($"/api/v1/lists/{list.Id}"));
         await AssertNoIdArrayAsync("cardIds", () => UpdateListAsync(list.Id, "Backlog"));
         await AssertNoIdArrayAsync("cardIds", () => MoveListAsync(list.Id, other.Id));
-        await AssertNoIdArrayAsync("cardIds", () => GetAsync($"/api/v1/lists?boardId={other.Id}"));
+        await AssertNoIdArrayAsync("cardIds", () => GetAsync(ListsPath(other.Id)));
     }
 
     private static async Task AssertNoIdArrayAsync(string idArray, Func<Task<HttpResponseMessage>> send)

@@ -15,10 +15,11 @@ public class ListsController : ApiControllerBase
         _listCopyService = listCopyService;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<PagedResponse<ListDto>>> GetLists([FromQuery] ListSearchDto searchDto)
+    [HttpGet("/api/v1/boards/{boardId}/lists")]
+    public async Task<ActionResult<PagedResponse<ListDto>>> GetLists(
+        Guid boardId, [FromQuery] ListSearchDto searchDto)
     {
-        var response = await _listService.GetAllAsync(searchDto);
+        var response = await _listService.GetAllAsync(boardId, searchDto);
         return ToActionResult(response);
     }
 
@@ -29,10 +30,11 @@ public class ListsController : ApiControllerBase
         return ToActionResult(response);
     }
 
-    [HttpPost]
-    public async Task<ActionResult<ApiResponse<ListDto>>> CreateList([FromBody] CreateListDto createListDto)
+    [HttpPost("/api/v1/boards/{boardId}/lists")]
+    public async Task<ActionResult<ApiResponse<ListDto>>> CreateList(
+        Guid boardId, [FromBody] CreateListDto createListDto)
     {
-        var response = await _listService.CreateAsync(CreateListWrite.Of(createListDto));
+        var response = await _listService.CreateAsync(CreateListWrite.Of(boardId, createListDto));
         if (!response.Success)
         {
             return ToActionResult(response);

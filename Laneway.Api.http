@@ -174,28 +174,26 @@ GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards?visibil
 Authorization: Bearer {{accessToken}}
 
 ### Create a list with the "Sky" color.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "To do",
   "position": 1,
-  "boardId": "{{boardId}}",
   "color": "Sky"
 }
 
 > {% client.global.set("listId", response.body.data.id); %}
 
 ### Create a list with no color. It comes back with "color": null.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Doing",
-  "position": 2,
-  "boardId": "{{boardId}}"
+  "position": 2
 }
 
 ### Create a label with the "Lime" color. Names are unique per board, so a plain "Bug" is free on a board created by this run.
@@ -491,21 +489,20 @@ Content-Type: application/json
 }
 
 ### Create a list with a padded name and a color. The name comes back trimmed.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "  Validation list  ",
   "position": 3,
-  "boardId": "{{boardId}}",
   "color": "Pink"
 }
 
 > {% client.global.set("validationListId", response.body.data.id); %}
 
-### Create a list with a blank name and nothing else. 400 required on name and boardId. Position is optional now.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+### Create a list with a blank name and nothing else. 400 required on name. Position is optional now.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -514,25 +511,33 @@ Content-Type: application/json
 }
 
 ### Create a list with a name of 101 characters. 400 tooLong on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
-  "position": 4,
-  "boardId": "{{boardId}}"
+  "position": 4
 }
 
-### Create a list on a board that doesn't exist. 400 notFound on boardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+### Create a list on a board that doesn't exist. 404 "Board not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{$uuid}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Orphan list",
-  "position": 4,
-  "boardId": "{{$uuid}}"
+  "position": 4
+}
+
+### Send boardId in the create body as well. 400 unknownField on boardId.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Doubled list",
+  "boardId": "{{boardId}}"
 }
 
 ### Replace the list with an empty object. 400 required on name, the only field left.
@@ -895,14 +900,13 @@ Content-Type: application/json
 > {% client.global.set("pagingBoardId", response.body.data.id); %}
 
 ### Create a list to search.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{pagingBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Paging list",
-  "position": 1,
-  "boardId": "{{pagingBoardId}}"
+  "position": 1
 }
 
 > {% client.global.set("pagingListId", response.body.data.id); %}
@@ -1054,8 +1058,24 @@ Authorization: Bearer {{accessToken}}
 GET {{Laneway_Api_HostAddress}}/api/v1/boards?workspaceId={{pagingWorkspaceId}}
 Authorization: Bearer {{accessToken}}
 
-### Filter lists by a board that doesn't exist. 400 notFound on boardId.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?boardId=11111111-2222-3333-4444-555555555555
+### List the lists of a board that doesn't exist. 404 "Board not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/11111111-2222-3333-4444-555555555555/lists
+Authorization: Bearer {{accessToken}}
+
+### List the lists of a real board. 200.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{pagingBoardId}}/lists
+Authorization: Bearer {{accessToken}}
+
+### Send boardId in the query as well. 400 unknownField on boardId.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{pagingBoardId}}/lists?boardId={{pagingBoardId}}
+Authorization: Bearer {{accessToken}}
+
+### Send a bad query to a board that doesn't exist. 400 unknownValue on archived, because query errors come before the board lookup.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/11111111-2222-3333-4444-555555555555/lists?archived=Nope
+Authorization: Bearer {{accessToken}}
+
+### Search the old flat list route. 404, because the route is gone.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists?boardId={{pagingBoardId}}
 Authorization: Bearer {{accessToken}}
 
 ### Filter cards by a list that doesn't exist. 400 notFound on listId.
@@ -1195,14 +1215,13 @@ Content-Type: application/json
 > {% client.global.set("actorBoardId", response.body.data.id); %}
 
 ### Create a list on it.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{actorBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Actor list",
-  "position": 1,
-  "boardId": "{{actorBoardId}}"
+  "position": 1
 }
 
 > {% client.global.set("actorListId", response.body.data.id); %}
@@ -1382,161 +1401,147 @@ Content-Type: application/json
 > {% client.global.set("placementBoardId", response.body.data.id); %}
 
 ### Create a list with no placement. An empty board gives 65536.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "First",
-  "boardId": "{{placementBoardId}}"
+  "name": "First"
 }
 
 > {% client.global.set("firstListId", response.body.data.id); %}
 
 ### Create a second list with no placement. A create with no placement lands at the bottom, so 131072.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Second",
-  "boardId": "{{placementBoardId}}"
+  "name": "Second"
 }
 
 > {% client.global.set("secondListId", response.body.data.id); %}
 
 ### Create a list at the top. Top is the smallest sibling halved, so 32768.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Top",
-  "position": "top",
-  "boardId": "{{placementBoardId}}"
+  "position": "top"
 }
 
 ### Create a list at the bottom by name. Bottom is the largest sibling plus 65536, so 196608.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Bottom",
-  "position": "bottom",
-  "boardId": "{{placementBoardId}}"
+  "position": "bottom"
 }
 
 ### Create a list at a number. A client number is stored as sent, so 1.5.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Numbered",
-  "position": 1.5,
-  "boardId": "{{placementBoardId}}"
+  "position": 1.5
 }
 
 ### Create a list at a number sent as a string. The field takes either, so it comes back as 2.5.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Numbered as a string",
-  "position": "2.5",
-  "boardId": "{{placementBoardId}}"
+  "position": "2.5"
 }
 
 ### Create a list between two named siblings. First and Second are neighbours, so it's their midpoint, 98304.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Between",
   "after": "{{firstListId}}",
-  "before": "{{secondListId}}",
-  "boardId": "{{placementBoardId}}"
+  "before": "{{secondListId}}"
 }
 
 ### Create a list at position 0. 400 outOfRange on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Zero",
-  "position": 0,
-  "boardId": "{{placementBoardId}}"
+  "position": 0
 }
 
 ### Create a list at a name that isn't top or bottom. 400 unknownValue on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Middle",
-  "position": "middle",
-  "boardId": "{{placementBoardId}}"
+  "position": "middle"
 }
 
 ### Send position together with before. 400 mutuallyExclusive with a null field, and the message names both fields sent.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Two meanings",
   "position": "top",
-  "before": "{{firstListId}}",
-  "boardId": "{{placementBoardId}}"
+  "before": "{{firstListId}}"
 }
 
 ### Name an anchor that doesn't exist. 400 notFound on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Ghost anchor",
-  "before": "{{$uuid}}",
-  "boardId": "{{placementBoardId}}"
+  "before": "{{$uuid}}"
 }
 
 ### Name an anchor that sits on another board. 400 notSibling on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Stranger anchor",
-  "before": "{{listId}}",
-  "boardId": "{{placementBoardId}}"
+  "before": "{{listId}}"
 }
 
 ### Name anchors that aren't neighbours in that order. 400 notAdjacent on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Wrong order",
   "after": "{{secondListId}}",
-  "before": "{{firstListId}}",
-  "boardId": "{{placementBoardId}}"
+  "before": "{{firstListId}}"
 }
 
 ### Create the list the card placement requests below use.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Card placement",
-  "boardId": "{{placementBoardId}}"
+  "name": "Card placement"
 }
 
 > {% client.global.set("placementListId", response.body.data.id); %}
@@ -1718,13 +1723,12 @@ Content-Type: application/json
 }
 
 ### Create the list the respread requests below use.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Respread",
-  "boardId": "{{placementBoardId}}"
+  "name": "Respread"
 }
 
 > {% client.global.set("respreadListId", response.body.data.id); %}
@@ -1787,13 +1791,12 @@ Content-Type: application/json
 > {% client.global.set("otherBoardId", response.body.data.id); %}
 
 ### Create a list on the second board.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Other list",
-  "boardId": "{{otherBoardId}}"
+  "name": "Other list"
 }
 
 > {% client.global.set("otherListId", response.body.data.id); %}
@@ -2181,25 +2184,23 @@ Content-Type: application/json
 }
 
 ### Create the list the archive checks hide and bring back.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Doing",
-  "boardId": "{{archiveBoardId}}"
+  "name": "Doing"
 }
 
 > {% client.global.set("archiveListId", response.body.data.id); %}
 
 ### Send isArchived on a list create. 400 unknownField on isArchived.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Born archived",
-  "boardId": "{{archiveBoardId}}",
   "isArchived": true
 }
 
@@ -2408,7 +2409,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards?isArchived=true
 Authorization: Bearer {{accessToken}}
 
 ### Search lists by isArchived. 400 unknownField on isArchived.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?isArchived=true
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists?isArchived=true
 Authorization: Bearer {{accessToken}}
 
 ### Search boards by isArchived. 400 unknownField on isArchived.
@@ -2416,7 +2417,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards?
 Authorization: Bearer {{accessToken}}
 
 ### Send a list an archived name that doesn't exist. 400 unknownValue on archived.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?archived=Nope
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists?archived=Nope
 Authorization: Bearer {{accessToken}}
 
 ### Send a board an archived name that doesn't exist. 400 unknownValue on archived.
@@ -2453,11 +2454,11 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{archiveListId}}&archived=i
 Authorization: Bearer {{accessToken}}
 
 ### Search lists on the board. The archived list is gone under the default.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?boardId={{archiveBoardId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 
 ### Search the list archive view. The list comes back.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?boardId={{archiveBoardId}}&archived=only
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Read the archived list by id. 200 in any state.
@@ -2486,8 +2487,8 @@ Content-Type: application/json
   "value": true
 }
 
-### Search lists on the archived board. Nothing comes back under the default.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?boardId={{archiveBoardId}}
+### Search lists on the archived board. The restored list comes back, because an archived board still lists its lists.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 
 ### Search cards in the list. Nothing comes back, because the board above the list is archived.
@@ -2596,25 +2597,23 @@ Content-Type: application/json
 > {% client.global.set("untouchedBoardId", response.body.data.id); %}
 
 ### Create the list the read-only checks archive.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Doing",
-  "boardId": "{{readOnlyBoardId}}"
+  "name": "Doing"
 }
 
 > {% client.global.set("readOnlyListId", response.body.data.id); %}
 
 ### Create a list on the untouched board.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{untouchedBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Untouched list",
-  "boardId": "{{untouchedBoardId}}"
+  "name": "Untouched list"
 }
 
 > {% client.global.set("untouchedListId", response.body.data.id); %}
@@ -2774,13 +2773,12 @@ Content-Type: application/json
 }
 
 ### Create a list on the board holding the archived list. 201, because only the list is archived.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Second list",
-  "boardId": "{{readOnlyBoardId}}"
+  "name": "Second list"
 }
 
 ### Create a label on that board. 201, for the same reason.
@@ -2852,14 +2850,13 @@ Content-Type: application/json
   "isDueComplete": false
 }
 
-### Create a list on the archived board. 409 archived on boardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+### Create a list on the archived board. 409 archived with a null field.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Born hidden",
-  "boardId": "{{readOnlyBoardId}}"
+  "name": "Born hidden"
 }
 
 ### Create a label on the archived board. 409 archived on boardId, naming the label's board.
@@ -3052,37 +3049,34 @@ Content-Type: application/json
 > {% client.global.set("moveBoardB", response.body.data.id); %}
 
 ### Create list A1, which holds the three cards the reorder checks drag.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "A1",
-  "boardId": "{{moveBoardA}}"
+  "name": "A1"
 }
 
 > {% client.global.set("moveListA1", response.body.data.id); %}
 
 ### Create list A2, the second list on board A.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "A2",
-  "boardId": "{{moveBoardA}}"
+  "name": "A2"
 }
 
 > {% client.global.set("moveListA2", response.body.data.id); %}
 
 ### Create list B1, the list on board B.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardB}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "B1",
-  "boardId": "{{moveBoardB}}"
+  "name": "B1"
 }
 
 > {% client.global.set("moveListB1", response.body.data.id); %}
@@ -3693,49 +3687,45 @@ Content-Type: application/json
 > {% client.global.set("moveBoardE", response.body.data.id); %}
 
 ### Create list D1, the one the reorder checks drag. No placement, so 65536.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "D1",
-  "boardId": "{{moveBoardD}}"
+  "name": "D1"
 }
 
 > {% client.global.set("moveListD1", response.body.data.id); %}
 
 ### Create list D2 on board D. 131072.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "D2",
-  "boardId": "{{moveBoardD}}"
+  "name": "D2"
 }
 
 > {% client.global.set("moveListD2", response.body.data.id); %}
 
 ### Create list D3 on board D. 196608.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "D3",
-  "boardId": "{{moveBoardD}}"
+  "name": "D3"
 }
 
 > {% client.global.set("moveListD3", response.body.data.id); %}
 
 ### Create list E1, the only list on board E. 65536.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardE}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "E1",
-  "boardId": "{{moveBoardE}}"
+  "name": "E1"
 }
 
 > {% client.global.set("moveListE1", response.body.data.id); %}
@@ -3998,13 +3988,12 @@ Content-Type: application/json
 > {% client.global.set("moveBugE", response.body.data.id); %}
 
 ### Create the labelled list on board D. The bottom of board D, so 262144.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Labelled",
-  "boardId": "{{moveBoardD}}"
+  "name": "Labelled"
 }
 
 > {% client.global.set("moveLabelledList", response.body.data.id); %}
@@ -4239,13 +4228,12 @@ Content-Type: application/json
 > {% client.global.set("checklistBoardId", response.body.data.id); %}
 
 ### Create the list the checklist cards sit in.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{checklistBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Checklist list",
-  "boardId": "{{checklistBoardId}}"
+  "name": "Checklist list"
 }
 
 > {% client.global.set("checklistListId", response.body.data.id); %}
@@ -4743,13 +4731,12 @@ Content-Type: application/json
 > {% client.global.set("checklistBoardTwo", response.body.data.id); %}
 
 ### Create the list the ancestor checks archive.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{checklistBoardTwo}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Checklist list two",
-  "boardId": "{{checklistBoardTwo}}"
+  "name": "Checklist list two"
 }
 
 > {% client.global.set("checklistListTwo", response.body.data.id); %}
@@ -4969,13 +4956,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checklistCascade}}
 Authorization: Bearer {{accessToken}}
 
 ### Create the list the check item cards sit in, so card search below sees only them.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{checklistBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Check item list",
-  "boardId": "{{checklistBoardId}}"
+  "name": "Check item list"
 }
 
 > {% client.global.set("checkItemListId", response.body.data.id); %}
@@ -6187,13 +6173,12 @@ Content-Type: application/json
 > {% client.global.set("attachmentBoard", response.body.data.id); %}
 
 ### Create the list.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{attachmentBoard}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Attachment list",
-  "boardId": "{{attachmentBoard}}"
+  "name": "Attachment list"
 }
 
 > {% client.global.set("attachmentList", response.body.data.id); %}
@@ -6832,13 +6817,12 @@ Content-Type: application/json
 }
 
 ### Create a list to archive, so an upload under an archived parent can be checked.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{attachmentBoard}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Archived list",
-  "boardId": "{{attachmentBoard}}"
+  "name": "Archived list"
 }
 
 > {% client.global.set("attachmentArchivedList", response.body.data.id); %}

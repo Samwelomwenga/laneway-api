@@ -8,13 +8,13 @@ public sealed record CreateListWrite(
     Guid? Before,
     Guid? After) : IPlacing
 {
-    public static CreateListWrite Of(CreateListDto dto)
+    public static CreateListWrite Of(Guid boardId, CreateListDto dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
         return new CreateListWrite(
             Writes.Required(dto.Name, "name"),
-            Writes.Required(dto.BoardId, "boardId"),
+            boardId,
             dto.Color,
             dto.Position,
             dto.Before,

@@ -10,7 +10,7 @@ public interface IListService
     Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
     Task<ApiResponse<ListDto>> GetByIdAsync(Guid id);
-    Task<ApiResponse<List<ListDto>>> GetAllAsync(ListSearchDto searchDto);
+    Task<ApiResponse<List<ListDto>>> GetAllAsync(Guid boardId, ListSearchDto searchDto);
 }
 
 public class ListService : IListService
@@ -48,7 +48,7 @@ public class ListService : IListService
 
         if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
         {
-            return BoardNotFound(boardId);
+            return BoardNotFound<ListDto>();
         }
 
         var placed = await _placements.ResolveOnBoardAsync(boardId, Placement.Of(write));
@@ -59,7 +59,7 @@ public class ListService : IListService
 
         if (await _archive.OnBoardAsync(boardId) is { } archived)
         {
-            return ArchiveErrors.NoCreate<ListDto>(archived, "boardId", TreeItem.List);
+            return ArchiveErrors.NoCreate<ListDto>(archived, null, TreeItem.List);
         }
 
         var list = MapToEntity(write, _actor.Id, placed.Position);
@@ -131,7 +131,7 @@ public class ListService : IListService
 
         if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
         {
-            return BoardNotFound(boardId);
+            return ReferenceErrors.NotFound<ListDto>("boardId", "Board", boardId);
         }
 
         var crossesBoards = boardId != list.BoardId;
@@ -251,26 +251,21 @@ public class ListService : IListService
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List retrieved successfully", 200);
     }
 
-    public async Task<ApiResponse<List<ListDto>>> GetAllAsync(ListSearchDto searchDto)
+    public async Task<ApiResponse<List<ListDto>>> GetAllAsync(Guid boardId, ListSearchDto searchDto)
     {
-        if (searchDto.BoardId is { } filterBoardId && !await _context.Boards.AnyAsync(b => b.Id == filterBoardId))
+        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
         {
-            return ReferenceErrors.NotFound<List<ListDto>>("boardId", "Board", filterBoardId);
+            return BoardNotFound<List<ListDto>>();
         }
 
-        var query = _context.Lists.AsQueryable();
+        var query = _context.Lists.Where(l => l.BoardId == boardId);
 
         if (searchDto.SearchTerm is { } term)
         {
             query = query.Where(l => l.Name.ToLower().Contains(term.ToLower()));
         }
 
-        if (searchDto.BoardId is { } boardId)
-        {
-            query = query.Where(l => l.BoardId == boardId);
-        }
-
-        query = ArchiveView.Lists(query, searchDto.Archived, _context);
+        query = ArchiveView.Lists(query, searchDto.Archived);
 
         var (lists, totalCount) = await PagedQuery.ReadAsync(
             query.InSortOrder(),
@@ -304,9 +299,8 @@ public class ListService : IListService
         );
     }
 
-    private static ApiResponse<ListDto> BoardNotFound(Guid boardId) =>
-        ApiResponse<ListDto>.ErrorResponse("A referenced resource does not exist", 400,
-            [new ApiError("boardId", ErrorCodes.NotFound, $"Board {boardId} does not exist.")]);
+    private static ApiResponse<T> BoardNotFound<T>() =>
+        ApiResponse<T>.ErrorResponse("Board not found", 404);
 
     private static List MapToEntity(CreateListWrite write, Guid actorId, double position)
     {

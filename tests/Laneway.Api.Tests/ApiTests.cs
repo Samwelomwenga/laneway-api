@@ -394,13 +394,14 @@ public abstract class ApiTests : IAsyncLifetime
     protected Task<HttpResponseMessage> MoveBoardAsync(Guid id, Guid workspaceId) =>
         PutAsync($"/api/v1/boards/{id}/workspace", new { workspaceId });
 
+    protected static string ListsPath(Guid boardId) => $"/api/v1/boards/{boardId}/lists";
+
     protected async Task<ListDto> CreateListAsync(
         Guid boardId, string name, Color? color = null, object? position = null)
     {
-        using var response = await PostAsync("/api/v1/lists", new
+        using var response = await PostAsync(ListsPath(boardId), new
         {
             name,
-            boardId,
             color = color?.ToString(),
             position
         });
@@ -418,7 +419,7 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected async Task<List<ListDto>> ReadListsOfBoardAsync(Guid boardId)
     {
-        using var response = await GetAsync($"/api/v1/lists?boardId={boardId}&archived=Include&pageSize=100");
+        using var response = await GetAsync($"{ListsPath(boardId)}?archived=Include&pageSize=100");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.ReadPage<ListDto>()).Entries;
     }

@@ -22,7 +22,6 @@ public record CreateListDto
     PositionValue? Position,
     Guid? Before,
     Guid? After,
-    Guid? BoardId,
     Color? Color
 ) : IPlacing
 {
@@ -64,7 +63,6 @@ public record ListSearchDto
     int PageNumber,
     int PageSize,
     string? SearchTerm,
-    Guid? BoardId,
     ArchiveFilter Archived
 ) : ISearchQuery<ListSearchDto>
 {
@@ -72,6 +70,5 @@ public record ListSearchDto
         query.PageNumber(),
         query.PageSize(),
         query.Text("searchTerm"),
-        query.Id("boardId"),
         query.EnumName<ArchiveFilter>("archived") ?? ArchiveFilter.Exclude);
 }

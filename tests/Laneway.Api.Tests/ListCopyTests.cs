@@ -620,7 +620,7 @@ public class ListCopyTests : ApiTests
 
     private async Task<List<ListDto>> ReadListsAsync(Guid boardId)
     {
-        using var response = await GetAsync($"/api/v1/lists?boardId={boardId}&archived=Include");
+        using var response = await GetAsync($"{ListsPath(boardId)}?archived=Include");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.ReadPage<ListDto>()).Entries;
     }
