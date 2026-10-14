@@ -7493,3 +7493,201 @@ Content-Type: application/json
 {
   "value": false
 }
+
+### Create the board the cap checks run on. A board holds at most 5,000 open cards, 500 open lists, and 1,000 labels, and a card holds at most 100 labels.
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Cap board {{$uuid}}"
+}
+
+> {% client.global.set("capBoard", response.body.data.id); %}
+
+### Create the list the seeded cards go in.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{capBoard}}/lists
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Cap list"
+}
+
+> {% client.global.set("capList", response.body.data.id); %}
+
+### Create the card the label cap check runs on.
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{capList}}/cards
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Cap card",
+  "isDueComplete": false
+}
+
+> {% client.global.set("capCard", response.body.data.id); %}
+
+### Create the label the card label cap check adds.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{capBoard}}/labels
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Cap label"
+}
+
+> {% client.global.set("capLabel", response.body.data.id); %}
+
+### Create a card with 101 label ids. 400 tooLong on labelIds, from the validator before any label is looked up.
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{capList}}/cards
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Too many labels",
+  "isDueComplete": false,
+  "labelIds": [
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}"
+  ]
+}
+
+### Reaching a board cap takes thousands of writes, so seed rows in psql first. Fill the board to 5,000 open cards:
+### INSERT INTO "Cards" ("Id", "Title", "Description", "ListId", "IsDueComplete", "IsArchived", "Position", "CreatedAt", "CreatedBy") SELECT gen_random_uuid(), 'Seeded card ' || n, '', l."Id", false, false, n * 65536.0, now(), l."CreatedBy" FROM "Lists" l, generate_series(1, 4999) AS n WHERE l."Id" = '<capList>';
+### Then create one more card. 409 limitReached with a null field: "A board holds at most 5,000 open cards. This one has 5,000, and this change adds 1."
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{capList}}/cards
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "One card too many",
+  "isDueComplete": false
+}
+
+### Fill the board to 500 open lists in psql:
+### INSERT INTO "Lists" ("Id", "Name", "BoardId", "IsArchived", "Position", "CreatedAt", "CreatedBy") SELECT gen_random_uuid(), 'Seeded list ' || n, b."Id", false, n * 65536.0, now(), b."CreatedBy" FROM "Boards" b, generate_series(1, 499) AS n WHERE b."Id" = '<capBoard>';
+### Then create one more list. 409 limitReached with a null field: "A board holds at most 500 open lists. This one has 500, and this change adds 1."
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{capBoard}}/lists
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "One list too many"
+}
+
+### Fill the board to 1,000 labels in psql:
+### INSERT INTO "Labels" ("Id", "Name", "BoardId", "CreatedAt", "CreatedBy") SELECT gen_random_uuid(), 'Seeded label ' || n, b."Id", now(), b."CreatedBy" FROM "Boards" b, generate_series(1, 999) AS n WHERE b."Id" = '<capBoard>';
+### Then create one more label. 409 limitReached with a null field: "A board holds at most 1,000 labels. This one has 1,000, and this change adds 1."
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{capBoard}}/labels
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "One label too many"
+}
+
+### Put 100 of the seeded labels on the cap card in psql:
+### INSERT INTO "CardLabels" ("CardsId", "LabelsId") SELECT '<capCard>', "Id" FROM "Labels" WHERE "BoardId" = '<capBoard>' AND "Id" <> '<capLabel>' LIMIT 100;
+### Then add the cap label to the card. 409 limitReached with a null field: "A card holds at most 100 labels."
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{capCard}}/labels/{{capLabel}}
+Authorization: Bearer {{accessToken}}

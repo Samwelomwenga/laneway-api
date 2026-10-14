@@ -65,6 +65,7 @@ builder.Services.AddScoped<ActivityTree>();
 builder.Services.AddScoped<Placements>();
 builder.Services.AddScoped<ArchiveGuard>();
 builder.Services.AddScoped<LabelMatching>();
+builder.Services.AddScoped<BoardCaps>();
 builder.Services.AddScoped<CardCompletion>();
 builder.Services.AddScoped<CardSnapshots>();
 builder.Services.AddScoped<ListSnapshots>();

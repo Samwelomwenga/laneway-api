@@ -9,6 +9,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
     private readonly Placements _placements;
     private readonly ArchiveGuard _archive;
     private readonly LabelMatching _labelMatching;
+    private readonly BoardCaps _caps;
     private readonly ListSnapshots _snapshots;
     private readonly ObjectCopies _objects;
     private readonly ActivityWriter _activity;
@@ -21,6 +22,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
         Placements placements,
         ArchiveGuard archive,
         LabelMatching labelMatching,
+        BoardCaps caps,
         ListSnapshots snapshots,
         ObjectCopies objects,
         ActivityWriter activity,
@@ -32,6 +34,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
         _placements = placements;
         _archive = archive;
         _labelMatching = labelMatching;
+        _caps = caps;
         _snapshots = snapshots;
         _objects = objects;
         _activity = activity;
@@ -118,6 +121,17 @@ public sealed class ListCopyRunner : ICopyJobRunner
         if (await _archive.OnBoardAsync(boardId) is { } archived)
         {
             return CopyRunResult.Refused([ArchiveErrors.NoCreateError(archived, "boardId", TreeItem.List)]);
+        }
+
+        var growth = new BoardGrowth(
+            Cards: snapshot.Cards.Count,
+            Lists: 1,
+            Labels: plan.Keep.Labels && boardId != snapshot.BoardId
+                ? await _labelMatching.CountCreatedAsync(snapshot.Labels, boardId)
+                : 0);
+        if (await _caps.ExceededAsync(boardId, growth) is { } full)
+        {
+            return CopyRunResult.Refused(full);
         }
 
         var (labels, created) = await LabelsOnAsync(snapshot, plan.Keep, boardId);

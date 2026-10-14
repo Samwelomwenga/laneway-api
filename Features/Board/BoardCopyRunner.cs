@@ -59,6 +59,15 @@ public sealed class BoardCopyRunner : ICopyJobRunner
             return CopyRunResult.Refused(capped);
         }
 
+        var growth = new BoardGrowth(
+            Cards: snapshot.Cards.Count,
+            Lists: snapshot.Lists.Count,
+            Labels: keep.Labels ? snapshot.Labels.Count : 0);
+        if (BoardCaps.OnNewBoard(growth) is { } full)
+        {
+            return CopyRunResult.Refused(full);
+        }
+
         var plan = CopyPlan.Of(RootsOf(snapshot, keep), snapshot.Cards, keep.OnCards, DateTime.UtcNow);
         var pending = await _objects.QueueAsync(plan.Objects);
         var copied = await _objects.CopyAsync(plan.Objects);

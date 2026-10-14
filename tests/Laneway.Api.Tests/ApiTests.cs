@@ -646,6 +646,47 @@ public abstract class ApiTests : IAsyncLifetime
         return await read(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
     }
 
+    protected Task<List<Guid>> SeedCardsAsync(Guid listId, int count, bool archived = false) =>
+        SeedAsync(context => context.Cards, count, n => new Card
+        {
+            Id = Guid.NewGuid(),
+            Title = $"Seeded card {n}",
+            ListId = listId,
+            Position = n * Placements.Gap,
+            IsArchived = archived,
+            CreatedBy = ActorId
+        });
+
+    protected Task<List<Guid>> SeedListsAsync(Guid boardId, int count, bool archived = false) =>
+        SeedAsync(context => context.Lists, count, n => new List
+        {
+            Id = Guid.NewGuid(),
+            Name = $"Seeded list {n}",
+            BoardId = boardId,
+            Position = n * Placements.Gap,
+            IsArchived = archived,
+            CreatedBy = ActorId
+        });
+
+    protected Task<List<Guid>> SeedLabelsAsync(Guid boardId, int count) =>
+        SeedAsync(context => context.Labels, count, n => new Label
+        {
+            Id = Guid.NewGuid(),
+            Name = $"Seeded label {n}",
+            BoardId = boardId,
+            CreatedBy = ActorId
+        });
+
+    private Task<List<Guid>> SeedAsync<T>(Func<ApplicationDbContext, DbSet<T>> set, int count, Func<int, T> row)
+        where T : BaseEntity =>
+        FromDatabaseAsync(async context =>
+        {
+            var rows = Enumerable.Range(1, count).Select(row).ToList();
+            set(context).AddRange(rows);
+            await context.SaveChangesAsync();
+            return rows.ConvertAll(seeded => seeded.Id);
+        });
+
     protected async Task<T> FromServicesAsync<T>(Func<IServiceProvider, Task<T>> use)
     {
         ArgumentNullException.ThrowIfNull(use);

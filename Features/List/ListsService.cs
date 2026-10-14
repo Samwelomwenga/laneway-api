@@ -20,6 +20,7 @@ public class ListService : IListService
     private readonly Placements _placements;
     private readonly ArchiveGuard _archive;
     private readonly LabelMatching _labelMatching;
+    private readonly BoardCaps _caps;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
 
@@ -29,6 +30,7 @@ public class ListService : IListService
         Placements placements,
         ArchiveGuard archive,
         LabelMatching labelMatching,
+        BoardCaps caps,
         ActivityWriter activity,
         ActivityTree tree)
     {
@@ -37,6 +39,7 @@ public class ListService : IListService
         _placements = placements;
         _archive = archive;
         _labelMatching = labelMatching;
+        _caps = caps;
         _activity = activity;
         _tree = tree;
     }
@@ -60,6 +63,11 @@ public class ListService : IListService
         if (await _archive.OnBoardAsync(boardId) is { } archived)
         {
             return ArchiveErrors.NoCreate<ListDto>(archived, null, TreeItem.List);
+        }
+
+        if (await _caps.ExceededAsync(boardId, new BoardGrowth(Lists: 1)) is { } full)
+        {
+            return BoardCaps.Full<ListDto>(full);
         }
 
         var list = MapToEntity(write, _actor.Id, placed.Position);
@@ -153,6 +161,16 @@ public class ListService : IListService
                 .Where(card => card.ListId == id)
                 .Include(card => card.Labels)
                 .ToListAsync();
+            var growth = new BoardGrowth(
+                Cards: cards.Count(card => !card.IsArchived),
+                Lists: 1,
+                Labels: await _labelMatching.CountCreatedAsync(
+                    cards.SelectMany(card => card.Labels).DistinctBy(label => label.Id), boardId));
+            if (await _caps.ExceededAsync(boardId, growth) is { } full)
+            {
+                return BoardCaps.Full<ListDto>(full);
+            }
+
             var matches = await _labelMatching.CarryToBoardAsync(cards, boardId);
             createdLabels.AddRange(matches.Where(match => match.Created).Select(match => LabelRef.Of(match.To)));
         }
@@ -205,7 +223,20 @@ public class ListService : IListService
             return ArchiveErrors.RestoreFirst<bool>(holder, TreeItem.List);
         }
 
-        return await _context.SetArchivedAsync(list, _actor, archived, "List", async archiving =>
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        if (list.IsArchived && !archived.Value)
+        {
+            var growth = new BoardGrowth(
+                Cards: await _context.Cards.CountAsync(card => card.ListId == id && !card.IsArchived),
+                Lists: 1);
+            if (await _caps.ExceededAsync(list.BoardId, growth) is { } full)
+            {
+                return BoardCaps.Full<bool>(full);
+            }
+        }
+
+        var response = await _context.SetArchivedAsync(list, _actor, archived, "List", async archiving =>
         {
             var chain = await _tree.BoardAsync(list.BoardId);
             await _activity.AddAsync(
@@ -213,6 +244,9 @@ public class ListService : IListService
                 chain.PlaceOn(list.Id),
                 actor => new ArchiveListData(actor, chain.Workspace, chain.Board, ListRef.Of(list)));
         });
+        await transaction.CommitAsync();
+
+        return response;
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)

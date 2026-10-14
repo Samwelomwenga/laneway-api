@@ -13,8 +13,9 @@ public sealed class Placements
         _context = context;
     }
 
-    public async Task<PlacementResult> ResolveInListAsync(Guid listId, Placement placement)
+    public async Task<PlacementResult> ResolveInListAsync(Guid boardId, Guid listId, Placement placement)
     {
+        await _context.LockBoardsAsync(boardId);
         await _context.LockListsAsync(listId);
         return await InListAsync(listId, placement, moving: null);
     }

@@ -36,9 +36,15 @@ public sealed class BoardCopyService : IBoardCopyService
             return ReferenceErrors.NotFound<CopyJobDto>("workspaceId", "Workspace", workspaceId);
         }
 
-        if (await CountedOverCapAsync(id, BoardCopyKeep.Of(write.Keep)) is { } capped)
+        var keep = BoardCopyKeep.Of(write.Keep);
+        if (await CountedOverCapAsync(id, keep) is { } capped)
         {
             return ApiResponse<CopyJobDto>.ErrorResponse("This copy is too big", 409, capped);
+        }
+
+        if (BoardCaps.OnNewBoard(await GrowthAsync(id, keep)) is { } full)
+        {
+            return BoardCaps.Full<CopyJobDto>(full);
         }
 
         var job = new CopyJob
@@ -59,6 +65,12 @@ public sealed class BoardCopyService : IBoardCopyService
         return ApiResponse<CopyJobDto>.SuccessResponse(CopyJobView.Of(job), "Board copy queued successfully", 202);
     }
 
+    private async Task<BoardGrowth> GrowthAsync(Guid id, BoardCopyKeep keep) =>
+        new(
+            Cards: keep.Cards ? await BoardCaps.OpenCards(_context, id).CountAsync() : 0,
+            Lists: await _context.Lists.CountAsync(list => list.BoardId == id && !list.IsArchived),
+            Labels: keep.Labels ? await _context.Labels.CountAsync(label => label.BoardId == id) : 0);
+
     private async Task<List<ApiError>?> CountedOverCapAsync(Guid id, BoardCopyKeep keep)
     {
         if (!keep.Cards)
@@ -66,9 +78,7 @@ public sealed class BoardCopyService : IBoardCopyService
             return null;
         }
 
-        var copied = _context.Cards.Where(card =>
-            !card.IsArchived
-            && _context.Lists.Any(list => list.Id == card.ListId && list.BoardId == id && !list.IsArchived));
+        var copied = BoardCaps.OpenCards(_context, id);
         var cards = await copied.CountAsync();
         var files = keep.Attachments
             ? await _context.Attachments.CountAsync(attachment =>

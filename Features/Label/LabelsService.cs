@@ -16,6 +16,7 @@ public class LabelService : ILabelService
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
     private readonly ArchiveGuard _archive;
+    private readonly BoardCaps _caps;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
 
@@ -23,12 +24,14 @@ public class LabelService : ILabelService
         ApplicationDbContext context,
         Actor actor,
         ArchiveGuard archive,
+        BoardCaps caps,
         ActivityWriter activity,
         ActivityTree tree)
     {
         _context = context;
         _actor = actor;
         _archive = archive;
+        _caps = caps;
         _activity = activity;
         _tree = tree;
     }
@@ -91,6 +94,11 @@ public class LabelService : ILabelService
         if (await FindDuplicateAsync(boardId, write.Name, write.Color, self: null) is { } duplicate)
         {
             return duplicate;
+        }
+
+        if (await _caps.ExceededAsync(boardId, new BoardGrowth(Labels: 1)) is { } full)
+        {
+            return BoardCaps.Full<LabelDto>(full);
         }
 
         var newLabel = MapToEntity(write, _actor.Id);

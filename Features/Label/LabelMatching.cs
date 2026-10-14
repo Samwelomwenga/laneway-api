@@ -45,6 +45,16 @@ public sealed class LabelMatching
         return matches;
     }
 
+    public async Task<int> CountCreatedAsync(IEnumerable<Label> source, Guid boardId)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        var onBoard = await _context.Labels.Where(label => label.BoardId == boardId).ToListAsync();
+        var keys = onBoard.Select(MatchKey).ToHashSet();
+
+        return source.Count(label => keys.Add(MatchKey(label)));
+    }
+
     public async Task<List<LabelMatch>> CarryToBoardAsync(IReadOnlyCollection<Card> cards, Guid boardId)
     {
         ArgumentNullException.ThrowIfNull(cards);

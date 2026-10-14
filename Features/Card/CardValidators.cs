@@ -12,6 +12,7 @@ public sealed class CreateCardDtoValidator : AbstractValidator<CreateCardDto>
         RuleFor(x => x.IsDueComplete).Required().CompleteNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.DueReminderMinutes).NotNegative().ReminderNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.StartDate).NotAfterDueDate(x => x.DueDate);
+        RuleFor(x => x.LabelIds).WithinLabelCap();
         RuleForEach(x => x.LabelIds).NotNullId();
     }
 }
@@ -25,6 +26,7 @@ public sealed class UpdateCardDtoValidator : AbstractValidator<UpdateCardDto>
         RuleFor(x => x.IsDueComplete).Required().CompleteNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.DueReminderMinutes).NotNegative().ReminderNeedsDueDate(x => x.DueDate);
         RuleFor(x => x.StartDate).NotAfterDueDate(x => x.DueDate);
+        RuleFor(x => x.LabelIds).WithinLabelCap();
         RuleForEach(x => x.LabelIds).NotNullId();
     }
 }
@@ -61,6 +63,11 @@ public sealed class CoverDtoValidator : AbstractValidator<CoverDto>
 
 internal static class CardRules
 {
+    public static IRuleBuilderOptions<T, List<Guid?>?> WithinLabelCap<T>(this IRuleBuilder<T, List<Guid?>?> rule) =>
+        rule.Must(labelIds => labelIds is null || labelIds.Count <= FieldLimits.LabelsPerCard)
+            .WithErrorCode(ErrorCodes.TooLong)
+            .WithMessage($"'{{PropertyName}}' can hold at most {FieldLimits.LabelsPerCard} ids.");
+
     public static IRuleBuilderOptions<T, bool?> CompleteNeedsDueDate<T>(
         this IRuleBuilder<T, bool?> rule, Func<T, DateTime?> dueDate) =>
         rule.Must((card, isDueComplete) => isDueComplete != true || dueDate(card) is not null)

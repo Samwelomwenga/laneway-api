@@ -23,5 +23,9 @@ public static class FieldLimits
     public const int CommentText = 10000;
     public const int CardsPerCopy = 5000;
     public const int FilesPerCopy = 5000;
+    public const int OpenCardsPerBoard = 5000;
+    public const int OpenListsPerBoard = 500;
+    public const int LabelsPerBoard = 1000;
+    public const int LabelsPerCard = 100;
     public const int SessionUserAgent = 256;
 }
