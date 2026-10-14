@@ -79,9 +79,7 @@ public class ListService : IListService
 
     public async Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListWrite write)
     {
-        var list = await _context.Lists
-            .Include(l => l.Cards)
-            .FirstOrDefaultAsync(l => l.Id == id);
+        var list = await _context.Lists.FirstOrDefaultAsync(l => l.Id == id);
         if (list == null)
         {
             return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
@@ -108,7 +106,7 @@ public class ListService : IListService
         }
 
         await _context.SaveChangesAsync();
-        var listDto = MapToDto(list, list.Cards.InSortOrder().Select(c => c.Id).ToList());
+        var listDto = MapToDto(list);
 
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List updated successfully", 200);
     }
@@ -120,9 +118,7 @@ public class ListService : IListService
         var boardId = write.BoardId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var list = await _context.Lists
-            .Include(l => l.Cards)
-            .FirstOrDefaultAsync(l => l.Id == id);
+        var list = await _context.Lists.FirstOrDefaultAsync(l => l.Id == id);
         if (list == null)
         {
             return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
@@ -191,7 +187,7 @@ public class ListService : IListService
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
-        var listDto = MapToDto(list, list.Cards.InSortOrder().Select(c => c.Id).ToList());
+        var listDto = MapToDto(list);
 
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List moved successfully", 200);
     }
@@ -245,15 +241,13 @@ public class ListService : IListService
 
     public async Task<ApiResponse<ListDto>> GetByIdAsync(Guid id)
     {
-        var list = await _context.Lists
-            .Include(l => l.Cards)
-            .FirstOrDefaultAsync(l => l.Id == id);
+        var list = await _context.Lists.FirstOrDefaultAsync(l => l.Id == id);
         if (list == null)
         {
             return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
         }
 
-        var listDto = MapToDto(list, list.Cards.InSortOrder().Select(c => c.Id).ToList());
+        var listDto = MapToDto(list);
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List retrieved successfully", 200);
     }
 
@@ -279,11 +273,11 @@ public class ListService : IListService
         query = ArchiveView.Lists(query, searchDto.Archived, _context);
 
         var (lists, totalCount) = await PagedQuery.ReadAsync(
-            query.InSortOrder().Include(l => l.Cards),
+            query.InSortOrder(),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var listDtos = lists.Select(l => MapToDto(l, l.Cards.InSortOrder().Select(c => c.Id).ToList())).ToList();
+        var listDtos = lists.Select(MapToDto).ToList();
 
         return PagedResponse<ListDto>.SuccessResponse(
             listDtos,
@@ -294,7 +288,7 @@ public class ListService : IListService
         );
     }
 
-    private static ListDto MapToDto(List list, List<Guid>? cardIds = null)
+    private static ListDto MapToDto(List list)
     {
         return new ListDto(
             list.Id,
@@ -303,7 +297,6 @@ public class ListService : IListService
             list.BoardId,
             list.Color,
             list.IsArchived,
-            cardIds ?? new List<Guid>(),
             list.CreatedAt,
             list.UpdatedAt,
             list.CreatedBy,

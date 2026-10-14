@@ -64,11 +64,11 @@ public class BoardService : IBoardService
         }
 
         var (boards, totalCount) = await PagedQuery.ReadAsync(
-            query.OrderBy(b => b.CreatedAt).Include(b => b.Lists),
+            query.OrderBy(b => b.CreatedAt),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var boardDtos = boards.Select(b => MapToDto(b, b.Lists.InSortOrder().Select(l => l.Id).ToList())).ToList();
+        var boardDtos = boards.Select(MapToDto).ToList();
 
         return PagedResponse<BoardDto>.SuccessResponse(
             boardDtos,
@@ -81,14 +81,12 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id)
     {
-        var existingBoard = await _context.Boards
-            .Include(b => b.Lists)
-            .FirstOrDefaultAsync(b => b.Id == id);
+        var existingBoard = await _context.Boards.FirstOrDefaultAsync(b => b.Id == id);
         if (existingBoard == null)
         {
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
         }
-        var boardDto = MapToDto(existingBoard, existingBoard.Lists.InSortOrder().Select(l => l.Id).ToList());
+        var boardDto = MapToDto(existingBoard);
         return ApiResponse<BoardDto>.SuccessResponse(boardDto, "Board retrieved successfully", 200);
     }
 
@@ -113,9 +111,7 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardWrite write)
     {
-        var existingBoard = await _context.Boards
-            .Include(b => b.Lists)
-            .FirstOrDefaultAsync(b => b.Id == id);
+        var existingBoard = await _context.Boards.FirstOrDefaultAsync(b => b.Id == id);
         if (existingBoard == null)
         {
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
@@ -143,7 +139,7 @@ public class BoardService : IBoardService
         }
 
         await _context.SaveChangesAsync();
-        var updatedBoardDto = MapToDto(existingBoard, existingBoard.Lists.InSortOrder().Select(l => l.Id).ToList());
+        var updatedBoardDto = MapToDto(existingBoard);
         return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
     }
 
@@ -151,9 +147,7 @@ public class BoardService : IBoardService
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        var board = await _context.Boards
-            .Include(b => b.Lists)
-            .FirstOrDefaultAsync(b => b.Id == id);
+        var board = await _context.Boards.FirstOrDefaultAsync(b => b.Id == id);
         if (board == null)
         {
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
@@ -185,7 +179,7 @@ public class BoardService : IBoardService
         }
 
         await _context.SaveChangesAsync();
-        var movedBoardDto = MapToDto(board, board.Lists.InSortOrder().Select(l => l.Id).ToList());
+        var movedBoardDto = MapToDto(board);
         return ApiResponse<BoardDto>.SuccessResponse(movedBoardDto, "Board moved successfully", 200);
     }
 
@@ -230,7 +224,7 @@ public class BoardService : IBoardService
         return ApiResponse<bool>.SuccessResponse(true, "Board deleted successfully", 204);
     }
 
-    private static BoardDto MapToDto(Board board, List<Guid>? listIds = null)
+    private static BoardDto MapToDto(Board board)
     {
         return new BoardDto
         (
@@ -240,7 +234,6 @@ public class BoardService : IBoardService
             board.WorkspaceId,
             board.Visibility,
             board.IsArchived,
-            listIds ?? new List<Guid>(),
             board.CreatedAt,
             board.UpdatedAt,
             board.CreatedBy,

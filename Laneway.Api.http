@@ -4062,7 +4062,7 @@ Content-Type: application/json
 GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{moveLabelledCard3}}
 Authorization: Bearer {{accessToken}}
 
-### Move the labelled list to board E. 200 at the bottom of board E, 131072, and the response carries cardIds but no label ids.
+### Move the labelled list to board E. 200 at the bottom of board E, 131072, and the response carries no card or label ids.
 PUT {{Laneway_Api_HostAddress}}/api/v1/lists/{{moveLabelledList}}/position
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json

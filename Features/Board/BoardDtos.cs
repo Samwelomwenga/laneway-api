@@ -10,7 +10,6 @@ public record BoardDto
     Guid WorkspaceId,
     BoardVisibility Visibility,
     bool IsArchived,
-    List<Guid> ListIds,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     Guid CreatedBy,

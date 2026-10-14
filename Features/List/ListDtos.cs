@@ -10,7 +10,6 @@ public record ListDto
     Guid BoardId,
     Color? Color,
     bool IsArchived,
-    List<Guid> CardIds,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     Guid CreatedBy,

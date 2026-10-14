@@ -131,7 +131,10 @@ public class BoardCopyTests : ApiTests
 
         var lists = await ReadListsOfBoardAsync(copy.Id);
         Assert.Equal(["To do", "Doing", "Done"], lists.ConvertAll(list => list.Name));
-        Assert.All(lists, list => Assert.Empty(list.CardIds));
+        foreach (var list in lists)
+        {
+            Assert.Empty(await ReadCardsOfListAsync(list.Id));
+        }
         var labels = await ReadLabelsOfBoardAsync(copy.Id);
         Assert.Equal(["Bug", "Feature"], labels.ConvertAll(label => label.Name));
         Assert.DoesNotContain(bug.Id, labels.ConvertAll(label => label.Id));

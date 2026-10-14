@@ -40,11 +40,11 @@ public class WorkSpaceService : IWorkSpaceService
         }
 
         var (workSpaces, totalCount) = await PagedQuery.ReadAsync(
-            query.OrderBy(ws => ws.CreatedAt).Include(ws => ws.Boards),
+            query.OrderBy(ws => ws.CreatedAt),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var workSpaceDtos = workSpaces.Select(ws => MapToDto(ws, ws.Boards.Select(b => b.Id).ToList())).ToList();
+        var workSpaceDtos = workSpaces.Select(MapToDto).ToList();
 
         return PagedResponse<WorkSpaceDto>.SuccessResponse(
             workSpaceDtos,
@@ -58,14 +58,12 @@ public class WorkSpaceService : IWorkSpaceService
     public async Task<ApiResponse<WorkSpaceDto>> GetByIdAsync(Guid id)
     {
         var existingWorkSpace = await _context.WorkSpaces
-            .Where(ws => ws.Id == id)
-            .Include(ws => ws.Boards)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(ws => ws.Id == id);
         if (existingWorkSpace == null)
         {
             return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
         }
-        var workSpaceDto = MapToDto(existingWorkSpace, existingWorkSpace.Boards.Select(b => b.Id).ToList());
+        var workSpaceDto = MapToDto(existingWorkSpace);
         return ApiResponse<WorkSpaceDto>.SuccessResponse(workSpaceDto, "Workspace retrieved successfully", 200);
     }
 
@@ -83,9 +81,7 @@ public class WorkSpaceService : IWorkSpaceService
 
     public async Task<ApiResponse<WorkSpaceDto>> UpdateAsync(Guid id, UpdateWorkSpaceWrite write)
     {
-        var existingWorkSpace = await _context.WorkSpaces
-            .Include(ws => ws.Boards)
-            .FirstOrDefaultAsync(ws => ws.Id == id);
+        var existingWorkSpace = await _context.WorkSpaces.FirstOrDefaultAsync(ws => ws.Id == id);
         if (existingWorkSpace == null)
         {
             return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
@@ -108,7 +104,7 @@ public class WorkSpaceService : IWorkSpaceService
 
         await _context.SaveChangesAsync();
 
-        return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(existingWorkSpace, existingWorkSpace.Boards.Select(b => b.Id).ToList()), "Workspace updated successfully", 200);
+        return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(existingWorkSpace), "Workspace updated successfully", 200);
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
@@ -136,7 +132,7 @@ public class WorkSpaceService : IWorkSpaceService
         return ApiResponse<bool>.SuccessResponse(true, "Workspace deleted successfully", 204);
     }
 
-    private static WorkSpaceDto MapToDto(WorkSpace workSpace, List<Guid>? boardIds = null)
+    private static WorkSpaceDto MapToDto(WorkSpace workSpace)
     {
         return new WorkSpaceDto
         (
@@ -147,8 +143,7 @@ public class WorkSpaceService : IWorkSpaceService
             workSpace.CreatedAt,
             workSpace.UpdatedAt,
             workSpace.CreatedBy,
-            workSpace.UpdatedBy,
-            boardIds ?? new List<Guid>()
+            workSpace.UpdatedBy
         );
     }
 
