@@ -337,7 +337,7 @@ public class CommentTests : ApiTests
         Assert.Equal(2, (await ReadCardAsync(card.Id)).CommentCount);
         Assert.Equal(0, (await ReadCardAsync(quiet.Id)).CommentCount);
 
-        var page = await ReadCardsAsync($"listId={list.Id}");
+        var page = await ReadCardsAsync(list.Id);
         Assert.Equal(2, page.Entries.Find(found => found.Id == card.Id)!.CommentCount);
         Assert.Equal(0, page.Entries.Find(found => found.Id == quiet.Id)!.CommentCount);
     }

@@ -445,6 +445,8 @@ public abstract class ApiTests : IAsyncLifetime
         return (await response.ReadEnvelope<ListDto>()).Data!;
     }
 
+    protected static string CardsPath(Guid listId) => $"/api/v1/lists/{listId}/cards";
+
     protected async Task<CardDto> CreateCardAsync(
         Guid listId,
         string title,
@@ -453,10 +455,9 @@ public abstract class ApiTests : IAsyncLifetime
         IEnumerable<Guid>? labelIds = null,
         bool isDueComplete = false)
     {
-        using var response = await PostAsync("/api/v1/cards", new
+        using var response = await PostAsync(CardsPath(listId), new
         {
             title,
-            listId,
             dueDate,
             position,
             labelIds,
@@ -724,7 +725,7 @@ public abstract class ApiTests : IAsyncLifetime
     }
 
     protected async Task<List<CardDto>> ReadCardsOfListAsync(Guid listId) =>
-        (await ReadCardsAsync($"listId={listId}&pageSize=100")).Entries;
+        (await ReadCardsAsync(listId, "pageSize=100")).Entries;
 
     private static string Described(List<ApiError>? errors) =>
         errors is null ? "none" : string.Join("; ", errors.Select(error => $"{error.Field}/{error.Code}"));
@@ -769,9 +770,9 @@ public abstract class ApiTests : IAsyncLifetime
         return await storage.GetByteArrayAsync(response.Headers.Location);
     }
 
-    protected async Task<ApiPage<CardDto>> ReadCardsAsync(string query)
+    protected async Task<ApiPage<CardDto>> ReadCardsAsync(Guid listId, string? query = null)
     {
-        using var response = await GetAsync($"/api/v1/cards?{query}");
+        using var response = await GetAsync(query is null ? CardsPath(listId) : $"{CardsPath(listId)}?{query}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return await response.ReadPage<CardDto>();
     }

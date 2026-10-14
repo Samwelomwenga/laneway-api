@@ -554,11 +554,10 @@ public class CardCopyTests : ApiTests
 
     private async Task<CardDto> CreateFullCardAsync(Guid listId, DateTime due)
     {
-        using var response = await PostAsync("/api/v1/cards", new
+        using var response = await PostAsync(CardsPath(listId), new
         {
             title = "Write the brief",
             description = "Two pages, no more.",
-            listId,
             dueDate = due,
             startDate = due.AddDays(-2),
             dueReminderMinutes = 60,

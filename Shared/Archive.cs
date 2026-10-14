@@ -81,14 +81,8 @@ public static class ArchiveView
     public static IQueryable<List> Lists(IQueryable<List> lists, ArchiveFilter filter) =>
         Apply(lists, filter, list => !list.IsArchived);
 
-    public static IQueryable<Card> Cards(
-        IQueryable<Card> cards, ArchiveFilter filter, ApplicationDbContext context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        return Apply(cards, filter, card => !card.IsArchived
-            && context.Lists.Any(list => list.Id == card.ListId && !list.IsArchived
-                && context.Boards.Any(board => board.Id == list.BoardId && !board.IsArchived)));
-    }
+    public static IQueryable<Card> Cards(IQueryable<Card> cards, ArchiveFilter filter) =>
+        Apply(cards, filter, card => !card.IsArchived);
 
     public static IQueryable<Checklist> Checklists(
         IQueryable<Checklist> checklists, ArchiveFilter filter, ApplicationDbContext context)
