@@ -30,7 +30,7 @@ A new card, list, or board made from an existing one, which stays unchanged. Com
 _Avoid_: Duplicate, clone
 
 **Archived**:
-A board, list, card, or checklist put away without being deleted, which can be restored. Archiving a board, list, card, or checklist hides what it holds but doesn't archive it. Nothing archived, and nothing an archived item holds, can be edited. A board, list, card, or checklist has to be archived before it can be deleted, and deleting it can't be undone. A workspace, label, or check item can't be archived.
+A board, list, card, or checklist put away without being deleted, which can be restored. Archiving a board, list, card, or checklist doesn't archive what it holds. It hides it from views above the archived item, so a card in an archived list doesn't show on its board. The archived item's own collection route still lists its unarchived children. Nothing archived, and nothing an archived item holds, can be edited. A board, list, card, or checklist has to be archived before it can be deleted, and deleting it can't be undone. A workspace, label, or check item can't be archived.
 _Avoid_: Closed
 
 **Open**:
