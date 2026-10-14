@@ -26,6 +26,22 @@ public class AccountTests : ApiTests
     }
 
     [Fact]
+    public async Task An_account_search_without_a_page_size_returns_twenty_items()
+    {
+        for (var i = 0; i < 21; i++)
+        {
+            await CreateAccountAsync($"Account {i}");
+        }
+
+        using var response = await GetAsync("/api/v1/accounts");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var page = await response.ReadPage<AccountDto>();
+        Assert.Equal(20, page.Entries.Count);
+        Assert.Equal(20, page.PageSize);
+    }
+
+    [Fact]
     public async Task A_new_account_belongs_to_the_caller()
     {
         var other = await CreateUserAsync();

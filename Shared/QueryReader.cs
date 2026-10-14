@@ -4,7 +4,7 @@ namespace Laneway.Api;
 
 public sealed class QueryReader
 {
-    public const int DefaultPageSize = 10;
+    public const int DefaultPageSize = 20;
     public const int MaxPageSize = 100;
 
     private readonly IQueryCollection _query;

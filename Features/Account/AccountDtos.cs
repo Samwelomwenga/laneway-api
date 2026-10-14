@@ -20,6 +20,6 @@ public record UpdateAccountDto(
 
 public record AccountSearchDto(
     int PageNumber = 1,
-    int PageSize = 10,
+    int PageSize = QueryReader.DefaultPageSize,
     string? SearchTerm = null
 );
