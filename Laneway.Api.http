@@ -6120,7 +6120,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Upload a PNG with a name. 201, name "Q3 numbers", fileName "report.png", mimeType "image/png",
-### and url the /content path. The part's own Content-Type is ignored.
+### and url /api/v1/attachments/{id}/content. The part's own Content-Type is ignored.
 POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
 Authorization: Bearer {{accessToken}}
 Content-Type: multipart/form-data; boundary=WebAppBoundary
@@ -6498,23 +6498,19 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments
 Authorization: Bearer {{accessToken}}
 
 ### Read one attachment. 200.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 
 ### Read an unknown attachment. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/11111111-1111-1111-1111-111111111111
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/11111111-1111-1111-1111-111111111111
 Authorization: Bearer {{accessToken}}
 
-### Read the attachment through the wrong card. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentFile}}
-Authorization: Bearer {{accessToken}}
-
-### Read the attachment through an unknown card. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/11111111-1111-1111-1111-111111111111/attachments/{{attachmentFile}}
+### Read it through the old route under the card. 404, because the route is gone.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 
 ### Rename it. 200, name "Q3 report", and fileName still "report.png" so the download keeps its name.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6527,7 +6523,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Rename with no name. 400 required on name.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6535,7 +6531,7 @@ Content-Type: application/json
 }
 
 ### Rename with a blank name. 400 required on name.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6544,7 +6540,7 @@ Content-Type: application/json
 }
 
 ### Rename with 257 characters. 400 tooLong on name.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6553,7 +6549,7 @@ Content-Type: application/json
 }
 
 ### Rename with url. 400 unknownField on url, because a link's URL never changes.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6563,7 +6559,7 @@ Content-Type: application/json
 }
 
 ### Rename with kind. 400 unknownField on kind.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6573,7 +6569,7 @@ Content-Type: application/json
 }
 
 ### Rename with fileName. 400 unknownField on fileName.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6583,7 +6579,7 @@ Content-Type: application/json
 }
 
 ### Rename with file. 400 unknownField on file, because PUT carries no bytes.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6593,16 +6589,7 @@ Content-Type: application/json
 }
 
 ### Rename an unknown attachment. 404.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/11111111-1111-1111-1111-111111111111
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "name": "Q3 report"
-}
-
-### Rename through the wrong card. 404.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/11111111-1111-1111-1111-111111111111
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6612,15 +6599,11 @@ Content-Type: application/json
 
 ### Download it. 302 to a signed URL that lasts 300 seconds, with Cache-Control: no-store. Following
 ### it downloads report.png with Content-Disposition: attachment and its original file name.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}/content
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}/content
 Authorization: Bearer {{accessToken}}
 
 ### Download an unknown attachment. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/11111111-1111-1111-1111-111111111111/content
-Authorization: Bearer {{accessToken}}
-
-### Download through the wrong card. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentFile}}/content
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/11111111-1111-1111-1111-111111111111/content
 Authorization: Bearer {{accessToken}}
 
 ### Create the card the archive checks use.
@@ -6669,7 +6652,7 @@ Content-Disposition: form-data; name="file"; filename="report.png"
 --WebAppBoundary--
 
 ### Rename on the archived card. 409 archived.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments/{{attachmentOnArchived}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentOnArchived}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6678,7 +6661,7 @@ Content-Type: application/json
 }
 
 ### Delete on the archived card. 409 archived.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments/{{attachmentOnArchived}}
+DELETE {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentOnArchived}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the archived card's attachments. 200, because reads don't care about the archive.
@@ -6686,7 +6669,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachme
 Authorization: Bearer {{accessToken}}
 
 ### Download from the archived card. 302, because a download is a read.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments/{{attachmentOnArchived}}/content
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentOnArchived}}/content
 Authorization: Bearer {{accessToken}}
 
 ### Restore the card. 204.
@@ -6805,28 +6788,24 @@ Content-Disposition: form-data; name="file"; filename="rows.csv"
 > {% client.global.set("attachmentDoomed", response.body.data.id); %}
 
 ### Delete an unknown attachment. 404.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/11111111-1111-1111-1111-111111111111
-Authorization: Bearer {{accessToken}}
-
-### Delete through the wrong card. 404.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentDoomed}}
+DELETE {{Laneway_Api_HostAddress}}/api/v1/attachments/11111111-1111-1111-1111-111111111111
 Authorization: Bearer {{accessToken}}
 
 ### Delete it. 204, with no archive step, because attachments have no archive. The trigger queues the
 ### object key, and the drainer removes the object from the bucket within a minute.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}
+DELETE {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentDoomed}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the deleted attachment. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentDoomed}}
 Authorization: Bearer {{accessToken}}
 
 ### Download the deleted attachment. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}/content
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentDoomed}}/content
 Authorization: Bearer {{accessToken}}
 
 ### Delete it again. 404.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}
+DELETE {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentDoomed}}
 Authorization: Bearer {{accessToken}}
 
 ### Create the card whose delete has to take its files with it.
@@ -6869,7 +6848,7 @@ DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCascadeCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the attachment the deleted card held. 404, because the cascade took its row.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCascadeCard}}/attachments/{{attachmentCascade}}
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentCascade}}
 Authorization: Bearer {{accessToken}}
 
 ### A card holds at most 100 attachments. The 101st is 409 limitReached with a null field, counted
@@ -7065,11 +7044,11 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
 Authorization: Bearer {{accessToken}}
 
 ### Download a link. 404, because a redirect to a stored link would make this an open redirect.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{linkCard}}/attachments/{{linkAttachment}}/content
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{linkAttachment}}/content
 Authorization: Bearer {{accessToken}}
 
 ### Rename a link. 200, name "Renamed", and url unchanged.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{linkCard}}/attachments/{{linkAttachment}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{linkAttachment}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -7157,8 +7136,8 @@ Content-Type: application/json
   "attachmentId": "{{coverImage}}"
 }
 
-### Read the card. 200, cover holds the attachment id, a null color, and the /content path as url,
-### and updatedAt is stamped, because the cover changed.
+### Read the card. 200, cover holds the attachment id, a null color, and
+### /api/v1/attachments/{id}/content as url, and updatedAt is stamped, because the cover changed.
 GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{coverCard}}
 Authorization: Bearer {{accessToken}}
 
@@ -7358,7 +7337,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{coverCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Delete the attachment the cover points at. 204.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{coverCard}}/attachments/{{coverImage}}
+DELETE {{Laneway_Api_HostAddress}}/api/v1/attachments/{{coverImage}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the card. 200, cover is null, updatedAt is unchanged, because the foreign key cleared the

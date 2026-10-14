@@ -63,7 +63,7 @@ public class AttachmentActivityTests : ApiTests
         var card = await CreateCardAsync(list.Id, "Write the brief");
         var attachment = await UploadAttachmentAsync(card.Id, "shot.png", "The mock");
 
-        using var response = await RenameAttachmentAsync(card.Id, attachment.Id, "The final mock");
+        using var response = await RenameAttachmentAsync(attachment.Id, "The final mock");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateAttachment");
@@ -83,7 +83,7 @@ public class AttachmentActivityTests : ApiTests
         var card = await CreateCardAsync((await CreateListAsync(board.Id, "Doing")).Id, "Write the brief");
         var attachment = await UploadAttachmentAsync(card.Id, "shot.png", "The mock");
 
-        using var response = await RenameAttachmentAsync(card.Id, attachment.Id, "The mock");
+        using var response = await RenameAttachmentAsync(attachment.Id, "The mock");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateAttachment");
@@ -100,7 +100,7 @@ public class AttachmentActivityTests : ApiTests
         var card = await CreateCardAsync(list.Id, "Write the brief");
         var attachment = await UploadAttachmentAsync(card.Id, "notes.txt", "The notes");
 
-        await DeleteAttachmentAsync(card.Id, attachment.Id);
+        await DeleteAttachmentAsync(attachment.Id);
 
         var page = await ActivityAsync($"cardId={card.Id}&type=deleteAttachment");
 
@@ -121,7 +121,7 @@ public class AttachmentActivityTests : ApiTests
         var attachment = await UploadAttachmentAsync(card.Id, "shot.png", "The mock");
         await SetCoverAsync(card.Id, attachmentId: attachment.Id);
 
-        await DeleteAttachmentAsync(card.Id, attachment.Id);
+        await DeleteAttachmentAsync(attachment.Id);
 
         var page = await ActivityAsync($"cardId={card.Id}&type=deleteAttachment");
 
@@ -226,9 +226,9 @@ public class AttachmentActivityTests : ApiTests
         var card = await CreateCardAsync((await CreateListAsync(board.Id, "Doing")).Id, "Write the brief");
         var attachment = await UploadAttachmentAsync(card.Id, "shot.png", "The mock");
 
-        using var renamed = await RenameAttachmentAsync(card.Id, attachment.Id, "The final mock");
+        using var renamed = await RenameAttachmentAsync(attachment.Id, "The final mock");
         Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
-        await DeleteAttachmentAsync(card.Id, attachment.Id);
+        await DeleteAttachmentAsync(attachment.Id);
 
         var page = await ActivityAsync($"cardId={card.Id}&type=addAttachment,updateAttachment,deleteAttachment");
 

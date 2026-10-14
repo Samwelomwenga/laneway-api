@@ -385,8 +385,8 @@ public class ListCopyTests : ApiTests
         Assert.NotEqual(uploaded.Id, attachment.Id);
         Assert.Equal(attachment.Id, copied.Cover!.AttachmentId);
         Assert.Equal(
-            await DownloadAttachmentAsync(card.Id, uploaded.Id),
-            await DownloadAttachmentAsync(copied.Id, attachment.Id));
+            await DownloadAttachmentAsync(uploaded.Id),
+            await DownloadAttachmentAsync(attachment.Id));
         Assert.Empty(await FromDatabaseAsync(context => context.PendingObjectDeletes.ToListAsync()));
     }
 

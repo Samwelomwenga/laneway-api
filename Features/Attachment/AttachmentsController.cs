@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Laneway.Api;
 
 [ApiController]
-[Route("api/v1/cards/{cardId}/attachments")]
+[Route("api/v1/[controller]")]
 public class AttachmentsController : ApiControllerBase
 {
     private readonly IAttachmentService _attachmentService;
@@ -13,7 +13,7 @@ public class AttachmentsController : ApiControllerBase
         _attachmentService = attachmentService;
     }
 
-    [HttpGet]
+    [HttpGet("/api/v1/cards/{cardId}/attachments")]
     public async Task<ActionResult<ApiResponse<List<AttachmentDto>>>> GetAttachments(Guid cardId)
     {
         var response = await _attachmentService.GetAllAsync(cardId);
@@ -21,16 +21,16 @@ public class AttachmentsController : ApiControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<ApiResponse<AttachmentDto>>> GetAttachment(Guid cardId, Guid id)
+    public async Task<ActionResult<ApiResponse<AttachmentDto>>> GetAttachment(Guid id)
     {
-        var response = await _attachmentService.GetByIdAsync(cardId, id);
+        var response = await _attachmentService.GetByIdAsync(id);
         return ToActionResult(response);
     }
 
     [HttpGet("{id}/content")]
-    public async Task<ActionResult> GetAttachmentContent(Guid cardId, Guid id)
+    public async Task<ActionResult> GetAttachmentContent(Guid id)
     {
-        var response = await _attachmentService.GetContentUrlAsync(cardId, id);
+        var response = await _attachmentService.GetContentUrlAsync(id);
         if (response.Data is not { } url)
         {
             return ToActionResult(response);
@@ -40,7 +40,7 @@ public class AttachmentsController : ApiControllerBase
         return Redirect(url);
     }
 
-    [HttpPost]
+    [HttpPost("/api/v1/cards/{cardId}/attachments")]
     [Consumes("multipart/form-data")]
     [NoFormBinding]
     public async Task<ActionResult<ApiResponse<AttachmentDto>>> CreateFileAttachment(Guid cardId)
@@ -59,10 +59,10 @@ public class AttachmentsController : ApiControllerBase
             return ToActionResult(response);
         }
 
-        return CreatedAtAction(nameof(GetAttachment), new { cardId, id = response.Data!.Id }, response);
+        return CreatedAtAction(nameof(GetAttachment), new { id = response.Data!.Id }, response);
     }
 
-    [HttpPost]
+    [HttpPost("/api/v1/cards/{cardId}/attachments")]
     [Consumes("application/json")]
     [RequiresContentType]
     public async Task<ActionResult<ApiResponse<AttachmentDto>>> CreateLinkAttachment(
@@ -74,21 +74,21 @@ public class AttachmentsController : ApiControllerBase
             return ToActionResult(response);
         }
 
-        return CreatedAtAction(nameof(GetAttachment), new { cardId, id = response.Data!.Id }, response);
+        return CreatedAtAction(nameof(GetAttachment), new { id = response.Data!.Id }, response);
     }
 
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<AttachmentDto>>> UpdateAttachment(
-        Guid cardId, Guid id, [FromBody] UpdateAttachmentDto updateAttachmentDto)
+        Guid id, [FromBody] UpdateAttachmentDto updateAttachmentDto)
     {
-        var response = await _attachmentService.UpdateAsync(cardId, id, UpdateAttachmentWrite.Of(updateAttachmentDto));
+        var response = await _attachmentService.UpdateAsync(id, UpdateAttachmentWrite.Of(updateAttachmentDto));
         return ToActionResult(response);
     }
 
     [HttpDelete("{id}")]
-    public async Task<ActionResult<ApiResponse<bool>>> DeleteAttachment(Guid cardId, Guid id)
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteAttachment(Guid id)
     {
-        var response = await _attachmentService.DeleteAsync(cardId, id);
+        var response = await _attachmentService.DeleteAsync(id);
         return ToActionResult(response);
     }
 }

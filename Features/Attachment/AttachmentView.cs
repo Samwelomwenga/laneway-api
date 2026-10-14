@@ -13,7 +13,7 @@ public static class AttachmentView
             attachment.Kind,
             attachment.Name,
             attachment.Kind == AttachmentKind.File
-                ? ContentPath(attachment.CardId, attachment.Id)
+                ? ContentPath(attachment.Id)
                 : attachment.Url,
             attachment.FileName,
             attachment.MimeType,
@@ -25,6 +25,6 @@ public static class AttachmentView
         );
     }
 
-    public static string ContentPath(Guid cardId, Guid attachmentId) =>
-        $"/api/v1/cards/{cardId}/attachments/{attachmentId}/content";
+    public static string ContentPath(Guid attachmentId) =>
+        $"/api/v1/attachments/{attachmentId}/content";
 }

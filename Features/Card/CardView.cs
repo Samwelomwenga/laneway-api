@@ -34,7 +34,7 @@ public static class CardView
     private static CardCoverDto? CoverOf(Card card) => card switch
     {
         { CoverAttachmentId: { } attachmentId } =>
-            new CardCoverDto(attachmentId, null, AttachmentView.ContentPath(card.Id, attachmentId)),
+            new CardCoverDto(attachmentId, null, AttachmentView.ContentPath(attachmentId)),
         { CoverColor: { } color } => new CardCoverDto(null, color, null),
         _ => null
     };

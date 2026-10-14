@@ -306,8 +306,8 @@ public class CardCopyTests : ApiTests
         Assert.Equal(uploaded.MimeType, attachment.MimeType);
         Assert.Equal(uploaded.Bytes, attachment.Bytes);
         Assert.Equal(
-            await DownloadAttachmentAsync(source.Id, uploaded.Id),
-            await DownloadAttachmentAsync(copy.Id, attachment.Id));
+            await DownloadAttachmentAsync(uploaded.Id),
+            await DownloadAttachmentAsync(attachment.Id));
     }
 
     [Fact]

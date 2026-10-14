@@ -610,12 +610,12 @@ public abstract class ApiTests : IAsyncLifetime
         return (await response.ReadEnvelope<AttachmentDto>()).Data!;
     }
 
-    protected Task<HttpResponseMessage> RenameAttachmentAsync(Guid cardId, Guid id, string name) =>
-        PutAsync($"{AttachmentPath(cardId)}/{id}", new { name });
+    protected Task<HttpResponseMessage> RenameAttachmentAsync(Guid id, string name) =>
+        PutAsync($"/api/v1/attachments/{id}", new { name });
 
-    protected async Task DeleteAttachmentAsync(Guid cardId, Guid id)
+    protected async Task DeleteAttachmentAsync(Guid id)
     {
-        using var response = await DeleteAsync($"{AttachmentPath(cardId)}/{id}");
+        using var response = await DeleteAsync($"/api/v1/attachments/{id}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
@@ -768,14 +768,14 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected async Task<List<AttachmentDto>> ReadAttachmentsAsync(Guid cardId)
     {
-        using var response = await GetAsync($"{AttachmentPath(cardId)}");
+        using var response = await GetAsync(AttachmentPath(cardId));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.ReadEnvelope<List<AttachmentDto>>()).Data!;
     }
 
-    protected async Task<byte[]> DownloadAttachmentAsync(Guid cardId, Guid id)
+    protected async Task<byte[]> DownloadAttachmentAsync(Guid id)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"{AttachmentPath(cardId)}/{id}/content");
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/attachments/{id}/content");
         request.Headers.Authorization = Bearer(ActorUser);
         using var response = await NoRedirects.SendAsync(request);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
