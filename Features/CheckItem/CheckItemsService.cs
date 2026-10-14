@@ -10,7 +10,7 @@ public interface ICheckItemService
     Task<ApiResponse<bool>> SetCheckedAsync(Guid id, CheckedWrite write);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
     Task<ApiResponse<CheckItemDto>> GetByIdAsync(Guid id);
-    Task<ApiResponse<List<CheckItemDto>>> GetAllAsync(CheckItemSearchDto searchDto);
+    Task<ApiResponse<List<CheckItemDto>>> GetAllAsync(Guid checklistId, CheckItemSearchDto searchDto);
 }
 
 public class CheckItemService : ICheckItemService
@@ -48,7 +48,7 @@ public class CheckItemService : ICheckItemService
 
         if (await CardOfChecklistAsync(checklistId) is not { } cardId)
         {
-            return ReferenceErrors.NotFound<CheckItemDto>("checklistId", "Checklist", checklistId);
+            return ReferenceErrors.ParentNotFound<CheckItemDto>("Checklist");
         }
 
         var watch = await _completion.WatchAsync(cardId);
@@ -60,12 +60,12 @@ public class CheckItemService : ICheckItemService
 
         if (await _archive.OnChecklistAsync(checklistId) is { } archived)
         {
-            return ArchiveErrors.NoCreate<CheckItemDto>(archived, "checklistId", TreeItem.CheckItem);
+            return ArchiveErrors.NoCreate<CheckItemDto>(archived, null, TreeItem.CheckItem);
         }
 
         if (await IsFullAsync(checklistId))
         {
-            return Full<CheckItemDto>();
+            return Full<CheckItemDto>(field: null);
         }
 
         var checkItem = MapToEntity(write, _actor.Id, placed.Position);
@@ -187,7 +187,7 @@ public class CheckItemService : ICheckItemService
 
         if (checklistId != checkItem.ChecklistId && await IsFullAsync(checklistId))
         {
-            return Full<CheckItemDto>();
+            return Full<CheckItemDto>(field: "checklistId");
         }
 
         var leaving = checkItem.ChecklistId;
@@ -323,27 +323,17 @@ public class CheckItemService : ICheckItemService
             CheckItemView.Of(checkItem), "Check item retrieved successfully", 200);
     }
 
-    public async Task<ApiResponse<List<CheckItemDto>>> GetAllAsync(CheckItemSearchDto searchDto)
+    public async Task<ApiResponse<List<CheckItemDto>>> GetAllAsync(Guid checklistId, CheckItemSearchDto searchDto)
     {
         ArgumentNullException.ThrowIfNull(searchDto);
 
-        if (searchDto.ChecklistId is { } filterChecklistId
-            && !await _context.Checklists.AnyAsync(c => c.Id == filterChecklistId))
+        if (!await _context.Checklists.AnyAsync(c => c.Id == checklistId))
         {
-            return ReferenceErrors.NotFound<List<CheckItemDto>>("checklistId", "Checklist", filterChecklistId);
+            return ReferenceErrors.ParentNotFound<List<CheckItemDto>>("Checklist");
         }
-
-        var query = _context.CheckItems.AsQueryable();
-
-        if (searchDto.ChecklistId is { } checklistId)
-        {
-            query = query.Where(checkItem => checkItem.ChecklistId == checklistId);
-        }
-
-        query = ArchiveView.CheckItems(query, searchDto.Archived, _context);
 
         var (checkItems, totalCount) = await PagedQuery.ReadAsync(
-            query.InSortOrder(),
+            _context.CheckItems.Where(checkItem => checkItem.ChecklistId == checklistId).InSortOrder(),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
@@ -374,10 +364,10 @@ public class CheckItemService : ICheckItemService
         await _context.CheckItems.CountAsync(checkItem => checkItem.ChecklistId == checklistId)
         >= FieldLimits.CheckItemsPerChecklist;
 
-    private static ApiResponse<T> Full<T>() =>
+    private static ApiResponse<T> Full<T>(string? field) =>
         ApiResponse<T>.ErrorResponse("The checklist is full", 409,
         [
-            new ApiError("checklistId", ErrorCodes.LimitReached,
+            new ApiError(field, ErrorCodes.LimitReached,
                 $"A checklist holds at most {FieldLimits.CheckItemsPerChecklist} check items.")
         ]);
 

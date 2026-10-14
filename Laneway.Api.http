@@ -4959,236 +4959,240 @@ Content-Type: application/json
 > {% client.global.set("checkItemElsewhere", response.body.data.id); %}
 
 ### Create a check item on the other card's checklist, for the anchor checks below.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemElsewhere}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Stray",
-  "checklistId": "{{checkItemElsewhere}}"
+  "name": "Stray"
 }
 
 > {% client.global.set("checkItemStray", response.body.data.id); %}
 
 ### Create a check item with a padded name and no placement. 201, the name comes back trimmed, position is 65536, and isChecked is false.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "  Write notes  ",
-  "checklistId": "{{checkItemRelease}}"
+  "name": "  Write notes  "
 }
 
 > {% client.global.set("checkItemWrite", response.body.data.id); %}
 
 ### Create a second check item with no placement. It goes to the bottom, 65536 + 65536 = 131072.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Tag the release",
-  "checklistId": "{{checkItemRelease}}"
+  "name": "Tag the release"
 }
 
 > {% client.global.set("checkItemTag", response.body.data.id); %}
 
 ### Create a check item at the top. The smallest sibling halves, so it's 32768.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Prep",
-  "position": "top",
-  "checklistId": "{{checkItemRelease}}"
+  "position": "top"
 }
 
 > {% client.global.set("checkItemPrep", response.body.data.id); %}
 
 ### Create a check item between two siblings. The midpoint of 32768 and 65536 is 49152.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Middle",
   "after": "{{checkItemPrep}}",
-  "before": "{{checkItemWrite}}",
-  "checklistId": "{{checkItemRelease}}"
+  "before": "{{checkItemWrite}}"
 }
 
 > {% client.global.set("checkItemMiddle", response.body.data.id); %}
 
 ### Create a check item at a number the client picked. It's stored as sent.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Numbered",
-  "position": 200000,
-  "checklistId": "{{checkItemRelease}}"
+  "position": 200000
 }
 
 > {% client.global.set("checkItemNumbered", response.body.data.id); %}
 
 ### Create a check item that's already checked, so a client can paste in a list that's partly done. 201 with isChecked true, at 200000 + 65536 = 265536.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Done already",
-  "isChecked": true,
-  "checklistId": "{{checkItemRelease}}"
+  "isChecked": true
 }
 
 > {% client.global.set("checkItemDone", response.body.data.id); %}
 
 ### Create a second check item called Middle. 201, because check item names don't have to be unique.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemSpare}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Middle",
-  "checklistId": "{{checkItemSpare}}"
+  "name": "Middle"
 }
 
-### Create a check item from an empty object. 400 required on name and checklistId. isChecked and placement are optional.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+### Create a check item from an empty object. 400 required on name. isChecked and placement are optional.
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {}
 
 ### Create a check item with a blank name. 400 required on name, because the name is trimmed first.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "   ",
-  "checklistId": "{{checkItemRelease}}"
+  "name": "   "
 }
 
 ### Create a check item with a name of 501 characters. 400 tooLong on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "checklistId": "{{checkItemRelease}}"
+  "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 }
 
 ### Create a check item with a padded name of 500 characters. 201, so the column takes the full limit.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemSpare}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  ",
-  "checklistId": "{{checkItemSpare}}"
+  "name": "  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "
 }
 
-### Create a check item on a checklist that doesn't exist. 400 notFound on checklistId.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+### Create a check item on a checklist that doesn't exist. 404 "Checklist not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Nowhere",
-  "checklistId": "3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b"
+  "name": "Nowhere"
 }
 
 ### Create a check item with a position and an anchor. 400 mutuallyExclusive with a null field.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Both",
   "position": "top",
-  "after": "{{checkItemWrite}}",
-  "checklistId": "{{checkItemRelease}}"
+  "after": "{{checkItemWrite}}"
 }
 
 ### Create a check item at a position name that doesn't exist. 400 unknownValue on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Middling",
-  "position": "middle",
-  "checklistId": "{{checkItemRelease}}"
+  "position": "middle"
 }
 
 ### Create a check item at position 0. 400 outOfRange on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Zero",
-  "position": 0,
-  "checklistId": "{{checkItemRelease}}"
+  "position": 0
 }
 
 ### Create a check item before an anchor that doesn't exist. 400 notFound on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Anchored",
-  "before": "3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b",
-  "checklistId": "{{checkItemRelease}}"
+  "before": "3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b"
 }
 
 ### Create a check item before one on another checklist. 400 notSibling on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Anchored elsewhere",
-  "before": "{{checkItemStray}}",
-  "checklistId": "{{checkItemRelease}}"
+  "before": "{{checkItemStray}}"
 }
 
 ### Create a check item that's already archived. 400 unknownField on isArchived, because check items have no archive.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Put away",
-  "isArchived": true,
-  "checklistId": "{{checkItemRelease}}"
+  "isArchived": true
 }
 
 ### Read the checklist's check items. 200 in position order: Prep, Middle, Write notes, Tag the release, Numbered, Done already.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemRelease}}
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 
 ### Read the second page of three. 200 with Write notes and Tag the release, totalCount 6, and totalPages 3.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemRelease}}&pageSize=2&pageNumber=2
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items?pageSize=2&pageNumber=2
 Authorization: Bearer {{accessToken}}
 
-### Filter by a checklist that doesn't exist. 400 notFound on checklistId.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId=3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b
+### List the check items of a checklist that doesn't exist. 404 "Checklist not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b/check-items
+Authorization: Bearer {{accessToken}}
+
+### Send a bad query to a checklist that doesn't exist. 400 unknownValue on archived, because query errors come before the checklist lookup.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b/check-items?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Ask for only the archived check items. 400 unknownValue on archived, and the message lists Exclude and Include, because check items have no archive of their own.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?archived=only
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items?archived=only
 Authorization: Bearer {{accessToken}}
 
-### Search check items by name. 400 unknownField on searchTerm, because check item search takes checklistId and archived only.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?searchTerm=Prep
+### Search check items by name. 400 unknownField on searchTerm, because check item search takes archived only.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items?searchTerm=Prep
+Authorization: Bearer {{accessToken}}
+
+### Send checklistId in the query as well. 400 unknownField on checklistId.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items?checklistId={{checkItemRelease}}
+Authorization: Bearer {{accessToken}}
+
+### Send checklistId in the create body. 400 unknownField on checklistId, because the path names the checklist.
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Doubled",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Search the old flat check item route. 404, because the route is gone.
+GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemRelease}}
 Authorization: Bearer {{accessToken}}
 
 ### Read one check item. 200.
@@ -5453,7 +5457,7 @@ Content-Type: application/json
   "checklistId": "{{checkItemRelease}}"
 }
 
-### The 200 check item cap takes 200 creates to reach, so this file stops short of it. A create past the cap, and a move into a checklist that already holds 200, are 409 limitReached on checklistId, with 200 in the message.
+### The 200 check item cap takes 200 creates to reach, so this file stops short of it. A create past the cap is 409 limitReached with a null field, and a move into a checklist that already holds 200 is 409 limitReached on checklistId. Both carry 200 in the message.
 
 ### Create the card the completion checks run on. It has a due date and no check items, so it shows the isDueComplete it was created with.
 POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checkItemListId}}/cards
@@ -5484,26 +5488,24 @@ Content-Type: application/json
 > {% client.global.set("checkItemDueRelease", response.body.data.id); %}
 
 ### Add an open check item to it.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemDueRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Open",
-  "checklistId": "{{checkItemDueRelease}}"
+  "name": "Open"
 }
 
 > {% client.global.set("checkItemDueA", response.body.data.id); %}
 
 ### Add a checked one.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemDueRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Checked",
-  "isChecked": true,
-  "checklistId": "{{checkItemDueRelease}}"
+  "isChecked": true
 }
 
 ### Read the card. 200 with isDueComplete false, checkItemCount 2, and checkedItemCount 1, for a "1/2" badge.
@@ -5535,13 +5537,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemDueFollowUp", response.body.data.id); %}
 
 ### Add an open check item to it.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemDueFollowUp}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Still open",
-  "checklistId": "{{checkItemDueFollowUp}}"
+  "name": "Still open"
 }
 
 > {% client.global.set("checkItemDueC", response.body.data.id); %}
@@ -5642,14 +5643,13 @@ Content-Type: application/json
 > {% client.global.set("checkItemUndatedList", response.body.data.id); %}
 
 ### Give it one checked check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemUndatedList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Checked",
-  "isChecked": true,
-  "checklistId": "{{checkItemUndatedList}}"
+  "isChecked": true
 }
 
 ### Read it. 200 with isDueComplete false and checkItemCount 1, because a card with no due date is never complete.
@@ -5681,14 +5681,13 @@ Content-Type: application/json
 > {% client.global.set("checkItemCopyList", response.body.data.id); %}
 
 ### Give it one checked check item, which makes the card complete.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemCopyList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Only",
-  "isChecked": true,
-  "checklistId": "{{checkItemCopyList}}"
+  "isChecked": true
 }
 
 > {% client.global.set("checkItemCopyOnly", response.body.data.id); %}
@@ -5730,14 +5729,13 @@ Content-Type: application/json
 > {% client.global.set("checkItemArchiveList", response.body.data.id); %}
 
 ### Give it one checked check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemArchiveList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Only",
-  "isChecked": true,
-  "checklistId": "{{checkItemArchiveList}}"
+  "isChecked": true
 }
 
 ### Archive the last unarchived checklist that holds check items. 204.
@@ -5778,13 +5776,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemKeepLive", response.body.data.id); %}
 
 ### Add the open check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemKeepLive}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Open",
-  "checklistId": "{{checkItemKeepLive}}"
+  "name": "Open"
 }
 
 ### Give it a second checklist, which gets archived and deleted.
@@ -5799,14 +5796,13 @@ Content-Type: application/json
 > {% client.global.set("checkItemKeepArchived", response.body.data.id); %}
 
 ### Add a checked check item to it.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemKeepArchived}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Checked",
-  "isChecked": true,
-  "checklistId": "{{checkItemKeepArchived}}"
+  "isChecked": true
 }
 
 ### Archive it, so it can be deleted. 204, and the live checklist still holds a counted check item, so nothing is copied.
@@ -5858,13 +5854,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemHiddenList", response.body.data.id); %}
 
 ### Give it a check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemHiddenList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Hidden step",
-  "checklistId": "{{checkItemHiddenList}}"
+  "name": "Hidden step"
 }
 
 > {% client.global.set("checkItemHidden", response.body.data.id); %}
@@ -5881,13 +5876,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemLiveList", response.body.data.id); %}
 
 ### Give that one a check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemLiveList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Live step",
-  "checklistId": "{{checkItemLiveList}}"
+  "name": "Live step"
 }
 
 > {% client.global.set("checkItemLive", response.body.data.id); %}
@@ -5901,26 +5895,21 @@ Content-Type: application/json
   "value": true
 }
 
-### Read its check items with the default filter. 200 with empty data, because exclude hides check items on archived checklists.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemHiddenList}}
-Authorization: Bearer {{accessToken}}
-
-### Read them with archived=include. 200 with the hidden step.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemHiddenList}}&archived=include
+### Read its check items with the default filter. 200 with the hidden step, because an archived checklist still lists its check items.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemHiddenList}}/check-items
 Authorization: Bearer {{accessToken}}
 
 ### Read the archived checklist. 200, and checkItems still holds it, because a checklist embeds every check item whatever its state.
 GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemHiddenList}}
 Authorization: Bearer {{accessToken}}
 
-### Create a check item on the archived checklist. 409 archived on checklistId.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+### Create a check item on the archived checklist. 409 archived with a null field.
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemHiddenList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Too late",
-  "checklistId": "{{checkItemHiddenList}}"
+  "name": "Too late"
 }
 
 ### Rename the check item on the archived checklist. 409 archived with a null field, "The checklist this check item is on is archived."
@@ -5981,12 +5970,8 @@ Content-Type: application/json
   "name": "Renamed"
 }
 
-### Read the live checklist's check items. 200 with empty data, because exclude hides check items on hidden cards too.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemLiveList}}
-Authorization: Bearer {{accessToken}}
-
-### Read them with archived=include. 200 with the live step.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemLiveList}}&archived=include
+### Read the live checklist's check items. 200 with the live step, because a checklist under an archived card still lists its check items.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemLiveList}}/check-items
 Authorization: Bearer {{accessToken}}
 
 ### Restore the card.
@@ -6022,13 +6007,12 @@ Content-Type: application/json
 > {% client.global.set("checkItemCascadeList", response.body.data.id); %}
 
 ### Create the check item the checklist takes with it.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemCascadeList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Doomed",
-  "checklistId": "{{checkItemCascadeList}}"
+  "name": "Doomed"
 }
 
 > {% client.global.set("checkItemCascade", response.body.data.id); %}

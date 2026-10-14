@@ -87,24 +87,6 @@ public static class ArchiveView
     public static IQueryable<Checklist> Checklists(IQueryable<Checklist> checklists, ArchiveFilter filter) =>
         Apply(checklists, filter, checklist => !checklist.IsArchived);
 
-    public static IQueryable<CheckItem> CheckItems(
-        IQueryable<CheckItem> checkItems, CheckItemArchiveFilter filter, ApplicationDbContext context)
-    {
-        ArgumentNullException.ThrowIfNull(checkItems);
-        ArgumentNullException.ThrowIfNull(context);
-
-        if (filter == CheckItemArchiveFilter.Include)
-        {
-            return checkItems;
-        }
-
-        var visible = context.Checklists.Where(checklist => !checklist.IsArchived
-            && context.Cards.Any(card => card.Id == checklist.CardId && !card.IsArchived
-                && context.Lists.Any(list => list.Id == card.ListId && !list.IsArchived
-                    && context.Boards.Any(board => board.Id == list.BoardId && !board.IsArchived))));
-        return checkItems.Where(checkItem => visible.Any(checklist => checklist.Id == checkItem.ChecklistId));
-    }
-
     private static IQueryable<TEntity> Apply<TEntity>(
         IQueryable<TEntity> items, ArchiveFilter filter, Expression<Func<TEntity, bool>> visible)
         where TEntity : IArchivable =>

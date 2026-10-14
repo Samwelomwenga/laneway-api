@@ -542,13 +542,14 @@ public abstract class ApiTests : IAsyncLifetime
         Guid id, object? position = null, Guid? before = null, Guid? after = null) =>
         PutAsync($"/api/v1/checklists/{id}/position", new { position, before, after });
 
+    protected static string CheckItemsPath(Guid checklistId) => $"/api/v1/checklists/{checklistId}/check-items";
+
     protected async Task<CheckItemDto> CreateCheckItemAsync(
         Guid checklistId, string name, bool isChecked = false, object? position = null)
     {
-        using var response = await PostAsync("/api/v1/check-items", new
+        using var response = await PostAsync(CheckItemsPath(checklistId), new
         {
             name,
-            checklistId,
             isChecked,
             position
         });
@@ -755,6 +756,14 @@ public abstract class ApiTests : IAsyncLifetime
             query is null ? ChecklistsPath(cardId) : $"{ChecklistsPath(cardId)}?{query}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.ReadPage<ChecklistDto>()).Entries;
+    }
+
+    protected async Task<List<CheckItemDto>> ReadCheckItemsAsync(Guid checklistId, string? query = null)
+    {
+        using var response = await GetAsync(
+            query is null ? CheckItemsPath(checklistId) : $"{CheckItemsPath(checklistId)}?{query}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.ReadPage<CheckItemDto>()).Entries;
     }
 
     protected async Task<List<AttachmentDto>> ReadAttachmentsAsync(Guid cardId)

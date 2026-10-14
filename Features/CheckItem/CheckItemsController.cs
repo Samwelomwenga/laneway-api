@@ -13,11 +13,11 @@ public class CheckItemsController : ApiControllerBase
         _checkItemService = checkItemService;
     }
 
-    [HttpGet]
+    [HttpGet("/api/v1/checklists/{checklistId}/check-items")]
     public async Task<ActionResult<PagedResponse<CheckItemDto>>> GetCheckItems(
-        [FromQuery] CheckItemSearchDto searchDto)
+        Guid checklistId, [FromQuery] CheckItemSearchDto searchDto)
     {
-        var response = await _checkItemService.GetAllAsync(searchDto);
+        var response = await _checkItemService.GetAllAsync(checklistId, searchDto);
         return ToActionResult(response);
     }
 
@@ -28,11 +28,12 @@ public class CheckItemsController : ApiControllerBase
         return ToActionResult(response);
     }
 
-    [HttpPost]
+    [HttpPost("/api/v1/checklists/{checklistId}/check-items")]
     public async Task<ActionResult<ApiResponse<CheckItemDto>>> CreateCheckItem(
-        [FromBody] CreateCheckItemDto createCheckItemDto)
+        Guid checklistId, [FromBody] CreateCheckItemDto createCheckItemDto)
     {
-        var response = await _checkItemService.CreateAsync(CreateCheckItemWrite.Of(createCheckItemDto));
+        var response = await _checkItemService.CreateAsync(
+            CreateCheckItemWrite.Of(checklistId, createCheckItemDto));
         if (!response.Success)
         {
             return ToActionResult(response);

@@ -8,7 +8,6 @@ public sealed class CreateCheckItemDtoValidator : AbstractValidator<CreateCheckI
     {
         RuleFor(x => x.Name).Required().MaxLength(FieldLimits.CheckItemName);
         this.ValidPlacement();
-        RuleFor(x => x.ChecklistId).Required();
     }
 }
 
