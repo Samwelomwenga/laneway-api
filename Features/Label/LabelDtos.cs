@@ -17,7 +17,6 @@ public record LabelDto
 public record CreateLabelDto
 (
     string? Name,
-    Guid? BoardId,
     Color? Color
 )
 {
@@ -38,13 +37,11 @@ public record LabelSearchDto
 (
     int PageNumber,
     int PageSize,
-    string? SearchTerm,
-    Guid? BoardId
+    string? SearchTerm
 ) : ISearchQuery<LabelSearchDto>
 {
     public static LabelSearchDto Read(QueryReader query) => new(
         query.PageNumber(),
         query.PageSize(),
-        query.Text("searchTerm"),
-        query.Id("boardId"));
+        query.Text("searchTerm"));
 }

@@ -197,26 +197,24 @@ Content-Type: application/json
 }
 
 ### Create a label with the "Lime" color. Names are unique per board, so a plain "Bug" is free on a board created by this run.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Bug",
-  "boardId": "{{boardId}}",
   "color": "Lime"
 }
 
 > {% client.global.set("labelId", response.body.data.id); %}
 
 ### Create a label with no color. It comes back with "color": null.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Idea",
-  "boardId": "{{boardId}}"
+  "name": "Idea"
 }
 
 ### Create a card with no due date and no description. It comes back with "dueDate": null, "dueReminderMinutes": null, and "description": "".
@@ -723,25 +721,23 @@ Content-Type: application/json
 }
 
 ### Create a label with a padded name. The name comes back trimmed.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "  Trim {{$uuid}}  ",
-  "boardId": "{{boardId}}"
+  "name": "  Trim {{$uuid}}  "
 }
 
 > {% client.global.set("trimmedLabelName", response.body.data.name); %}
 
 ### Create a label with that name padded again. The check compares trimmed names, so it's 409 duplicate on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "   {{trimmedLabelName}}   ",
-  "boardId": "{{boardId}}"
+  "name": "   {{trimmedLabelName}}   "
 }
 
 ### Rename another label to the padded name. 409 duplicate on name.
@@ -755,24 +751,22 @@ Content-Type: application/json
 }
 
 ### Create a label with a blank name and a color. 201, and the name comes back "".
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "   ",
-  "boardId": "{{boardId}}",
   "color": "Red"
 }
 
 ### Create a label with a name of 51 characters. 400 tooLong on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "lllllllllllllllllllllllllllllllllllllllllllllllllll",
-  "boardId": "{{boardId}}"
+  "name": "lllllllllllllllllllllllllllllllllllllllllllllllllll"
 }
 
 ### Replace the label with an empty object. 400 required on name, because a label with no color needs one.
@@ -783,25 +777,23 @@ Content-Type: application/json
 {}
 
 ### Create a label to test duplicate names against.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Duplicate {{$uuid}}",
-  "boardId": "{{boardId}}"
+  "name": "Duplicate {{$uuid}}"
 }
 
 > {% client.global.set("duplicateLabelName", response.body.data.name); %}
 
 ### Create a second label with the same name on the same board. 409 duplicate on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "{{duplicateLabelName}}",
-  "boardId": "{{boardId}}"
+  "name": "{{duplicateLabelName}}"
 }
 
 ### Create a board in a workspace that doesn't exist. 404 "Workspace not found".
@@ -1147,8 +1139,8 @@ Authorization: Bearer {{accessToken}}
 GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?reminderDate=2026-10-02T00:00:00Z
 Authorization: Bearer {{accessToken}}
 
-### Filter labels by board. The board exists but has no labels, so data is empty.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{pagingBoardId}}
+### List the labels of a board. The board exists but has no labels, so data is empty.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{pagingBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Read the second page of two. Card search returns the paged shape.
@@ -1216,13 +1208,12 @@ Content-Type: application/json
 > {% client.global.set("actorListId", response.body.data.id); %}
 
 ### Create a label for the card.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{actorBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Actor {{$uuid}}",
-  "boardId": "{{actorBoardId}}"
+  "name": "Actor {{$uuid}}"
 }
 
 > {% client.global.set("actorLabelId", response.body.data.id); %}
@@ -1773,85 +1764,78 @@ Content-Type: application/json
 > {% client.global.set("otherListId", response.body.data.id); %}
 
 ### Create "Bug" on the second board. 201, because the first board's "Bug" is its own.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Bug",
-  "boardId": "{{otherBoardId}}"
+  "name": "Bug"
 }
 
 > {% client.global.set("otherBugId", response.body.data.id); %}
 
 ### Create "bug" on the second board. 409 duplicate on name, because names ignore case.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "bug",
+  "name": "bug"
+}
+
+### Send boardId in the create body as well. 400 unknownField on boardId.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Stray board",
   "boardId": "{{otherBoardId}}"
 }
 
-### Create a label with no board. 400 required on boardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+### Create a label on a board that doesn't exist. 404 "Board not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{$uuid}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "No board"
-}
-
-### Create a label on a board that doesn't exist. 400 notFound on boardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "name": "Nowhere",
-  "boardId": "{{$uuid}}"
+  "name": "Nowhere"
 }
 
 ### Create a label with neither a name nor a color. 400 required on name, with "A label with no color needs a name."
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
-{
-  "boardId": "{{otherBoardId}}"
-}
+{}
 
 ### Create an unnamed red label on the second board. 201, because the first board's red label is its own.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "boardId": "{{otherBoardId}}",
   "color": "Red"
 }
 
 > {% client.global.set("unnamedRedId", response.body.data.id); %}
 
 ### Create a second unnamed red label on that board. 409 duplicate on color.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "boardId": "{{otherBoardId}}",
   "color": "Red"
 }
 
 ### Create a named red label on that board. 201, because a name moves it to the name rule.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Blocker",
-  "boardId": "{{otherBoardId}}",
   "color": "Red"
 }
 
@@ -1971,20 +1955,24 @@ Authorization: Bearer {{accessToken}}
 DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{toggleCardId}}/labels/{{labelId}}
 Authorization: Bearer {{accessToken}}
 
-### Filter labels by the second board. Unnamed labels come first, then names, then colors.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{otherBoardId}}
+### List the labels of the second board. Unnamed labels come first, then names, then colors.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 
-### Filter labels by a board that doesn't exist. 400 notFound on boardId.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{$uuid}}
+### List the labels of a board that doesn't exist. 404 "Board not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{$uuid}}/labels
+Authorization: Bearer {{accessToken}}
+
+### Send boardId in the query as well. 400 unknownField on boardId.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels?boardId={{otherBoardId}}
 Authorization: Bearer {{accessToken}}
 
 ### Search labels by name, ignoring case. Only names match, never colors.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{otherBoardId}}&searchTerm=bug
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels?searchTerm=bug
 Authorization: Bearer {{accessToken}}
 
 ### Search labels by a color name. No label matches, because searchTerm reads the name only.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{otherBoardId}}&searchTerm=Red
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels?searchTerm=Red
 Authorization: Bearer {{accessToken}}
 
 ### Create a third board. A new board starts with no labels.
@@ -2000,17 +1988,16 @@ Content-Type: application/json
 > {% client.global.set("freshBoardId", response.body.data.id); %}
 
 ### Read the new board's labels. data is empty and totalCount is 0.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{freshBoardId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{freshBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Create the label that gets deleted while a card carries it.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Doomed",
-  "boardId": "{{otherBoardId}}"
+  "name": "Doomed"
 }
 
 > {% client.global.set("doomedLabelId", response.body.data.id); %}
@@ -2044,8 +2031,8 @@ Content-Type: application/json
 DELETE {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}
 Authorization: Bearer {{accessToken}}
 
-### Read the deleted board's labels. 400 notFound on boardId, because the board is gone.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{otherBoardId}}
+### Read the deleted board's labels. 404 "Board not found", because the board is gone.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Create the workspace the archive checks work in.
@@ -2141,13 +2128,12 @@ Content-Type: application/json
 }
 
 ### Create a label on the board. Label search ignores archive, and this one proves it later.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Hidden board label",
-  "boardId": "{{archiveBoardId}}",
   "color": "Red"
 }
 
@@ -2390,7 +2376,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards?
 Authorization: Bearer {{accessToken}}
 
 ### Send labels an archived name. 400 unknownField on archived, because label search has no such key.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?archived=only
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/labels?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Archive the list. 204.
@@ -2473,7 +2459,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the archived board's labels. The label still shows, because label search ignores archive.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{archiveBoardId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Delete card A, which isn't archived. 409 notArchived with a null field.
@@ -2608,13 +2594,12 @@ Content-Type: application/json
 > {% client.global.set("untouchedCardId", response.body.data.id); %}
 
 ### Create the label the read-only checks block.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Read only label",
-  "boardId": "{{readOnlyBoardId}}",
   "color": "Red"
 }
 
@@ -2742,13 +2727,12 @@ Content-Type: application/json
 }
 
 ### Create a label on that board. 201, for the same reason.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Second label",
-  "boardId": "{{readOnlyBoardId}}",
   "color": "Blue"
 }
 
@@ -2818,14 +2802,13 @@ Content-Type: application/json
   "name": "Born hidden"
 }
 
-### Create a label on the archived board. 409 archived on boardId, naming the label's board.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+### Create a label on the archived board. 409 archived with a null field.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Born hidden",
-  "boardId": "{{readOnlyBoardId}}",
   "color": "Green"
 }
 
@@ -3283,51 +3266,47 @@ Content-Type: application/json
 }
 
 ### Create a red "Bug" on board A.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Bug",
-  "boardId": "{{moveBoardA}}",
   "color": "Red"
 }
 
 > {% client.global.set("moveBugA", response.body.data.id); %}
 
 ### Create an orange "urgent" on board A.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "urgent",
-  "boardId": "{{moveBoardA}}",
   "color": "Orange"
 }
 
 > {% client.global.set("moveUrgentA", response.body.data.id); %}
 
 ### Create an unnamed green label on board A.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "boardId": "{{moveBoardA}}",
   "color": "Green"
 }
 
 > {% client.global.set("moveGreenA", response.body.data.id); %}
 
 ### Create a blue "bug" on board B. Only the name has to match, and the case doesn't.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardB}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "bug",
-  "boardId": "{{moveBoardB}}",
   "color": "Blue"
 }
 
@@ -3354,11 +3333,11 @@ Content-Type: application/json
 }
 
 ### Read board B's labels. Four now: the unnamed green and the orange "urgent" the move created, and the blue "bug", still blue with updatedAt null.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardB}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardB}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Read board A's labels. Still the same three, untouched. Source labels stay where they are.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardA}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Read board A. updatedAt stays null, because a card move never stamps a board.
@@ -3379,7 +3358,7 @@ Content-Type: application/json
 }
 
 ### Read board A's labels again. Still three, and the round trip added nothing.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardA}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Replace card 2 with board B's "bug". 400 notOnBoard on labelIds[0], checked against the board of the card's current list.
@@ -3892,51 +3871,47 @@ Content-Type: application/json
 }
 
 ### Create a red "Bug" on board D.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Bug",
-  "boardId": "{{moveBoardD}}",
   "color": "Red"
 }
 
 > {% client.global.set("moveBugD", response.body.data.id); %}
 
 ### Create an orange "urgent" on board D.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "urgent",
-  "boardId": "{{moveBoardD}}",
   "color": "Orange"
 }
 
 > {% client.global.set("moveUrgentD", response.body.data.id); %}
 
 ### Create an unnamed green label on board D.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "boardId": "{{moveBoardD}}",
   "color": "Green"
 }
 
 > {% client.global.set("moveGreenD", response.body.data.id); %}
 
 ### Create a blue "bug" on board E. Only the name has to match, and the case doesn't.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardE}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "bug",
-  "boardId": "{{moveBoardE}}",
   "color": "Blue"
 }
 
@@ -4015,7 +3990,7 @@ Content-Type: application/json
 }
 
 ### Read board E's labels. Three: the blue "bug", still blue with updatedAt null, plus the orange "urgent" and the unnamed green the move created.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardE}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardE}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Read labelled card 1. labelIds hold board E's blue "bug" and the new "urgent", and updatedAt is still null.
@@ -4031,7 +4006,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{moveLabelledCard3}}
 Authorization: Bearer {{accessToken}}
 
 ### Read board D's labels. Still the same three, untouched. Source labels stay where they are.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardD}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Read board D. updatedAt stays null, because a list move never stamps a board.
@@ -4052,7 +4027,7 @@ Content-Type: application/json
 }
 
 ### Read board D's labels again. Still three, and the round trip added nothing.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardD}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Archive list D3.

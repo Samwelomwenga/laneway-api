@@ -4,7 +4,7 @@ namespace Laneway.Api;
 
 public interface ILabelService
 {
-    Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto);
+    Task<ApiResponse<List<LabelDto>>> GetAllAsync(Guid boardId, LabelSearchDto searchDto);
     Task<ApiResponse<LabelDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelWrite write);
     Task<ApiResponse<LabelDto>> UpdateAsync(Guid id, UpdateLabelWrite write);
@@ -33,22 +33,17 @@ public class LabelService : ILabelService
         _tree = tree;
     }
 
-    public async Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto)
+    public async Task<ApiResponse<List<LabelDto>>> GetAllAsync(Guid boardId, LabelSearchDto searchDto)
     {
-        if (searchDto.BoardId is { } filterBoardId && !await _context.Boards.AnyAsync(b => b.Id == filterBoardId))
+        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
         {
-            return ReferenceErrors.NotFound<List<LabelDto>>("boardId", "Board", filterBoardId);
+            return ReferenceErrors.ParentNotFound<List<LabelDto>>("Board");
         }
 
-        var query = _context.Labels.AsQueryable();
+        var query = _context.Labels.Where(l => l.BoardId == boardId);
         if (searchDto.SearchTerm is { } term)
         {
             query = query.Where(l => l.Name.ToLower().Contains(term.ToLower()));
-        }
-
-        if (searchDto.BoardId is { } boardId)
-        {
-            query = query.Where(l => l.BoardId == boardId);
         }
 
         var (labels, totalCount) = await PagedQuery.ReadAsync(
@@ -85,12 +80,12 @@ public class LabelService : ILabelService
 
         if (!await _context.TryLockBoardAsync(boardId))
         {
-            return ReferenceErrors.NotFound<LabelDto>("boardId", "Board", boardId);
+            return ReferenceErrors.ParentNotFound<LabelDto>("Board");
         }
 
         if (await _archive.OnBoardAsync(boardId) is { } archived)
         {
-            return ArchiveErrors.NoCreate<LabelDto>(archived, "boardId", TreeItem.Label);
+            return ArchiveErrors.NoCreate<LabelDto>(archived, null, TreeItem.Label);
         }
 
         if (await FindDuplicateAsync(boardId, write.Name, write.Color, self: null) is { } duplicate)

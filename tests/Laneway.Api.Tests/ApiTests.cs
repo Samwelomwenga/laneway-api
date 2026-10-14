@@ -424,9 +424,10 @@ public abstract class ApiTests : IAsyncLifetime
         return (await response.ReadPage<ListDto>()).Entries;
     }
 
-    protected async Task<List<LabelDto>> ReadLabelsOfBoardAsync(Guid boardId)
+    protected async Task<List<LabelDto>> ReadLabelsOfBoardAsync(Guid boardId, string? query = null)
     {
-        using var response = await GetAsync($"/api/v1/labels?boardId={boardId}&pageSize=100");
+        using var response = await GetAsync(
+            query is null ? $"{LabelsPath(boardId)}?pageSize=100" : $"{LabelsPath(boardId)}?pageSize=100&{query}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.ReadPage<LabelDto>()).Entries;
     }
@@ -507,12 +508,13 @@ public abstract class ApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
+    protected static string LabelsPath(Guid boardId) => $"/api/v1/boards/{boardId}/labels";
+
     protected async Task<LabelDto> CreateLabelAsync(Guid boardId, string? name, Color? color = null)
     {
-        using var response = await PostAsync("/api/v1/labels", new
+        using var response = await PostAsync(LabelsPath(boardId), new
         {
             name,
-            boardId,
             color = color?.ToString()
         });
 

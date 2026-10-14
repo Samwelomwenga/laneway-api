@@ -2,13 +2,13 @@ namespace Laneway.Api;
 
 public sealed record CreateLabelWrite(string Name, Guid BoardId, Color? Color)
 {
-    public static CreateLabelWrite Of(CreateLabelDto dto)
+    public static CreateLabelWrite Of(Guid boardId, CreateLabelDto dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
         return new CreateLabelWrite(
             dto.Name ?? string.Empty,
-            Writes.Required(dto.BoardId, "boardId"),
+            boardId,
             dto.Color);
     }
 }

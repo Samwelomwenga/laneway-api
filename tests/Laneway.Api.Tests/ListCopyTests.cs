@@ -430,7 +430,7 @@ public class ListCopyTests : ApiTests
         var carried = Assert.Single(room.LabelIds);
         Assert.NotEqual(green.Id, carried);
         Assert.Contains(carried, brief.LabelIds);
-        Assert.Equal(2, (await ReadLabelsAsync(to.Id)).Count);
+        Assert.Equal(2, (await ReadLabelsOfBoardAsync(to.Id)).Count);
     }
 
     [Fact]
@@ -623,12 +623,5 @@ public class ListCopyTests : ApiTests
         using var response = await GetAsync($"{ListsPath(boardId)}?archived=Include");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.ReadPage<ListDto>()).Entries;
-    }
-
-    private async Task<List<LabelDto>> ReadLabelsAsync(Guid boardId)
-    {
-        using var response = await GetAsync($"/api/v1/labels?boardId={boardId}");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return (await response.ReadPage<LabelDto>()).Entries;
     }
 }
