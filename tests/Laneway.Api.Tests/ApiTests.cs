@@ -631,12 +631,11 @@ public abstract class ApiTests : IAsyncLifetime
     protected Task<HttpResponseMessage> SendCommentAsync(Guid cardId, object body, TestUser? @as = null) =>
         PostAsync(CommentPath(cardId), body, @as);
 
-    protected Task<HttpResponseMessage> EditCommentAsync(
-        Guid cardId, Guid id, object body, TestUser? @as = null) =>
-        PutAsync($"{CommentPath(cardId)}/{id}", body, @as);
+    protected Task<HttpResponseMessage> EditCommentAsync(Guid id, object body, TestUser? @as = null) =>
+        PutAsync($"/api/v1/comments/{id}", body, @as);
 
-    protected Task<HttpResponseMessage> RemoveCommentAsync(Guid cardId, Guid id, TestUser? @as = null) =>
-        DeleteAsync($"{CommentPath(cardId)}/{id}", @as);
+    protected Task<HttpResponseMessage> RemoveCommentAsync(Guid id, TestUser? @as = null) =>
+        DeleteAsync($"/api/v1/comments/{id}", @as);
 
     protected async Task<T> FromDatabaseAsync<T>(Func<ApplicationDbContext, Task<T>> read)
     {

@@ -5,8 +5,8 @@ namespace Laneway.Api;
 public interface ICommentService
 {
     Task<ApiResponse<ActivityEntryDto>> CreateAsync(Guid cardId, CommentTextWrite write);
-    Task<ApiResponse<ActivityEntryDto>> UpdateAsync(Guid cardId, Guid id, CommentTextWrite write);
-    Task<ApiResponse<bool>> DeleteAsync(Guid cardId, Guid id);
+    Task<ApiResponse<ActivityEntryDto>> UpdateAsync(Guid id, CommentTextWrite write);
+    Task<ApiResponse<bool>> DeleteAsync(Guid id);
 }
 
 public class CommentService : ICommentService
@@ -61,12 +61,11 @@ public class CommentService : ICommentService
             ActivityView.Of(entry), "Comment created successfully", 201);
     }
 
-    public async Task<ApiResponse<ActivityEntryDto>> UpdateAsync(
-        Guid cardId, Guid id, CommentTextWrite write)
+    public async Task<ApiResponse<ActivityEntryDto>> UpdateAsync(Guid id, CommentTextWrite write)
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        var found = await FindAsync<ActivityEntryDto>(cardId, id);
+        var found = await FindAsync<ActivityEntryDto>(id);
         if (found.Refused is { } refused)
         {
             return refused;
@@ -84,9 +83,9 @@ public class CommentService : ICommentService
             ActivityView.Of(comment), "Comment updated successfully");
     }
 
-    public async Task<ApiResponse<bool>> DeleteAsync(Guid cardId, Guid id)
+    public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        var found = await FindAsync<bool>(cardId, id);
+        var found = await FindAsync<bool>(id);
         if (found.Refused is { } refused)
         {
             return refused;
@@ -98,15 +97,12 @@ public class CommentService : ICommentService
         return ApiResponse<bool>.SuccessResponse(true, "Comment deleted successfully", 204);
     }
 
-    private async Task<(ActivityEntry? Comment, ApiResponse<T>? Refused)> FindAsync<T>(Guid cardId, Guid id)
+    private async Task<(ActivityEntry? Comment, ApiResponse<T>? Refused)> FindAsync<T>(Guid id)
     {
-        if (!await _context.Cards.AnyAsync(card => card.Id == cardId))
-        {
-            return (null, CardNotFound<T>());
-        }
-
         var comment = await _context.ActivityEntries.FirstOrDefaultAsync(entry =>
-            entry.Id == id && entry.CardId == cardId && entry.Type == ActivityType.Comment);
+            entry.Id == id
+            && entry.Type == ActivityType.Comment
+            && _context.Cards.Any(card => card.Id == entry.CardId));
         if (comment is null)
         {
             return (null, NotFound<T>());
@@ -117,7 +113,7 @@ public class CommentService : ICommentService
             return (null, NotAuthor<T>());
         }
 
-        return await _archive.OnCardAsync(cardId) is { } archived
+        return await _archive.OnCardAsync(comment.CardId!.Value) is { } archived
             ? (null, ArchiveErrors.ReadOnly<T>(archived, TreeItem.Comment))
             : (comment, null);
     }

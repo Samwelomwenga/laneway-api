@@ -84,7 +84,7 @@ public class CommentActivityTests : ApiTests
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
 
-        using var response = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." });
+        using var response = await EditCommentAsync(comment.Id, new { text = "By Monday." });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var edited = (await response.ReadEnvelope<ActivityEntryDto>()).Data!;
@@ -106,7 +106,7 @@ public class CommentActivityTests : ApiTests
         using var renamed = await UpdateCardAsync(card.Id, "Write the final brief");
         Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
 
-        using var response = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." });
+        using var response = await EditCommentAsync(comment.Id, new { text = "By Monday." });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var edited = (await response.ReadEnvelope<ActivityEntryDto>()).Data!;
@@ -120,7 +120,7 @@ public class CommentActivityTests : ApiTests
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
 
-        using var response = await EditCommentAsync(card.Id, comment.Id, new { text = "By Friday." });
+        using var response = await EditCommentAsync(comment.Id, new { text = "By Friday." });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Null((await response.ReadEnvelope<ActivityEntryDto>()).Data!.UpdatedAt);
@@ -135,7 +135,7 @@ public class CommentActivityTests : ApiTests
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
 
-        using var response = await EditCommentAsync(card.Id, comment.Id, new { text = "By Friday. " });
+        using var response = await EditCommentAsync(comment.Id, new { text = "By Friday. " });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var edited = (await response.ReadEnvelope<ActivityEntryDto>()).Data!;
@@ -149,7 +149,7 @@ public class CommentActivityTests : ApiTests
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
 
-        using var response = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." });
+        using var response = await EditCommentAsync(comment.Id, new { text = "By Monday." });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var page = await ActivityAsync($"cardId={card.Id}");
@@ -167,7 +167,7 @@ public class CommentActivityTests : ApiTests
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
 
-        using var response = await RemoveCommentAsync(card.Id, comment.Id);
+        using var response = await RemoveCommentAsync(comment.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         var page = await ActivityAsync($"cardId={card.Id}");
