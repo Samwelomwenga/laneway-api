@@ -23,7 +23,7 @@ public static class CardView
             tally.CheckedItemCount,
             attachmentCount,
             commentCount,
-            CoverOf(card),
+            CoverOf(card.CoverAttachmentId, card.CoverColor),
             card.CreatedAt,
             card.UpdatedAt,
             card.CreatedBy,
@@ -31,7 +31,7 @@ public static class CardView
         );
     }
 
-    public static BoardCardDto OnBoard(CardDto card)
+    public static BoardCardDto OnBoard(BoardCardRow card, CardTally tally, int attachmentCount, int commentCount)
     {
         ArgumentNullException.ThrowIfNull(card);
 
@@ -39,20 +39,20 @@ public static class CardView
         (
             card.Id,
             card.Title,
-            card.Description.Length > 0,
+            card.HasDescription,
             card.DueDate,
             card.Position,
             card.ListId,
-            card.IsDueComplete,
+            tally.IsComplete(card.DueDate, card.IsDueComplete),
             card.StartDate,
             card.DueReminderMinutes,
             card.IsArchived,
             card.LabelIds,
-            card.CheckItemCount,
-            card.CheckedItemCount,
-            card.AttachmentCount,
-            card.CommentCount,
-            card.Cover,
+            tally.CheckItemCount,
+            tally.CheckedItemCount,
+            attachmentCount,
+            commentCount,
+            CoverOf(card.CoverAttachmentId, card.CoverColor),
             card.CreatedAt,
             card.UpdatedAt,
             card.CreatedBy,
@@ -60,11 +60,10 @@ public static class CardView
         );
     }
 
-    private static CardCoverDto? CoverOf(Card card) => card switch
+    private static CardCoverDto? CoverOf(Guid? attachmentId, Color? color) => (attachmentId, color) switch
     {
-        { CoverAttachmentId: { } attachmentId } =>
-            new CardCoverDto(attachmentId, null, AttachmentView.ContentPath(attachmentId)),
-        { CoverColor: { } color } => new CardCoverDto(null, color, null),
+        ({ } id, _) => new CardCoverDto(id, null, AttachmentView.ContentPath(id)),
+        (null, { } shade) => new CardCoverDto(null, shade, null),
         _ => null
     };
 }

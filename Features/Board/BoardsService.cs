@@ -89,18 +89,17 @@ public class BoardService : IBoardService
             .InSortOrder()
             .ToListAsync();
         var listIds = lists.ConvertAll(l => l.Id);
-        var cards = await ArchiveView.Cards(_context.Cards.Where(c => listIds.Contains(c.ListId)), ArchiveFilter.Exclude)
-            .InSortOrder()
-            .Include(c => c.Labels)
-            .ToListAsync();
-        var cardsByList = (await _cards.OfAsync(cards)).ToLookup(card => card.ListId);
+        var cards = await _cards.OnBoardAsync(
+            ArchiveView.Cards(_context.Cards.Where(c => listIds.Contains(c.ListId)), ArchiveFilter.Exclude)
+                .InSortOrder());
+        var cardsByList = cards.ToLookup(card => card.ListId);
 
         var boardView = new BoardViewDto(
             MapToDto(existingBoard),
             labels.ConvertAll(LabelView.Of),
             lists.ConvertAll(list => new BoardListDto(
                 ListView.Of(list),
-                cardsByList[list.Id].Select(CardView.OnBoard).ToList())));
+                cardsByList[list.Id].ToList())));
         return ApiResponse<BoardViewDto>.SuccessResponse(boardView, "Board retrieved successfully", 200);
     }
 
