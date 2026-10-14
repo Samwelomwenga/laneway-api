@@ -48,7 +48,7 @@ public class ListService : IListService
 
         if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
         {
-            return BoardNotFound<ListDto>();
+            return ReferenceErrors.ParentNotFound<ListDto>("Board");
         }
 
         var placed = await _placements.ResolveOnBoardAsync(boardId, Placement.Of(write));
@@ -255,7 +255,7 @@ public class ListService : IListService
     {
         if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
         {
-            return BoardNotFound<List<ListDto>>();
+            return ReferenceErrors.ParentNotFound<List<ListDto>>("Board");
         }
 
         var query = _context.Lists.Where(l => l.BoardId == boardId);
@@ -298,9 +298,6 @@ public class ListService : IListService
             list.UpdatedBy
         );
     }
-
-    private static ApiResponse<T> BoardNotFound<T>() =>
-        ApiResponse<T>.ErrorResponse("Board not found", 404);
 
     private static List MapToEntity(CreateListWrite write, Guid actorId, double position)
     {

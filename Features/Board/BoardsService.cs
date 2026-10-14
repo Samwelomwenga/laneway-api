@@ -39,7 +39,7 @@ public class BoardService : IBoardService
     {
         if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
         {
-            return WorkspaceNotFound<List<BoardDto>>();
+            return ReferenceErrors.ParentNotFound<List<BoardDto>>("Workspace");
         }
 
         var query = _context.Boards.Where(b => b.WorkspaceId == workspaceId);
@@ -89,7 +89,7 @@ public class BoardService : IBoardService
         var workspaceId = write.WorkspaceId;
         if (await _tree.FindWorkspaceAsync(workspaceId) is not { } workspace)
         {
-            return WorkspaceNotFound<BoardDto>();
+            return ReferenceErrors.ParentNotFound<BoardDto>("Workspace");
         }
 
         var boardEntity = MapToEntity(write, _actor.Id);
@@ -234,9 +234,6 @@ public class BoardService : IBoardService
             board.UpdatedBy
         );
     }
-
-    private static ApiResponse<T> WorkspaceNotFound<T>() =>
-        ApiResponse<T>.ErrorResponse("Workspace not found", 404);
 
     private static Board MapToEntity(CreateBoardWrite write, Guid actorId)
     {
