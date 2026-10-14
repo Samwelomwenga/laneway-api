@@ -20,7 +20,6 @@ public record CreateBoardDto
 (
     string? Name,
     string? Description,
-    Guid? WorkspaceId,
     BoardVisibility? Visibility
 )
 {
@@ -58,7 +57,6 @@ public record BoardSearchDto
     int PageNumber,
     int PageSize,
     string? SearchTerm,
-    Guid? WorkspaceId,
     ArchiveFilter Archived,
     BoardVisibility? Visibility
 ) : ISearchQuery<BoardSearchDto>
@@ -67,7 +65,6 @@ public record BoardSearchDto
         query.PageNumber(),
         query.PageSize(),
         query.Text("searchTerm"),
-        query.Id("workspaceId"),
         query.EnumName<ArchiveFilter>("archived") ?? ArchiveFilter.Exclude,
         query.EnumName<BoardVisibility>("visibility"));
 }

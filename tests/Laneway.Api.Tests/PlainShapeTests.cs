@@ -31,11 +31,11 @@ public class PlainShapeTests : ApiTests
         var board = await CreateBoardAsync(workspace.Id, "Sprint 14");
         await CreateListAsync(board.Id, "To do");
 
-        await AssertNoIdArrayAsync("listIds", () => PostAsync("/api/v1/boards", new { name = "Sprint 15", workspaceId = workspace.Id, visibility = "Workspace" }));
+        await AssertNoIdArrayAsync("listIds", () => PostAsync(BoardsPath(workspace.Id), new { name = "Sprint 15", visibility = "Workspace" }));
         await AssertNoIdArrayAsync("listIds", () => GetAsync($"/api/v1/boards/{board.Id}"));
         await AssertNoIdArrayAsync("listIds", () => UpdateBoardAsync(board.Id, "Sprint 14b"));
         await AssertNoIdArrayAsync("listIds", () => MoveBoardAsync(board.Id, other.Id));
-        await AssertNoIdArrayAsync("listIds", () => GetAsync($"/api/v1/boards?workspaceId={other.Id}"));
+        await AssertNoIdArrayAsync("listIds", () => GetAsync(BoardsPath(other.Id)));
     }
 
     [Fact]

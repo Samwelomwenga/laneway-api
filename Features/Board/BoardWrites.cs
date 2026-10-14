@@ -6,14 +6,14 @@ public sealed record CreateBoardWrite(
     Guid WorkspaceId,
     BoardVisibility Visibility)
 {
-    public static CreateBoardWrite Of(CreateBoardDto dto)
+    public static CreateBoardWrite Of(Guid workspaceId, CreateBoardDto dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
         return new CreateBoardWrite(
             Writes.Required(dto.Name, "name"),
             dto.Description ?? string.Empty,
-            Writes.Required(dto.WorkspaceId, "workspaceId"),
+            workspaceId,
             Writes.Required(dto.Visibility, "visibility"));
     }
 }

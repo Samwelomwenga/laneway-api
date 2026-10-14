@@ -147,13 +147,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/workspaces?visibility=Private
 Authorization: Bearer {{accessToken}}
 
 ### Create a board with "Workspace" visibility. The response has no title or ownerId.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Sprint 1",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Workspace"
 }
 
@@ -171,7 +170,7 @@ Content-Type: application/json
 }
 
 ### Search boards by visibility name.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?visibility=Public
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards?visibility=Public
 Authorization: Bearer {{accessToken}}
 
 ### Create a list with the "Sky" color.
@@ -413,56 +412,63 @@ Content-Type: application/json
 }
 
 ### Create a board with a padded name. The name comes back trimmed.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "  Validation board  ",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("validationBoardId", response.body.data.id); %}
 
-### Create a board from an empty object. 400 required on name, workspaceId, and visibility.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+### Create a board from an empty object. 400 required on name and visibility.
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {}
 
 ### Create a board with a blank name. 400 required on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "   ",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
 ### Create a board with a name of 101 characters and a description of 1,001. One 400 holds tooLong on both.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
   "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
-### Create a board whose workspaceId is the empty GUID. 400 notFound on workspaceId.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+### Create a board under the empty GUID. 404 "Workspace not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/00000000-0000-0000-0000-000000000000/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Empty workspace id",
-  "workspaceId": "00000000-0000-0000-0000-000000000000",
+  "visibility": "Private"
+}
+
+### Send workspaceId in the create body as well. 400 unknownField on workspaceId.
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Two parents",
+  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
@@ -808,14 +814,13 @@ Content-Type: application/json
   "boardId": "{{boardId}}"
 }
 
-### Create a board in a workspace that doesn't exist. 400 notFound on workspaceId.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+### Create a board in a workspace that doesn't exist. 404 "Workspace not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{$uuid}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Orphan",
-  "workspaceId": "{{$uuid}}",
   "visibility": "Private"
 }
 
@@ -878,13 +883,12 @@ Content-Type: application/json
 > {% client.global.set("pagingWorkspaceId", response.body.data.id); %}
 
 ### Create a board to search.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Paging board",
-  "workspaceId": "{{pagingWorkspaceId}}",
   "visibility": "Public"
 }
 
@@ -1015,26 +1019,38 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards?pageSize=0&Bogus=1&listId=not-a-gui
 Authorization: Bearer {{accessToken}}
 
 ### Send visibility in lowercase. 200, because enum keys take names in any case.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?visibility=public
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards?visibility=public
 Authorization: Bearer {{accessToken}}
 
 ### Send visibility as an integer. 400 unknownValue on visibility, and the message lists the names.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?visibility=1
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards?visibility=1
 Authorization: Bearer {{accessToken}}
 
 ### Send a visibility name that doesn't exist. 400 unknownValue on visibility.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?visibility=Nope
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards?visibility=Nope
 Authorization: Bearer {{accessToken}}
 
-### Filter boards by a workspace that doesn't exist. 400 notFound on workspaceId.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?workspaceId=11111111-2222-3333-4444-555555555555
+### List the boards of a workspace that doesn't exist. 404 "Workspace not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/11111111-2222-3333-4444-555555555555/boards
 Authorization: Bearer {{accessToken}}
 
-### Filter boards by the empty GUID. 400 notFound on workspaceId.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?workspaceId=00000000-0000-0000-0000-000000000000
+### List the boards of the empty GUID. 404 "Workspace not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/00000000-0000-0000-0000-000000000000/boards
 Authorization: Bearer {{accessToken}}
 
-### Filter boards by a real workspace. 200.
+### List the boards of a real workspace. 200.
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards
+Authorization: Bearer {{accessToken}}
+
+### Send workspaceId in the query as well. 400 unknownField on workspaceId.
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards?workspaceId={{pagingWorkspaceId}}
+Authorization: Bearer {{accessToken}}
+
+### Send a bad query to a workspace that doesn't exist. 400 unknownValue on visibility, because query errors come before the workspace lookup.
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/11111111-2222-3333-4444-555555555555/boards?visibility=Nope
+Authorization: Bearer {{accessToken}}
+
+### Search the old flat board route. 404, because the route is gone.
 GET {{Laneway_Api_HostAddress}}/api/v1/boards?workspaceId={{pagingWorkspaceId}}
 Authorization: Bearer {{accessToken}}
 
@@ -1055,7 +1071,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards?searchTerm=50%25_off
 Authorization: Bearer {{accessToken}}
 
 ### Search boards in the wrong case.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?searchTerm=PAGING
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards?searchTerm=PAGING
 Authorization: Bearer {{accessToken}}
 
 ### Search cards due on a UTC day. Only "50%_off sale" comes back.
@@ -1167,13 +1183,12 @@ Content-Type: application/json
 }
 
 ### Create a board for the card stamp checks.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{actorWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Actor board",
-  "workspaceId": "{{actorWorkspaceId}}",
   "visibility": "Private"
 }
 
@@ -1355,13 +1370,12 @@ Content-Type: application/json
 }
 
 ### Create the board the placement requests below use.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Placement board",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
@@ -1761,13 +1775,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{respreadListId}}
 Authorization: Bearer {{accessToken}}
 
 ### Create a second board, so the label rules have two boards to work across.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Labels board",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
@@ -2004,13 +2017,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{otherBoardId}}&searchTer
 Authorization: Bearer {{accessToken}}
 
 ### Create a third board. A new board starts with no labels.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Fresh board",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
@@ -2108,26 +2120,24 @@ GET {{Laneway_Api_HostAddress}}/api/v1/workspaces?isArchived=false
 Authorization: Bearer {{accessToken}}
 
 ### Create the board the archive checks hide and bring back.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Archive board",
-  "workspaceId": "{{archiveWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("archiveBoardId", response.body.data.id); %}
 
 ### Create a second board in the same workspace, so the workspace delete has two to count.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Spare board",
-  "workspaceId": "{{archiveWorkspaceId}}",
   "visibility": "Private"
 }
 
@@ -2138,13 +2148,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}
 Authorization: Bearer {{accessToken}}
 
 ### Send isArchived on a board create. 400 unknownField on isArchived.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Born archived",
-  "workspaceId": "{{archiveWorkspaceId}}",
   "visibility": "Private",
   "isArchived": true
 }
@@ -2403,7 +2412,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/lists?isArchived=true
 Authorization: Bearer {{accessToken}}
 
 ### Search boards by isArchived. 400 unknownField on isArchived.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?isArchived=true
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards?isArchived=true
 Authorization: Bearer {{accessToken}}
 
 ### Send a list an archived name that doesn't exist. 400 unknownValue on archived.
@@ -2411,7 +2420,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/lists?archived=Nope
 Authorization: Bearer {{accessToken}}
 
 ### Send a board an archived name that doesn't exist. 400 unknownValue on archived.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?archived=Nope
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards?archived=Nope
 Authorization: Bearer {{accessToken}}
 
 ### Send labels an archived name. 400 unknownField on archived, because label search has no such key.
@@ -2486,11 +2495,11 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{archiveListId}}
 Authorization: Bearer {{accessToken}}
 
 ### Search boards in the workspace. The archived board is gone and the spare board stays.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?workspaceId={{archiveWorkspaceId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 
 ### Search the board archive view. The archived board comes back.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?workspaceId={{archiveWorkspaceId}}&archived=only
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Read the archived board by id. 200.
@@ -2563,26 +2572,24 @@ Content-Type: application/json
 > {% client.global.set("readOnlyWorkspaceId", response.body.data.id); %}
 
 ### Create the board the read-only checks archive.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{readOnlyWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Read only board",
-  "workspaceId": "{{readOnlyWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("readOnlyBoardId", response.body.data.id); %}
 
 ### Create a second board, which nothing below archives. Its writes keep working throughout.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{readOnlyWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Untouched board",
-  "workspaceId": "{{readOnlyWorkspaceId}}",
   "visibility": "Private"
 }
 
@@ -3021,26 +3028,24 @@ Content-Type: application/json
 > {% client.global.set("moveWorkspaceTwoId", response.body.data.id); %}
 
 ### Create board A, which the cards start on.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{moveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Board A",
-  "workspaceId": "{{moveWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("moveBoardA", response.body.data.id); %}
 
 ### Create board B, which a card crosses to.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{moveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Board B",
-  "workspaceId": "{{moveWorkspaceId}}",
   "visibility": "Private"
 }
 
@@ -3581,13 +3586,12 @@ Content-Type: application/json
 }
 
 ### Create the board the workspace endpoint moves around.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{moveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Board C",
-  "workspaceId": "{{moveWorkspaceId}}",
   "visibility": "Private"
 }
 
@@ -3665,26 +3669,24 @@ Content-Type: application/json
 }
 
 ### Create board D, which the lists start on.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{moveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Board D",
-  "workspaceId": "{{moveWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("moveBoardD", response.body.data.id); %}
 
 ### Create board E, which a list crosses to.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{moveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Board E",
-  "workspaceId": "{{moveWorkspaceId}}",
   "visibility": "Private"
 }
 
@@ -4225,13 +4227,12 @@ Content-Type: application/json
 > {% client.global.set("checklistWorkspaceId", response.body.data.id); %}
 
 ### Create the board the checklist checks run on.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{checklistWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Checklist board",
-  "workspaceId": "{{checklistWorkspaceId}}",
   "visibility": "Private"
 }
 
@@ -4730,13 +4731,12 @@ Content-Type: application/json
 }
 
 ### Create the board the ancestor checks archive.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{checklistWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Checklist board two",
-  "workspaceId": "{{checklistWorkspaceId}}",
   "visibility": "Private"
 }
 
@@ -6175,13 +6175,12 @@ Content-Type: application/json
 > {% client.global.set("attachmentWorkspace", response.body.data.id); %}
 
 ### Create the board.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{attachmentWorkspace}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Attachment board",
-  "workspaceId": "{{attachmentWorkspace}}",
   "visibility": "Public"
 }
 

@@ -364,13 +364,14 @@ public abstract class ApiTests : IAsyncLifetime
             visibility = visibility.ToString()
         });
 
+    protected static string BoardsPath(Guid workspaceId) => $"/api/v1/workspaces/{workspaceId}/boards";
+
     protected async Task<BoardDto> CreateBoardAsync(
         Guid workspaceId, string name, BoardVisibility visibility = BoardVisibility.Workspace)
     {
-        using var response = await PostAsync("/api/v1/boards", new
+        using var response = await PostAsync(BoardsPath(workspaceId), new
         {
             name,
-            workspaceId,
             visibility = visibility.ToString()
         });
 
