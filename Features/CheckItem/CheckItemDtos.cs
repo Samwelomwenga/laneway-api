@@ -21,8 +21,7 @@ public record CreateCheckItemDto
     bool? IsChecked,
     PositionValue? Position,
     Guid? Before,
-    Guid? After,
-    Guid? ChecklistId
+    Guid? After
 ) : IPlacing
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -51,14 +50,12 @@ public record CheckItemSearchDto
 (
     int PageNumber,
     int PageSize,
-    Guid? ChecklistId,
     CheckItemArchiveFilter Archived
 ) : ISearchQuery<CheckItemSearchDto>
 {
     public static CheckItemSearchDto Read(QueryReader query) => new(
         query.PageNumber(),
         query.PageSize(),
-        query.Id("checklistId"),
         query.EnumName<CheckItemArchiveFilter>("archived") ?? CheckItemArchiveFilter.Exclude);
 }
 

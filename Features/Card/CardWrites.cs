@@ -13,7 +13,7 @@ public sealed record CreateCardWrite(
     Guid? Before,
     Guid? After) : IPlacing
 {
-    public static CreateCardWrite Of(CreateCardDto dto)
+    public static CreateCardWrite Of(Guid listId, CreateCardDto dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
@@ -21,7 +21,7 @@ public sealed record CreateCardWrite(
             Writes.Required(dto.Title, "title"),
             dto.Description ?? string.Empty,
             dto.DueDate,
-            Writes.Required(dto.ListId, "listId"),
+            listId,
             Writes.Required(dto.IsDueComplete, "isDueComplete"),
             dto.StartDate,
             dto.DueReminderMinutes,

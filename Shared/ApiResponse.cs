@@ -41,27 +41,28 @@ public class ApiResponse<T>
 public class PagedResponse<T> : ApiResponse<List<T>>
 {
     public new List<T> Data { get; set; } = new();
-    public int TotalCount { get; set; }
-    public int PageSize { get; set; }
-    public int CurrentPage { get; set; }
-    public int TotalPages { get; set; }
+    public Pagination Pagination { get; set; } = null!;
 
-    public static PagedResponse<T> SuccessResponse(List<T> data, int totalCount, int pageSize, int currentPage, string message = "Request was successful", int statusCode = 200)
+    public static PagedResponse<T> SuccessResponse(List<T> data, int totalCount, int pageSize, int pageNumber, string message = "Request was successful", int statusCode = 200)
     {
-        var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
         return new PagedResponse<T>
         {
             Success = true,
             Message = message,
             Data = data,
             StatusCode = statusCode,
-            TotalCount = totalCount,
-            PageSize = pageSize,
-            CurrentPage = currentPage,
-            TotalPages = totalPages
+            Pagination = Pagination.Of(pageNumber, pageSize, totalCount)
         };
     }
+}
 
-    public bool HasNextPage => CurrentPage < TotalPages;
-    public bool HasPreviousPage => CurrentPage > 1;
+public record Pagination(
+    int PageNumber, int PageSize, int TotalCount, int TotalPages, bool HasNextPage, bool HasPreviousPage)
+{
+    public static Pagination Of(int pageNumber, int pageSize, int totalCount)
+    {
+        var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+        return new Pagination(
+            pageNumber, pageSize, totalCount, totalPages, pageNumber < totalPages, pageNumber > 1);
+    }
 }

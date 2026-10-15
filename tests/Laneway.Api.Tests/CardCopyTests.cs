@@ -306,8 +306,8 @@ public class CardCopyTests : ApiTests
         Assert.Equal(uploaded.MimeType, attachment.MimeType);
         Assert.Equal(uploaded.Bytes, attachment.Bytes);
         Assert.Equal(
-            await DownloadAttachmentAsync(source.Id, uploaded.Id),
-            await DownloadAttachmentAsync(copy.Id, attachment.Id));
+            await DownloadAttachmentAsync(uploaded.Id),
+            await DownloadAttachmentAsync(attachment.Id));
     }
 
     [Fact]
@@ -554,11 +554,10 @@ public class CardCopyTests : ApiTests
 
     private async Task<CardDto> CreateFullCardAsync(Guid listId, DateTime due)
     {
-        using var response = await PostAsync("/api/v1/cards", new
+        using var response = await PostAsync(CardsPath(listId), new
         {
             title = "Write the brief",
             description = "Two pages, no more.",
-            listId,
             dueDate = due,
             startDate = due.AddDays(-2),
             dueReminderMinutes = 60,

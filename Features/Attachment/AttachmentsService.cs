@@ -6,11 +6,11 @@ public interface IAttachmentService
 {
     Task<ApiResponse<AttachmentDto>> CreateFileAsync(Guid cardId, AttachmentUpload upload, CancellationToken token);
     Task<ApiResponse<AttachmentDto>> CreateLinkAsync(Guid cardId, CreateLinkAttachmentWrite write);
-    Task<ApiResponse<AttachmentDto>> UpdateAsync(Guid cardId, Guid id, UpdateAttachmentWrite write);
-    Task<ApiResponse<bool>> DeleteAsync(Guid cardId, Guid id);
-    Task<ApiResponse<AttachmentDto>> GetByIdAsync(Guid cardId, Guid id);
+    Task<ApiResponse<AttachmentDto>> UpdateAsync(Guid id, UpdateAttachmentWrite write);
+    Task<ApiResponse<bool>> DeleteAsync(Guid id);
+    Task<ApiResponse<AttachmentDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<List<AttachmentDto>>> GetAllAsync(Guid cardId);
-    Task<ApiResponse<string>> GetContentUrlAsync(Guid cardId, Guid id);
+    Task<ApiResponse<string>> GetContentUrlAsync(Guid id);
 }
 
 public class AttachmentService : IAttachmentService
@@ -144,18 +144,17 @@ public class AttachmentService : IAttachmentService
             AttachmentView.Of(attachment), "Attachment created successfully", 201);
     }
 
-    public async Task<ApiResponse<AttachmentDto>> UpdateAsync(
-        Guid cardId, Guid id, UpdateAttachmentWrite write)
+    public async Task<ApiResponse<AttachmentDto>> UpdateAsync(Guid id, UpdateAttachmentWrite write)
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        var attachment = await FindAsync(cardId, id);
+        var attachment = await FindAsync(id);
         if (attachment == null)
         {
             return NotFound<AttachmentDto>();
         }
 
-        if (await _archive.OnCardAsync(cardId) is { } archived)
+        if (await _archive.OnCardAsync(attachment.CardId) is { } archived)
         {
             return ArchiveErrors.ReadOnly<AttachmentDto>(archived, TreeItem.Attachment);
         }
@@ -167,7 +166,7 @@ public class AttachmentService : IAttachmentService
         if (tracked.Changed())
         {
             var old = AttachmentFields.Changed(tracked);
-            var chain = await _tree.CardAsync(cardId);
+            var chain = await _tree.CardAsync(attachment.CardId);
             await _activity.AddAsync(
                 ActivityType.UpdateAttachment,
                 chain.Place,
@@ -187,25 +186,25 @@ public class AttachmentService : IAttachmentService
             AttachmentView.Of(attachment), "Attachment updated successfully");
     }
 
-    public async Task<ApiResponse<bool>> DeleteAsync(Guid cardId, Guid id)
+    public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        var attachment = await FindAsync(cardId, id);
+        var attachment = await FindAsync(id);
         if (attachment == null)
         {
             return NotFound<bool>();
         }
 
-        if (await _archive.OnCardAsync(cardId) is { } archived)
+        if (await _archive.OnCardAsync(attachment.CardId) is { } archived)
         {
             return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.Attachment);
         }
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
-        await _context.LockCardsAsync(cardId);
+        await _context.LockCardsAsync(attachment.CardId);
 
         var wasCover = await _context.Cards.AnyAsync(
-            card => card.Id == cardId && card.CoverAttachmentId == id);
-        var chain = await _tree.CardAsync(cardId);
+            card => card.Id == attachment.CardId && card.CoverAttachmentId == id);
+        var chain = await _tree.CardAsync(attachment.CardId);
         _context.Attachments.Remove(attachment);
         await _activity.AddAsync(
             ActivityType.DeleteAttachment,
@@ -224,9 +223,9 @@ public class AttachmentService : IAttachmentService
         return ApiResponse<bool>.SuccessResponse(true, "Attachment deleted successfully", 204);
     }
 
-    public async Task<ApiResponse<AttachmentDto>> GetByIdAsync(Guid cardId, Guid id)
+    public async Task<ApiResponse<AttachmentDto>> GetByIdAsync(Guid id)
     {
-        var attachment = await FindAsync(cardId, id);
+        var attachment = await FindAsync(id);
         if (attachment == null)
         {
             return NotFound<AttachmentDto>();
@@ -245,17 +244,16 @@ public class AttachmentService : IAttachmentService
 
         var attachments = await _context.Attachments
             .Where(attachment => attachment.CardId == cardId)
-            .OrderByDescending(attachment => attachment.CreatedAt)
-            .ThenByDescending(attachment => attachment.Id)
+            .NewestFirst()
             .ToListAsync();
 
         return ApiResponse<List<AttachmentDto>>.SuccessResponse(
             attachments.ConvertAll(AttachmentView.Of), "Attachments retrieved successfully");
     }
 
-    public async Task<ApiResponse<string>> GetContentUrlAsync(Guid cardId, Guid id)
+    public async Task<ApiResponse<string>> GetContentUrlAsync(Guid id)
     {
-        if (await FindAsync(cardId, id)
+        if (await FindAsync(id)
             is not { Kind: AttachmentKind.File, ObjectKey: { } objectKey, FileName: { } fileName })
         {
             return NotFound<string>();
@@ -317,9 +315,8 @@ public class AttachmentService : IAttachmentService
         }
     }
 
-    private Task<Attachment?> FindAsync(Guid cardId, Guid id) =>
-        _context.Attachments.FirstOrDefaultAsync(
-            attachment => attachment.Id == id && attachment.CardId == cardId);
+    private Task<Attachment?> FindAsync(Guid id) =>
+        _context.Attachments.FirstOrDefaultAsync(attachment => attachment.Id == id);
 
     private async Task<bool> IsFullAsync(Guid cardId) =>
         await _context.Attachments.CountAsync(attachment => attachment.CardId == cardId)

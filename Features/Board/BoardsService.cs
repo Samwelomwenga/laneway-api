@@ -4,8 +4,8 @@ namespace Laneway.Api;
 
 public interface IBoardService
 {
-    Task<ApiResponse<List<BoardDto>>> GetAllAsync(BoardSearchDto searchDto);
-    Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id);
+    Task<ApiResponse<List<BoardDto>>> GetAllAsync(Guid workspaceId, BoardSearchDto searchDto);
+    Task<ApiResponse<BoardViewDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardWrite write);
     Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardWrite write);
     Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardWrite write);
@@ -20,40 +20,37 @@ public class BoardService : IBoardService
     private readonly ArchiveGuard _archive;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly CardReads _cards;
 
     public BoardService(
         ApplicationDbContext context,
         Actor actor,
         ArchiveGuard archive,
         ActivityWriter activity,
-        ActivityTree tree)
+        ActivityTree tree,
+        CardReads cards)
     {
         _context = context;
         _actor = actor;
         _archive = archive;
         _activity = activity;
         _tree = tree;
+        _cards = cards;
     }
 
-    public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(BoardSearchDto searchDto)
+    public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(Guid workspaceId, BoardSearchDto searchDto)
     {
-        if (searchDto.WorkspaceId is { } filterWorkspaceId
-            && !await _context.WorkSpaces.AnyAsync(ws => ws.Id == filterWorkspaceId))
+        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
         {
-            return ReferenceErrors.NotFound<List<BoardDto>>("workspaceId", "Workspace", filterWorkspaceId);
+            return ReferenceErrors.ParentNotFound<List<BoardDto>>("Workspace");
         }
 
-        var query = _context.Boards.AsQueryable();
+        var query = _context.Boards.Where(b => b.WorkspaceId == workspaceId);
 
         if (searchDto.SearchTerm is { } term)
         {
             query = query.Where(b => b.Name.ToLower().Contains(term.ToLower()) ||
                                      b.Description.ToLower().Contains(term.ToLower()));
-        }
-
-        if (searchDto.WorkspaceId is { } workspaceId)
-        {
-            query = query.Where(b => b.WorkspaceId == workspaceId);
         }
 
         query = ArchiveView.Boards(query, searchDto.Archived);
@@ -64,32 +61,46 @@ public class BoardService : IBoardService
         }
 
         var (boards, totalCount) = await PagedQuery.ReadAsync(
-            query.OrderBy(b => b.CreatedAt).Include(b => b.Lists),
+            query.OrderBy(b => b.CreatedAt),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var boardDtos = boards.Select(b => MapToDto(b, b.Lists.InSortOrder().Select(l => l.Id).ToList())).ToList();
+        var boardDtos = boards.Select(MapToDto).ToList();
 
         return PagedResponse<BoardDto>.SuccessResponse(
             boardDtos,
             totalCount,
             pageSize: searchDto.PageSize,
-            currentPage: searchDto.PageNumber,
+            pageNumber: searchDto.PageNumber,
             message: "Boards retrieved successfully"
         );
     }
 
-    public async Task<ApiResponse<BoardDto>> GetByIdAsync(Guid id)
+    public async Task<ApiResponse<BoardViewDto>> GetByIdAsync(Guid id)
     {
-        var existingBoard = await _context.Boards
-            .Include(b => b.Lists)
-            .FirstOrDefaultAsync(b => b.Id == id);
+        var existingBoard = await _context.Boards.FirstOrDefaultAsync(b => b.Id == id);
         if (existingBoard == null)
         {
-            return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
+            return ApiResponse<BoardViewDto>.ErrorResponse("Board not found", 404);
         }
-        var boardDto = MapToDto(existingBoard, existingBoard.Lists.InSortOrder().Select(l => l.Id).ToList());
-        return ApiResponse<BoardDto>.SuccessResponse(boardDto, "Board retrieved successfully", 200);
+
+        var labels = await _context.Labels.Where(l => l.BoardId == id).InNameOrder().ToListAsync();
+        var lists = await ArchiveView.Lists(_context.Lists.Where(l => l.BoardId == id), ArchiveFilter.Exclude)
+            .InSortOrder()
+            .ToListAsync();
+        var listIds = lists.ConvertAll(l => l.Id);
+        var cards = await _cards.OnBoardAsync(
+            ArchiveView.Cards(_context.Cards.Where(c => listIds.Contains(c.ListId)), ArchiveFilter.Exclude)
+                .InSortOrder());
+        var cardsByList = cards.ToLookup(card => card.ListId);
+
+        var boardView = new BoardViewDto(
+            MapToDto(existingBoard),
+            labels.ConvertAll(LabelView.Of),
+            lists.ConvertAll(list => new BoardListDto(
+                ListView.Of(list),
+                cardsByList[list.Id].ToList())));
+        return ApiResponse<BoardViewDto>.SuccessResponse(boardView, "Board retrieved successfully", 200);
     }
 
     public async Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardWrite write)
@@ -97,7 +108,7 @@ public class BoardService : IBoardService
         var workspaceId = write.WorkspaceId;
         if (await _tree.FindWorkspaceAsync(workspaceId) is not { } workspace)
         {
-            return WorkspaceNotFound(workspaceId);
+            return ReferenceErrors.ParentNotFound<BoardDto>("Workspace");
         }
 
         var boardEntity = MapToEntity(write, _actor.Id);
@@ -113,9 +124,7 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardWrite write)
     {
-        var existingBoard = await _context.Boards
-            .Include(b => b.Lists)
-            .FirstOrDefaultAsync(b => b.Id == id);
+        var existingBoard = await _context.Boards.FirstOrDefaultAsync(b => b.Id == id);
         if (existingBoard == null)
         {
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
@@ -143,7 +152,7 @@ public class BoardService : IBoardService
         }
 
         await _context.SaveChangesAsync();
-        var updatedBoardDto = MapToDto(existingBoard, existingBoard.Lists.InSortOrder().Select(l => l.Id).ToList());
+        var updatedBoardDto = MapToDto(existingBoard);
         return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
     }
 
@@ -151,9 +160,7 @@ public class BoardService : IBoardService
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        var board = await _context.Boards
-            .Include(b => b.Lists)
-            .FirstOrDefaultAsync(b => b.Id == id);
+        var board = await _context.Boards.FirstOrDefaultAsync(b => b.Id == id);
         if (board == null)
         {
             return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
@@ -167,7 +174,7 @@ public class BoardService : IBoardService
         var workspaceId = write.WorkspaceId;
         if (await _tree.FindWorkspaceAsync(workspaceId) is not { } workspace)
         {
-            return WorkspaceNotFound(workspaceId);
+            return ReferenceErrors.NotFound<BoardDto>("workspaceId", "Workspace", workspaceId);
         }
 
         var leaving = board.WorkspaceId;
@@ -185,7 +192,7 @@ public class BoardService : IBoardService
         }
 
         await _context.SaveChangesAsync();
-        var movedBoardDto = MapToDto(board, board.Lists.InSortOrder().Select(l => l.Id).ToList());
+        var movedBoardDto = MapToDto(board);
         return ApiResponse<BoardDto>.SuccessResponse(movedBoardDto, "Board moved successfully", 200);
     }
 
@@ -230,7 +237,7 @@ public class BoardService : IBoardService
         return ApiResponse<bool>.SuccessResponse(true, "Board deleted successfully", 204);
     }
 
-    private static BoardDto MapToDto(Board board, List<Guid>? listIds = null)
+    private static BoardDto MapToDto(Board board)
     {
         return new BoardDto
         (
@@ -240,17 +247,12 @@ public class BoardService : IBoardService
             board.WorkspaceId,
             board.Visibility,
             board.IsArchived,
-            listIds ?? new List<Guid>(),
             board.CreatedAt,
             board.UpdatedAt,
             board.CreatedBy,
             board.UpdatedBy
         );
     }
-
-    private static ApiResponse<BoardDto> WorkspaceNotFound(Guid workspaceId) =>
-        ApiResponse<BoardDto>.ErrorResponse("A referenced resource does not exist", 400,
-            [new ApiError("workspaceId", ErrorCodes.NotFound, $"Workspace {workspaceId} does not exist.")]);
 
     private static Board MapToEntity(CreateBoardWrite write, Guid actorId)
     {

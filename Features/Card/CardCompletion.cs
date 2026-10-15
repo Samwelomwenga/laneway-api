@@ -9,9 +9,11 @@ public readonly record struct CardTally(int CheckItemCount, int CheckedItemCount
     {
         ArgumentNullException.ThrowIfNull(card);
 
-        return card.DueDate is not null
-               && (CheckItemCount > 0 ? CheckedItemCount == CheckItemCount : card.IsDueComplete);
+        return IsComplete(card.DueDate, card.IsDueComplete);
     }
+
+    public bool IsComplete(DateTime? dueDate, bool isDueComplete) =>
+        dueDate is not null && (CheckItemCount > 0 ? CheckedItemCount == CheckItemCount : isDueComplete);
 
     public CardTally Plus(int checkItems, int checkedItems) =>
         new(CheckItemCount + checkItems, CheckedItemCount + checkedItems);

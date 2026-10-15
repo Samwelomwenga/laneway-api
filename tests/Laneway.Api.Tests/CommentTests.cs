@@ -17,7 +17,7 @@ public class CommentTests : ApiTests
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
 
         using var list = await GetAsync(CommentPath(card.Id));
-        using var one = await GetAsync($"{CommentPath(card.Id)}/{comment.Id}");
+        using var one = await GetAsync($"/api/v1/comments/{comment.Id}");
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, list.StatusCode);
         Assert.Equal(HttpStatusCode.MethodNotAllowed, one.StatusCode);
@@ -59,9 +59,9 @@ public class CommentTests : ApiTests
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
 
-        using var blank = await EditCommentAsync(card.Id, comment.Id, new { text = " " });
+        using var blank = await EditCommentAsync(comment.Id, new { text = " " });
         using var tooLong = await EditCommentAsync(
-            card.Id, comment.Id, new { text = new string('a', FieldLimits.CommentText + 1) });
+            comment.Id, new { text = new string('a', FieldLimits.CommentText + 1) });
 
         Assert.Equal(ErrorCodes.Required, Assert.Single(await blank.ReadErrors()).Code);
         Assert.Equal(ErrorCodes.TooLong, Assert.Single(await tooLong.ReadErrors()).Code);
@@ -87,7 +87,7 @@ public class CommentTests : ApiTests
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
 
         using var response = await EditCommentAsync(
-            card.Id, comment.Id, new { text = "By Monday.", updatedAt = DateTime.UtcNow });
+            comment.Id, new { text = "By Monday.", updatedAt = DateTime.UtcNow });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = Assert.Single(await response.ReadErrors());
@@ -100,7 +100,7 @@ public class CommentTests : ApiTests
     {
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
-        var path = $"{CommentPath(card.Id)}/{comment.Id}";
+        var path = $"/api/v1/comments/{comment.Id}";
 
         var sends = new[]
         {
@@ -139,19 +139,11 @@ public class CommentTests : ApiTests
     }
 
     [Fact]
-    public async Task An_unknown_card_is_404_on_every_write()
+    public async Task Commenting_on_an_unknown_card_is_404()
     {
-        var card = await CardAsync();
-        var comment = await CreateCommentAsync(card.Id, "By Friday.");
-        var unknown = Guid.NewGuid();
+        using var response = await SendCommentAsync(Guid.NewGuid(), new { text = "By Monday." });
 
-        using var created = await SendCommentAsync(unknown, new { text = "By Monday." });
-        using var edited = await EditCommentAsync(unknown, comment.Id, new { text = "By Monday." });
-        using var removed = await RemoveCommentAsync(unknown, comment.Id);
-
-        Assert.Equal(HttpStatusCode.NotFound, created.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, edited.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, removed.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -159,8 +151,8 @@ public class CommentTests : ApiTests
     {
         var card = await CardAsync();
 
-        using var edited = await EditCommentAsync(card.Id, Guid.NewGuid(), new { text = "By Monday." });
-        using var removed = await RemoveCommentAsync(card.Id, Guid.NewGuid());
+        using var edited = await EditCommentAsync(Guid.NewGuid(), new { text = "By Monday." });
+        using var removed = await RemoveCommentAsync(Guid.NewGuid());
 
         Assert.Equal(HttpStatusCode.NotFound, edited.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, removed.StatusCode);
@@ -172,27 +164,44 @@ public class CommentTests : ApiTests
         var card = await CardAsync();
         var created = Assert.Single((await ActivityAsync($"cardId={card.Id}&type=createCard")).Entries);
 
-        using var edited = await EditCommentAsync(card.Id, created.Id, new { text = "By Monday." });
-        using var removed = await RemoveCommentAsync(card.Id, created.Id);
+        using var edited = await EditCommentAsync(created.Id, new { text = "By Monday." });
+        using var removed = await RemoveCommentAsync(created.Id);
 
         Assert.Equal(HttpStatusCode.NotFound, edited.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, removed.StatusCode);
     }
 
     [Fact]
-    public async Task A_comment_on_another_card_is_404()
+    public async Task An_edit_or_delete_needs_no_card()
     {
-        var list = await CreateListAsync(
-            (await CreateBoardAsync((await CreateWorkspaceAsync("Design")).Id, "Roadmap")).Id, "Doing");
-        var card = await CreateCardAsync(list.Id, "Write the brief");
-        var other = await CreateCardAsync(list.Id, "Book the studio");
+        var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
 
-        using var edited = await EditCommentAsync(other.Id, comment.Id, new { text = "By Monday." });
-        using var removed = await RemoveCommentAsync(other.Id, comment.Id);
+        using var edited = await EditCommentAsync(comment.Id, new { text = "By Monday." });
+        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+        var entry = (await edited.ReadEnvelope<ActivityEntryDto>()).Data!;
+        Assert.Equal(comment.Id, entry.Id);
+        Assert.Equal("By Monday.", entry.Text);
+
+        using var removed = await RemoveCommentAsync(comment.Id);
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.Empty((await ActivityAsync($"cardId={card.Id}&type=comment")).Entries);
+    }
+
+    [Fact]
+    public async Task The_routes_under_the_card_are_gone()
+    {
+        var card = await CardAsync();
+        var comment = await CreateCommentAsync(card.Id, "By Friday.");
+        var path = $"{CommentPath(card.Id)}/{comment.Id}";
+
+        using var edited = await PutAsync(path, new { text = "By Monday." });
+        using var removed = await DeleteAsync(path);
 
         Assert.Equal(HttpStatusCode.NotFound, edited.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, removed.StatusCode);
+        var entry = Assert.Single((await ActivityAsync($"cardId={card.Id}&type=comment")).Entries);
+        Assert.Equal("By Friday.", entry.Text);
     }
 
     [Fact]
@@ -202,8 +211,8 @@ public class CommentTests : ApiTests
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
         var ben = await CreateUserAsync();
 
-        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." }, ben);
-        using var removed = await RemoveCommentAsync(card.Id, comment.Id, ben);
+        using var edited = await EditCommentAsync(comment.Id, new { text = "By Monday." }, ben);
+        using var removed = await RemoveCommentAsync(comment.Id, ben);
 
         foreach (var response in new[] { edited, removed })
         {
@@ -227,7 +236,7 @@ public class CommentTests : ApiTests
         var comment = await CreateCommentAsync(card.Id, "I'll take it.", ben);
 
         Assert.Equal(ben.Id, comment.CreatedBy);
-        Assert.Equal(2, (await ActivityAsync($"cardId={card.Id}&type=comment")).TotalCount);
+        Assert.Equal(2, (await ActivityAsync($"cardId={card.Id}&type=comment")).Pagination.TotalCount);
     }
 
     [Fact]
@@ -271,8 +280,8 @@ public class CommentTests : ApiTests
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
         await SetCardArchivedAsync(card.Id, true);
 
-        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." });
-        using var removed = await RemoveCommentAsync(card.Id, comment.Id);
+        using var edited = await EditCommentAsync(comment.Id, new { text = "By Monday." });
+        using var removed = await RemoveCommentAsync(comment.Id);
 
         foreach (var response in new[] { edited, removed })
         {
@@ -287,8 +296,7 @@ public class CommentTests : ApiTests
         var card = await CardAsync();
         var ben = await CreateUserAsync();
 
-        using var response = await EditCommentAsync(
-            card.Id, Guid.NewGuid(), new { text = "By Monday." }, ben);
+        using var response = await EditCommentAsync(Guid.NewGuid(), new { text = "By Monday." }, ben);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -301,8 +309,8 @@ public class CommentTests : ApiTests
         await SetCardArchivedAsync(card.Id, true);
         var ben = await CreateUserAsync();
 
-        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." }, ben);
-        using var removed = await RemoveCommentAsync(card.Id, comment.Id, ben);
+        using var edited = await EditCommentAsync(comment.Id, new { text = "By Monday." }, ben);
+        using var removed = await RemoveCommentAsync(comment.Id, ben);
 
         Assert.Equal(HttpStatusCode.Forbidden, edited.StatusCode);
         Assert.Equal(ErrorCodes.NotAuthor, Assert.Single(await edited.ReadErrors()).Code);
@@ -315,7 +323,7 @@ public class CommentTests : ApiTests
     {
         var card = await CardAsync();
 
-        using var response = await EditCommentAsync(card.Id, Guid.NewGuid(), new { text = "  " });
+        using var response = await EditCommentAsync(Guid.NewGuid(), new { text = "  " });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(ErrorCodes.Required, Assert.Single(await response.ReadErrors()).Code);
@@ -337,7 +345,7 @@ public class CommentTests : ApiTests
         Assert.Equal(2, (await ReadCardAsync(card.Id)).CommentCount);
         Assert.Equal(0, (await ReadCardAsync(quiet.Id)).CommentCount);
 
-        var page = await ReadCardsAsync($"listId={list.Id}");
+        var page = await ReadCardsAsync(list.Id);
         Assert.Equal(2, page.Entries.Find(found => found.Id == card.Id)!.CommentCount);
         Assert.Equal(0, page.Entries.Find(found => found.Id == quiet.Id)!.CommentCount);
     }
@@ -348,7 +356,7 @@ public class CommentTests : ApiTests
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
 
-        using var response = await RemoveCommentAsync(card.Id, comment.Id);
+        using var response = await RemoveCommentAsync(comment.Id);
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         Assert.Equal(0, (await ReadCardAsync(card.Id)).CommentCount);
@@ -363,8 +371,8 @@ public class CommentTests : ApiTests
         await DeleteCardAsync(card.Id);
 
         using var created = await SendCommentAsync(card.Id, new { text = "One more." });
-        using var edited = await EditCommentAsync(card.Id, comment.Id, new { text = "By Monday." });
-        using var removed = await RemoveCommentAsync(card.Id, comment.Id);
+        using var edited = await EditCommentAsync(comment.Id, new { text = "By Monday." });
+        using var removed = await RemoveCommentAsync(comment.Id);
 
         Assert.Equal(HttpStatusCode.NotFound, created.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, edited.StatusCode);

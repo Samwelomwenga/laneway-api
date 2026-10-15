@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Laneway.Api;
@@ -26,6 +27,45 @@ public record CardDto
      Guid? UpdatedBy
 );
 
+public record BoardCardDto
+(
+    Guid Id,
+    string Title,
+    bool HasDescription,
+    DateTime? DueDate,
+    double Position,
+    Guid ListId,
+    bool IsDueComplete,
+    DateTime? StartDate,
+    int? DueReminderMinutes,
+    bool IsArchived,
+    List<Guid> LabelIds,
+    int CheckItemCount,
+    int CheckedItemCount,
+    int AttachmentCount,
+    int CommentCount,
+    CardCoverDto? Cover,
+    DateTime CreatedAt,
+    DateTime? UpdatedAt,
+    Guid CreatedBy,
+    Guid? UpdatedBy
+);
+
+public record CardViewDto : CardDto
+{
+    public CardViewDto(CardDto card, List<ChecklistDto> checklists, List<AttachmentDto> attachments) : base(card)
+    {
+        Checklists = checklists;
+        Attachments = attachments;
+    }
+
+    [JsonPropertyOrder(1)]
+    public List<ChecklistDto> Checklists { get; init; }
+
+    [JsonPropertyOrder(1)]
+    public List<AttachmentDto> Attachments { get; init; }
+}
+
 public record CardCoverDto
 (
     Guid? AttachmentId,
@@ -47,7 +87,6 @@ public record CreateCardDto
     PositionValue? Position,
     Guid? Before,
     Guid? After,
-    Guid? ListId,
     bool? IsDueComplete,
     DateTime? StartDate,
     int? DueReminderMinutes,
@@ -97,7 +136,6 @@ public record CardSearchDto
     int PageNumber,
     int PageSize,
     string? SearchTerm,
-    Guid? ListId,
     ArchiveFilter Archived,
     DateOnly? DueDate,
     DateTimeOffset? DueBefore,
@@ -109,7 +147,6 @@ public record CardSearchDto
         query.PageNumber(),
         query.PageSize(),
         query.Text("searchTerm"),
-        query.Id("listId"),
         query.EnumName<ArchiveFilter>("archived") ?? ArchiveFilter.Exclude,
         query.Day("dueDate"),
         query.Timestamp("dueBefore"),

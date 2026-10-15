@@ -25,7 +25,7 @@ public class CompletionActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=checkCheckItem");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.False(page.Entries[1].Data.Has("completion"));
         AssertCompletion(page.Entries[0], from: false, to: true);
         Assert.True((await ReadCardAsync(card.Id)).IsDueComplete);
@@ -55,7 +55,7 @@ public class CompletionActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=createChecklist,createCheckItem");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.False(page.Entries[1].Data.Has("completion"));
         AssertCompletion(page.Entries[0], from: true, to: false);
         Assert.False((await ReadCardAsync(card.Id)).IsDueComplete);
@@ -179,7 +179,7 @@ public class CompletionActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=checkCheckItem");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         AssertCompletion(
             Assert.Single(page.Entries.FindAll(entry => entry.Data.Has("completion"))), from: false, to: true);
         Assert.True((await ReadCardAsync(card.Id)).IsDueComplete);

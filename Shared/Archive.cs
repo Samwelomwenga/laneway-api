@@ -78,47 +78,14 @@ public static class ArchiveView
     public static IQueryable<Board> Boards(IQueryable<Board> boards, ArchiveFilter filter) =>
         Apply(boards, filter, board => !board.IsArchived);
 
-    public static IQueryable<List> Lists(
-        IQueryable<List> lists, ArchiveFilter filter, ApplicationDbContext context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        return Apply(lists, filter, list => !list.IsArchived
-            && context.Boards.Any(board => board.Id == list.BoardId && !board.IsArchived));
-    }
+    public static IQueryable<List> Lists(IQueryable<List> lists, ArchiveFilter filter) =>
+        Apply(lists, filter, list => !list.IsArchived);
 
-    public static IQueryable<Card> Cards(
-        IQueryable<Card> cards, ArchiveFilter filter, ApplicationDbContext context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        return Apply(cards, filter, card => !card.IsArchived
-            && context.Lists.Any(list => list.Id == card.ListId && !list.IsArchived
-                && context.Boards.Any(board => board.Id == list.BoardId && !board.IsArchived)));
-    }
+    public static IQueryable<Card> Cards(IQueryable<Card> cards, ArchiveFilter filter) =>
+        Apply(cards, filter, card => !card.IsArchived);
 
-    public static IQueryable<Checklist> Checklists(
-        IQueryable<Checklist> checklists, ArchiveFilter filter, ApplicationDbContext context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        return Apply(checklists, filter, checklist => !checklist.IsArchived
-            && context.Cards.Any(card => card.Id == checklist.CardId && !card.IsArchived
-                && context.Lists.Any(list => list.Id == card.ListId && !list.IsArchived
-                    && context.Boards.Any(board => board.Id == list.BoardId && !board.IsArchived))));
-    }
-
-    public static IQueryable<CheckItem> CheckItems(
-        IQueryable<CheckItem> checkItems, CheckItemArchiveFilter filter, ApplicationDbContext context)
-    {
-        ArgumentNullException.ThrowIfNull(checkItems);
-        ArgumentNullException.ThrowIfNull(context);
-
-        if (filter == CheckItemArchiveFilter.Include)
-        {
-            return checkItems;
-        }
-
-        var visible = Checklists(context.Checklists, ArchiveFilter.Exclude, context);
-        return checkItems.Where(checkItem => visible.Any(checklist => checklist.Id == checkItem.ChecklistId));
-    }
+    public static IQueryable<Checklist> Checklists(IQueryable<Checklist> checklists, ArchiveFilter filter) =>
+        Apply(checklists, filter, checklist => !checklist.IsArchived);
 
     private static IQueryable<TEntity> Apply<TEntity>(
         IQueryable<TEntity> items, ArchiveFilter filter, Expression<Func<TEntity, bool>> visible)
@@ -206,7 +173,7 @@ public static class ArchiveErrors
     public static ApiResponse<T> ReadOnly<T>(TreeItem archived, TreeItem subject) =>
         Blocked<T>(archived, null, Describe(archived, subject));
 
-    public static ApiResponse<T> NoCreate<T>(TreeItem archived, string field, TreeItem subject) =>
+    public static ApiResponse<T> NoCreate<T>(TreeItem archived, string? field, TreeItem subject) =>
         Blocked<T>(archived, field, Describe(archived, subject));
 
     public static ApiError NoCreateError(TreeItem archived, string field, TreeItem subject) =>

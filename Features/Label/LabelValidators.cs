@@ -7,7 +7,6 @@ public sealed class CreateLabelDtoValidator : AbstractValidator<CreateLabelDto>
     public CreateLabelDtoValidator()
     {
         RuleFor(x => x.Name).MaxLength(FieldLimits.LabelName).NameOrColor(x => x.Color);
-        RuleFor(x => x.BoardId).Required();
     }
 }
 

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Laneway.Api;
 
 [ApiController]
-[Route("api/v1/cards/{cardId}/comments")]
+[Route("api/v1/[controller]")]
 public class CommentsController : ApiControllerBase
 {
     private readonly ICommentService _commentService;
@@ -13,7 +13,7 @@ public class CommentsController : ApiControllerBase
         _commentService = commentService;
     }
 
-    [HttpPost]
+    [HttpPost("/api/v1/cards/{cardId}/comments")]
     public async Task<ActionResult<ApiResponse<ActivityEntryDto>>> CreateComment(
         Guid cardId, [FromBody] CommentTextDto commentTextDto)
     {
@@ -23,16 +23,16 @@ public class CommentsController : ApiControllerBase
 
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<ActivityEntryDto>>> UpdateComment(
-        Guid cardId, Guid id, [FromBody] CommentTextDto commentTextDto)
+        Guid id, [FromBody] CommentTextDto commentTextDto)
     {
-        var response = await _commentService.UpdateAsync(cardId, id, CommentTextWrite.Of(commentTextDto));
+        var response = await _commentService.UpdateAsync(id, CommentTextWrite.Of(commentTextDto));
         return ToActionResult(response);
     }
 
     [HttpDelete("{id}")]
-    public async Task<ActionResult<ApiResponse<bool>>> DeleteComment(Guid cardId, Guid id)
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteComment(Guid id)
     {
-        var response = await _commentService.DeleteAsync(cardId, id);
+        var response = await _commentService.DeleteAsync(id);
         return ToActionResult(response);
     }
 }

@@ -89,7 +89,7 @@ public class CardActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCard");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.Equal(JsonValueKind.Null, page.Entries[0].Data.At("old.dueDate").ValueKind);
         Assert.Equal(due, page.Entries[1].Data.At("old.dueDate").GetDateTime());
     }
@@ -146,7 +146,7 @@ public class CardActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCard");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public class CardActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=archiveCard,restoreCard");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.Equal(ActivityType.RestoreCard, page.Entries[0].Type);
         Assert.Equal(ActivityType.ArchiveCard, page.Entries[1].Type);
         ActivityAssert.Place(
@@ -187,7 +187,7 @@ public class CardActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=archiveCard");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -204,7 +204,7 @@ public class CardActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}");
 
-        Assert.Equal(3, page.TotalCount);
+        Assert.Equal(3, page.Pagination.TotalCount);
         var entry = page.Entries[0];
         Assert.Equal(ActivityType.DeleteCard, entry.Type);
         ActivityAssert.Place(
@@ -269,7 +269,7 @@ public class CardActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=addLabelToCard");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -284,7 +284,7 @@ public class CardActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=removeLabelFromCard");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]

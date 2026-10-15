@@ -8,7 +8,6 @@ public sealed class CreateBoardDtoValidator : AbstractValidator<CreateBoardDto>
     {
         RuleFor(x => x.Name).Required().MaxLength(FieldLimits.BoardName);
         RuleFor(x => x.Description).MaxLength(FieldLimits.BoardDescription);
-        RuleFor(x => x.WorkspaceId).Required();
         RuleFor(x => x.Visibility).Required();
     }
 }

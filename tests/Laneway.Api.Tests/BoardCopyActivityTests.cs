@@ -112,9 +112,9 @@ public class BoardCopyActivityTests : ApiTests
         var entry = Assert.Single((await ActivityAsync($"boardId={copy.Id}")).Entries);
         Assert.Equal(ActivityType.CopyBoard, entry.Type);
         var list = Assert.Single(await ReadListsOfBoardAsync(copy.Id));
-        Assert.Equal(0, (await ActivityAsync($"listId={list.Id}")).TotalCount);
+        Assert.Equal(0, (await ActivityAsync($"listId={list.Id}")).Pagination.TotalCount);
         var copied = Assert.Single(await ReadCardsOfListAsync(list.Id));
-        Assert.Equal(0, (await ActivityAsync($"cardId={copied.Id}")).TotalCount);
+        Assert.Equal(0, (await ActivityAsync($"cardId={copied.Id}")).Pagination.TotalCount);
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public class BoardCopyActivityTests : ApiTests
         });
         await AwaitCopyJobAsync(id, CopyJobStatus.Failed);
 
-        Assert.Equal(0, (await ActivityAsync("type=copyBoard")).TotalCount);
+        Assert.Equal(0, (await ActivityAsync("type=copyBoard")).Pagination.TotalCount);
     }
 
     private async Task<List<string>> KeepAsync(Guid boardId)

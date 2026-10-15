@@ -147,13 +147,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/workspaces?visibility=Private
 Authorization: Bearer {{accessToken}}
 
 ### Create a board with "Workspace" visibility. The response has no title or ownerId.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Sprint 1",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Workspace"
 }
 
@@ -171,66 +170,61 @@ Content-Type: application/json
 }
 
 ### Search boards by visibility name.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?visibility=Public
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards?visibility=Public
 Authorization: Bearer {{accessToken}}
 
 ### Create a list with the "Sky" color.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "To do",
   "position": 1,
-  "boardId": "{{boardId}}",
   "color": "Sky"
 }
 
 > {% client.global.set("listId", response.body.data.id); %}
 
 ### Create a list with no color. It comes back with "color": null.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Doing",
-  "position": 2,
-  "boardId": "{{boardId}}"
+  "position": 2
 }
 
 ### Create a label with the "Lime" color. Names are unique per board, so a plain "Bug" is free on a board created by this run.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Bug",
-  "boardId": "{{boardId}}",
   "color": "Lime"
 }
 
 > {% client.global.set("labelId", response.body.data.id); %}
 
 ### Create a label with no color. It comes back with "color": null.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Idea",
-  "boardId": "{{boardId}}"
+  "name": "Idea"
 }
 
 ### Create a card with no due date and no description. It comes back with "dueDate": null, "dueReminderMinutes": null, and "description": "".
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Write the spec",
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": false
 }
 
@@ -250,15 +244,27 @@ Content-Type: application/json
 }
 
 ### Search complete cards. A card with no due date matches neither true nor false, so an undated card never comes back.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?isDueComplete=true
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards?isDueComplete=true
 Authorization: Bearer {{accessToken}}
 
 ### Search cards due before a time. The dueBefore key matches dueDate < value.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?dueBefore=2026-10-02T00:00:00Z
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards?dueBefore=2026-10-02T00:00:00Z
 Authorization: Bearer {{accessToken}}
 
 ### Search cards due on a given day. A card with no due date never matches.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?dueDate=2026-10-01
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards?dueDate=2026-10-01
+Authorization: Bearer {{accessToken}}
+
+### Read the board view. labels holds both labels by name, and lists holds both lists in position order, each with its open cards. Cards carry hasDescription in place of description.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}
+Authorization: Bearer {{accessToken}}
+
+### Ask the board view for archived lists. 400 unknownField on archived, because the view takes no query keys. Archived lists come from GET /boards/{boardId}/lists?archived=only.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}?archived=only
+Authorization: Bearer {{accessToken}}
+
+### Read the card view. It has every card field, plus checklists and attachments, both empty here. It has no comments.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{cardId}}
 Authorization: Bearer {{accessToken}}
 
 ### Create a workspace with a padded name, a padded description, and a lowercase visibility. The name comes back trimmed, the description comes back as sent, and visibility comes back as "Public".
@@ -375,19 +381,18 @@ Content-Type: application/json
 }
 
 ### Create a card with a due date that has no offset. 400 invalidFormat on dueDate.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "No offset",
   "dueDate": "2026-10-01T17:00:00",
-  "position": 1,
-  "listId": "{{listId}}"
+  "position": 1
 }
 
 ### Create a card with a due date in +03:00. It comes back as "2026-10-01T14:00:00Z".
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -395,74 +400,79 @@ Content-Type: application/json
   "title": "East Africa time",
   "dueDate": "2026-10-01T17:00:00+03:00",
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": false
 }
 
 ### Create a card whose second label doesn't exist. 400 notFound on labelIds[1].
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Missing label",
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": false,
   "labelIds": ["{{labelId}}", "{{$uuid}}"]
 }
 
 ### Create a board with a padded name. The name comes back trimmed.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "  Validation board  ",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("validationBoardId", response.body.data.id); %}
 
-### Create a board from an empty object. 400 required on name, workspaceId, and visibility.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+### Create a board from an empty object. 400 required on name and visibility.
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {}
 
 ### Create a board with a blank name. 400 required on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "   ",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
 ### Create a board with a name of 101 characters and a description of 1,001. One 400 holds tooLong on both.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
   "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
-### Create a board whose workspaceId is the empty GUID. 400 notFound on workspaceId.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+### Create a board under the empty GUID. 404 "Workspace not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/00000000-0000-0000-0000-000000000000/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Empty workspace id",
-  "workspaceId": "00000000-0000-0000-0000-000000000000",
+  "visibility": "Private"
+}
+
+### Send workspaceId in the create body as well. 400 unknownField on workspaceId.
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Two parents",
+  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
@@ -485,21 +495,20 @@ Content-Type: application/json
 }
 
 ### Create a list with a padded name and a color. The name comes back trimmed.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "  Validation list  ",
   "position": 3,
-  "boardId": "{{boardId}}",
   "color": "Pink"
 }
 
 > {% client.global.set("validationListId", response.body.data.id); %}
 
-### Create a list with a blank name and nothing else. 400 required on name and boardId. Position is optional now.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+### Create a list with a blank name and nothing else. 400 required on name. Position is optional now.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -508,25 +517,33 @@ Content-Type: application/json
 }
 
 ### Create a list with a name of 101 characters. 400 tooLong on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
-  "position": 4,
-  "boardId": "{{boardId}}"
+  "position": 4
 }
 
-### Create a list on a board that doesn't exist. 400 notFound on boardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+### Create a list on a board that doesn't exist. 404 "Board not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{$uuid}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Orphan list",
-  "position": 4,
-  "boardId": "{{$uuid}}"
+  "position": 4
+}
+
+### Send boardId in the create body as well. 400 unknownField on boardId.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/lists
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Doubled list",
+  "boardId": "{{boardId}}"
 }
 
 ### Replace the list with an empty object. 400 required on name, the only field left.
@@ -546,25 +563,24 @@ Content-Type: application/json
 }
 
 ### Create a card with no title that is marked complete without a due date. One 400 holds required on title and requiresDueDate on isDueComplete.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": true
 }
 
-### Create a card from an empty object. 400 required on title, listId, and isDueComplete. Position is optional now.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+### Create a card from an empty object. 400 required on title and isDueComplete. Position is optional now.
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {}
 
 ### Create a card with a reminder and no due date. 400 requiresDueDate on dueReminderMinutes.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -572,12 +588,11 @@ Content-Type: application/json
   "title": "Reminder without due date",
   "dueReminderMinutes": 30,
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": false
 }
 
 ### Create a card with a due date and a negative reminder. 400 outOfRange on dueReminderMinutes.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -586,12 +601,11 @@ Content-Type: application/json
   "dueDate": "2026-10-01T17:00:00Z",
   "dueReminderMinutes": -1,
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": false
 }
 
 ### Create a card that starts after its due date. 400 startAfterDue on startDate.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -600,12 +614,11 @@ Content-Type: application/json
   "startDate": "2026-10-02T09:00:00Z",
   "dueDate": "2026-10-01T17:00:00Z",
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": false
 }
 
 ### Create a card with a start date and no due date. 201.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -613,12 +626,11 @@ Content-Type: application/json
   "title": "Start date only",
   "startDate": "2026-10-02T09:00:00Z",
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": false
 }
 
 ### Create a complete card that starts at its due time, with a reminder of 0. 201.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -628,12 +640,11 @@ Content-Type: application/json
   "dueDate": "2026-10-01T17:00:00Z",
   "dueReminderMinutes": 0,
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": true
 }
 
 ### Create a card with a title of 501 characters and a description of 10,001. One 400 holds tooLong on both.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -641,12 +652,11 @@ Content-Type: application/json
   "title": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
   "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": false
 }
 
 ### Create a card with a padded title of 500 characters and a description of 10,000. 201, so the columns take the full limits. The title comes back trimmed.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -654,45 +664,41 @@ Content-Type: application/json
   "title": "  tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt  ",
   "description": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": false
 }
 
 ### Create a card with a blank title and a null second label id. One 400 holds required on title and invalidFormat on labelIds[1].
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "  ",
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": false,
   "labelIds": ["{{labelId}}", null]
 }
 
-### Create a card in a list that doesn't exist, with the empty GUID as a label. One 400 holds notFound on listId and labelIds[0].
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+### Create a card in a list that doesn't exist, with the empty GUID as a label. 404 "List not found", because the path's list is checked before the labels.
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{$uuid}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Nothing exists",
   "position": 1,
-  "listId": "{{$uuid}}",
   "isDueComplete": false,
   "labelIds": ["00000000-0000-0000-0000-000000000000"]
 }
 
 ### Create a card with the same label twice. 201 with one entry in labelIds.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Repeated label",
   "position": 1,
-  "listId": "{{listId}}",
   "isDueComplete": false,
   "labelIds": ["{{labelId}}", "{{labelId}}"]
 }
@@ -727,25 +733,23 @@ Content-Type: application/json
 }
 
 ### Create a label with a padded name. The name comes back trimmed.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "  Trim {{$uuid}}  ",
-  "boardId": "{{boardId}}"
+  "name": "  Trim {{$uuid}}  "
 }
 
 > {% client.global.set("trimmedLabelName", response.body.data.name); %}
 
 ### Create a label with that name padded again. The check compares trimmed names, so it's 409 duplicate on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "   {{trimmedLabelName}}   ",
-  "boardId": "{{boardId}}"
+  "name": "   {{trimmedLabelName}}   "
 }
 
 ### Rename another label to the padded name. 409 duplicate on name.
@@ -759,24 +763,22 @@ Content-Type: application/json
 }
 
 ### Create a label with a blank name and a color. 201, and the name comes back "".
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "   ",
-  "boardId": "{{boardId}}",
   "color": "Red"
 }
 
 ### Create a label with a name of 51 characters. 400 tooLong on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "lllllllllllllllllllllllllllllllllllllllllllllllllll",
-  "boardId": "{{boardId}}"
+  "name": "lllllllllllllllllllllllllllllllllllllllllllllllllll"
 }
 
 ### Replace the label with an empty object. 400 required on name, because a label with no color needs one.
@@ -787,35 +789,32 @@ Content-Type: application/json
 {}
 
 ### Create a label to test duplicate names against.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Duplicate {{$uuid}}",
-  "boardId": "{{boardId}}"
+  "name": "Duplicate {{$uuid}}"
 }
 
 > {% client.global.set("duplicateLabelName", response.body.data.name); %}
 
 ### Create a second label with the same name on the same board. 409 duplicate on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{boardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "{{duplicateLabelName}}",
-  "boardId": "{{boardId}}"
+  "name": "{{duplicateLabelName}}"
 }
 
-### Create a board in a workspace that doesn't exist. 400 notFound on workspaceId.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+### Create a board in a workspace that doesn't exist. 404 "Workspace not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{$uuid}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Orphan",
-  "workspaceId": "{{$uuid}}",
   "visibility": "Private"
 }
 
@@ -878,45 +877,42 @@ Content-Type: application/json
 > {% client.global.set("pagingWorkspaceId", response.body.data.id); %}
 
 ### Create a board to search.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Paging board",
-  "workspaceId": "{{pagingWorkspaceId}}",
   "visibility": "Public"
 }
 
 > {% client.global.set("pagingBoardId", response.body.data.id); %}
 
 ### Create a list to search.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{pagingBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Paging list",
-  "position": 1,
-  "boardId": "{{pagingBoardId}}"
+  "position": 1
 }
 
 > {% client.global.set("pagingListId", response.body.data.id); %}
 
 ### Create a card with no due date, so that the isDueComplete checks have one to leave out.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Bug report",
   "position": 1,
-  "listId": "{{pagingListId}}",
   "isDueComplete": false
 }
 
 ### Create a card whose title holds the LIKE wildcards.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -925,24 +921,22 @@ Content-Type: application/json
   "dueDate": "2026-10-01T12:00:00Z",
   "startDate": "2026-09-30T00:00:00Z",
   "position": 2,
-  "listId": "{{pagingListId}}",
   "isDueComplete": false
 }
 
 ### Create a card that an unescaped 50%_off pattern would match. The search below must not return it.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "50Xoff",
   "position": 3,
-  "listId": "{{pagingListId}}",
   "isDueComplete": false
 }
 
 ### Create a complete card due later.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -950,184 +944,219 @@ Content-Type: application/json
   "title": "Ship it",
   "dueDate": "2026-10-05T00:00:00Z",
   "position": 4,
-  "listId": "{{pagingListId}}",
   "isDueComplete": true
 }
 
-### Ask for a page size of 0. 400 outOfRange on pageSize, the message names 1 and 100, and the body is the plain envelope with no totalCount, pageSize, currentPage or totalPages.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?pageSize=0
+### Ask for a page size of 0. 400 outOfRange on pageSize, the message names 1 and 100, and the body is the plain envelope with no pagination object.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageSize=0
 Authorization: Bearer {{accessToken}}
 
 ### Ask for a page size above the maximum. 400 outOfRange on pageSize.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?pageSize=101
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageSize=101
 Authorization: Bearer {{accessToken}}
 
 ### Ask for the maximum page size. 200.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?pageSize=100
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageSize=100
 Authorization: Bearer {{accessToken}}
 
 ### Ask for page 0. 400 outOfRange on pageNumber.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?pageNumber=0
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageNumber=0
 Authorization: Bearer {{accessToken}}
 
-### Ask for a page past the end. 200 with empty data and the real totalCount and totalPages.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?pageNumber=9999&pageSize=2
+### Ask for a page past the end. 200 with empty data. pagination has the real totalCount and totalPages, hasNextPage false, and hasPreviousPage true.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageNumber=9999&pageSize=2
 Authorization: Bearer {{accessToken}}
 
 ### Ask for a page whose offset overflows int math. The offset is a long, so it's still a 200 with empty data.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?pageNumber=30000000&pageSize=100
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageNumber=30000000&pageSize=100
 Authorization: Bearer {{accessToken}}
 
 ### Send a key the endpoint doesn't take. 400 unknownField on Bogus, the key as sent.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?Bogus=1
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?Bogus=1
 Authorization: Bearer {{accessToken}}
 
 ### Send a known key in another case. 200, because keys match ignoring case.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?PAGESIZE=5
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?PAGESIZE=5
 Authorization: Bearer {{accessToken}}
 
 ### Send one key twice. One 400 invalidFormat on pageSize, even though the values differ.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?pageSize=10&pageSize=20
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageSize=10&pageSize=20
 Authorization: Bearer {{accessToken}}
 
 ### Send an empty searchTerm. 400 invalidFormat on searchTerm.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?searchTerm=
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?searchTerm=
 Authorization: Bearer {{accessToken}}
 
-### Send a whitespace-only listId. 400 invalidFormat on listId.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId=%20%20
+### Send listId in the query as well. 400 unknownField on listId.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?listId={{pagingListId}}
 Authorization: Bearer {{accessToken}}
 
-### Send a listId that isn't a GUID. 400 invalidFormat on listId.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId=not-a-guid
+### Send a listId in the path that isn't a GUID. 400 invalidFormat on listId.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/not-a-guid/cards
 Authorization: Bearer {{accessToken}}
 
 ### Send a pageSize that isn't an int. 400 invalidFormat on pageSize.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?pageSize=abc
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageSize=abc
 Authorization: Bearer {{accessToken}}
 
 ### Send archived as 1. 400 unknownValue on archived.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?archived=1
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?archived=1
 Authorization: Bearer {{accessToken}}
 
-### Break three keys at once. One 400 holds unknownField on Bogus, invalidFormat on listId, and outOfRange on pageSize.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?pageSize=0&Bogus=1&listId=not-a-guid
+### Break three keys at once. One 400 holds unknownField on Bogus, invalidFormat on dueDate, and outOfRange on pageSize.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageSize=0&Bogus=1&dueDate=not-a-date
 Authorization: Bearer {{accessToken}}
 
 ### Send visibility in lowercase. 200, because enum keys take names in any case.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?visibility=public
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards?visibility=public
 Authorization: Bearer {{accessToken}}
 
 ### Send visibility as an integer. 400 unknownValue on visibility, and the message lists the names.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?visibility=1
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards?visibility=1
 Authorization: Bearer {{accessToken}}
 
 ### Send a visibility name that doesn't exist. 400 unknownValue on visibility.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?visibility=Nope
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards?visibility=Nope
 Authorization: Bearer {{accessToken}}
 
-### Filter boards by a workspace that doesn't exist. 400 notFound on workspaceId.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?workspaceId=11111111-2222-3333-4444-555555555555
+### List the boards of a workspace that doesn't exist. 404 "Workspace not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/11111111-2222-3333-4444-555555555555/boards
 Authorization: Bearer {{accessToken}}
 
-### Filter boards by the empty GUID. 400 notFound on workspaceId.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?workspaceId=00000000-0000-0000-0000-000000000000
+### List the boards of the empty GUID. 404 "Workspace not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/00000000-0000-0000-0000-000000000000/boards
 Authorization: Bearer {{accessToken}}
 
-### Filter boards by a real workspace. 200.
+### List the boards of a real workspace. 200.
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards
+Authorization: Bearer {{accessToken}}
+
+### Send workspaceId in the query as well. 400 unknownField on workspaceId.
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards?workspaceId={{pagingWorkspaceId}}
+Authorization: Bearer {{accessToken}}
+
+### Send a bad query to a workspace that doesn't exist. 400 unknownValue on visibility, because query errors come before the workspace lookup.
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/11111111-2222-3333-4444-555555555555/boards?visibility=Nope
+Authorization: Bearer {{accessToken}}
+
+### Search the old flat board route. 404, because the route is gone.
 GET {{Laneway_Api_HostAddress}}/api/v1/boards?workspaceId={{pagingWorkspaceId}}
 Authorization: Bearer {{accessToken}}
 
-### Filter lists by a board that doesn't exist. 400 notFound on boardId.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?boardId=11111111-2222-3333-4444-555555555555
+### List the lists of a board that doesn't exist. 404 "Board not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/11111111-2222-3333-4444-555555555555/lists
 Authorization: Bearer {{accessToken}}
 
-### Filter cards by a list that doesn't exist. 400 notFound on listId.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId=11111111-2222-3333-4444-555555555555
+### List the lists of a real board. 200.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{pagingBoardId}}/lists
+Authorization: Bearer {{accessToken}}
+
+### Send boardId in the query as well. 400 unknownField on boardId.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{pagingBoardId}}/lists?boardId={{pagingBoardId}}
+Authorization: Bearer {{accessToken}}
+
+### Send a bad query to a board that doesn't exist. 400 unknownValue on archived, because query errors come before the board lookup.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/11111111-2222-3333-4444-555555555555/lists?archived=Nope
+Authorization: Bearer {{accessToken}}
+
+### Search the old flat list route. 404, because the route is gone.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists?boardId={{pagingBoardId}}
+Authorization: Bearer {{accessToken}}
+
+### List the cards of a list that doesn't exist. 404 "List not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/11111111-2222-3333-4444-555555555555/cards
+Authorization: Bearer {{accessToken}}
+
+### Send a bad query to a list that doesn't exist. 400 unknownValue on archived, because query errors come before the list lookup.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/11111111-2222-3333-4444-555555555555/cards?archived=Nope
+Authorization: Bearer {{accessToken}}
+
+### Search the old flat card route. 404, because the route is gone.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{pagingListId}}
 Authorization: Bearer {{accessToken}}
 
 ### Search with a padded term in the wrong case. It's trimmed and matches ignoring case, so "Bug report" comes back.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?searchTerm=%20bug%20
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?searchTerm=%20bug%20
 Authorization: Bearer {{accessToken}}
 
 ### Search for 50%_off. EF escapes % and _, so only "50%_off sale" comes back, not "50Xoff".
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?searchTerm=50%25_off
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?searchTerm=50%25_off
 Authorization: Bearer {{accessToken}}
 
 ### Search boards in the wrong case.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?searchTerm=PAGING
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{pagingWorkspaceId}}/boards?searchTerm=PAGING
 Authorization: Bearer {{accessToken}}
 
 ### Search cards due on a UTC day. Only "50%_off sale" comes back.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?dueDate=2026-10-01
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?dueDate=2026-10-01
 Authorization: Bearer {{accessToken}}
 
 ### Send dueDate as a timestamp. 400 invalidFormat on dueDate.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?dueDate=2026-10-01T00:00:00Z
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?dueDate=2026-10-01T00:00:00Z
 Authorization: Bearer {{accessToken}}
 
 ### Send dueDate without padding. 400 invalidFormat on dueDate.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?dueDate=2026-9-14
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?dueDate=2026-9-14
 Authorization: Bearer {{accessToken}}
 
 ### Send dueDate in US order. 400 invalidFormat on dueDate.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?dueDate=09/14/2026
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?dueDate=09/14/2026
 Authorization: Bearer {{accessToken}}
 
 ### Search cards due before a UTC time. dueBefore matches dueDate < value.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?dueBefore=2026-10-02T00:00:00Z
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?dueBefore=2026-10-02T00:00:00Z
 Authorization: Bearer {{accessToken}}
 
 ### Send dueBefore with no offset. 400 invalidFormat on dueBefore, and the message names %2B and Z.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?dueBefore=2026-10-02T00:00:00
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?dueBefore=2026-10-02T00:00:00
 Authorization: Bearer {{accessToken}}
 
 ### Send dueBefore with an unencoded +. The + arrives as a space, so it's 400 invalidFormat on dueBefore.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?dueBefore=2026-10-02T00:00:00+03:00
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?dueBefore=2026-10-02T00:00:00+03:00
 Authorization: Bearer {{accessToken}}
 
 ### Send the same offset encoded as %2B. 200.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?dueBefore=2026-10-02T00:00:00%2B03:00
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?dueBefore=2026-10-02T00:00:00%2B03:00
 Authorization: Bearer {{accessToken}}
 
 ### Search cards starting from a UTC time. startFrom matches startDate >= value.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?startFrom=2026-09-30T00:00:00Z
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?startFrom=2026-09-30T00:00:00Z
 Authorization: Bearer {{accessToken}}
 
 ### Send startFrom with no offset. 400 invalidFormat on startFrom, with the same message about %2B and Z.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?startFrom=2026-09-30T00:00:00
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?startFrom=2026-09-30T00:00:00
 Authorization: Bearer {{accessToken}}
 
 ### Send startFrom with an unencoded +. 400 invalidFormat on startFrom.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?startFrom=2026-09-30T00:00:00+03:00
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?startFrom=2026-09-30T00:00:00+03:00
 Authorization: Bearer {{accessToken}}
 
 ### Search incomplete cards. Only cards that have a due date and aren't complete come back, so "Bug report" doesn't.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?isDueComplete=false
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?isDueComplete=false
 Authorization: Bearer {{accessToken}}
 
 ### Filter cards by position. 400 unknownField on position.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?position=1
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?position=1
 Authorization: Bearer {{accessToken}}
 
 ### Filter cards by status. 400 unknownField on status.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?status=open
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?status=open
 Authorization: Bearer {{accessToken}}
 
 ### Filter cards by endDate. 400 unknownField on endDate.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?endDate=2026-10-02T00:00:00Z
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?endDate=2026-10-02T00:00:00Z
 Authorization: Bearer {{accessToken}}
 
 ### Filter cards by reminderDate. 400 unknownField on reminderDate.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?reminderDate=2026-10-02T00:00:00Z
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?reminderDate=2026-10-02T00:00:00Z
 Authorization: Bearer {{accessToken}}
 
-### Filter labels by board. The board exists but has no labels, so data is empty.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{pagingBoardId}}
+### List the labels of a board. The board exists but has no labels, so data is empty.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{pagingBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Read the second page of two. Card search returns the paged shape.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{pagingListId}}&pageSize=2&pageNumber=2
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageSize=2&pageNumber=2
 Authorization: Bearer {{accessToken}}
 
 ### Create a workspace as the actor. 201, and createdBy is the actor's id.
@@ -1167,52 +1196,48 @@ Content-Type: application/json
 }
 
 ### Create a board for the card stamp checks.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{actorWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Actor board",
-  "workspaceId": "{{actorWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("actorBoardId", response.body.data.id); %}
 
 ### Create a list on it.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{actorBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Actor list",
-  "position": 1,
-  "boardId": "{{actorBoardId}}"
+  "position": 1
 }
 
 > {% client.global.set("actorListId", response.body.data.id); %}
 
 ### Create a label for the card.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{actorBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Actor {{$uuid}}",
-  "boardId": "{{actorBoardId}}"
+  "name": "Actor {{$uuid}}"
 }
 
 > {% client.global.set("actorLabelId", response.body.data.id); %}
 
 ### Create a card carrying that label.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{actorListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Actor card",
   "position": 1,
-  "listId": "{{actorListId}}",
   "isDueComplete": false,
   "labelIds": ["{{actorLabelId}}"]
 }
@@ -1355,281 +1380,258 @@ Content-Type: application/json
 }
 
 ### Create the board the placement requests below use.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Placement board",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("placementBoardId", response.body.data.id); %}
 
 ### Create a list with no placement. An empty board gives 65536.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "First",
-  "boardId": "{{placementBoardId}}"
+  "name": "First"
 }
 
 > {% client.global.set("firstListId", response.body.data.id); %}
 
 ### Create a second list with no placement. A create with no placement lands at the bottom, so 131072.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Second",
-  "boardId": "{{placementBoardId}}"
+  "name": "Second"
 }
 
 > {% client.global.set("secondListId", response.body.data.id); %}
 
 ### Create a list at the top. Top is the smallest sibling halved, so 32768.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Top",
-  "position": "top",
-  "boardId": "{{placementBoardId}}"
+  "position": "top"
 }
 
 ### Create a list at the bottom by name. Bottom is the largest sibling plus 65536, so 196608.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Bottom",
-  "position": "bottom",
-  "boardId": "{{placementBoardId}}"
+  "position": "bottom"
 }
 
 ### Create a list at a number. A client number is stored as sent, so 1.5.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Numbered",
-  "position": 1.5,
-  "boardId": "{{placementBoardId}}"
+  "position": 1.5
 }
 
 ### Create a list at a number sent as a string. The field takes either, so it comes back as 2.5.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Numbered as a string",
-  "position": "2.5",
-  "boardId": "{{placementBoardId}}"
+  "position": "2.5"
 }
 
 ### Create a list between two named siblings. First and Second are neighbours, so it's their midpoint, 98304.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Between",
   "after": "{{firstListId}}",
-  "before": "{{secondListId}}",
-  "boardId": "{{placementBoardId}}"
+  "before": "{{secondListId}}"
 }
 
 ### Create a list at position 0. 400 outOfRange on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Zero",
-  "position": 0,
-  "boardId": "{{placementBoardId}}"
+  "position": 0
 }
 
 ### Create a list at a name that isn't top or bottom. 400 unknownValue on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Middle",
-  "position": "middle",
-  "boardId": "{{placementBoardId}}"
+  "position": "middle"
 }
 
 ### Send position together with before. 400 mutuallyExclusive with a null field, and the message names both fields sent.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Two meanings",
   "position": "top",
-  "before": "{{firstListId}}",
-  "boardId": "{{placementBoardId}}"
+  "before": "{{firstListId}}"
 }
 
 ### Name an anchor that doesn't exist. 400 notFound on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Ghost anchor",
-  "before": "{{$uuid}}",
-  "boardId": "{{placementBoardId}}"
+  "before": "{{$uuid}}"
 }
 
 ### Name an anchor that sits on another board. 400 notSibling on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Stranger anchor",
-  "before": "{{listId}}",
-  "boardId": "{{placementBoardId}}"
+  "before": "{{listId}}"
 }
 
 ### Name anchors that aren't neighbours in that order. 400 notAdjacent on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Wrong order",
   "after": "{{secondListId}}",
-  "before": "{{firstListId}}",
-  "boardId": "{{placementBoardId}}"
+  "before": "{{firstListId}}"
 }
 
 ### Create the list the card placement requests below use.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Card placement",
-  "boardId": "{{placementBoardId}}"
+  "name": "Card placement"
 }
 
 > {% client.global.set("placementListId", response.body.data.id); %}
 
 ### Create a card with no placement in an empty list. 65536.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "First card",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("firstCardId", response.body.data.id); %}
 
 ### Create a card at the bottom. 131072.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Bottom card",
   "position": "bottom",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("bottomCardId", response.body.data.id); %}
 
 ### Create a card at the top. 32768.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Top card",
   "position": "top",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 ### Create a card after a named sibling. The first card and the bottom card are neighbours, so it's their midpoint, 98304.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "After the first card",
   "after": "{{firstCardId}}",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("middleCardId", response.body.data.id); %}
 
 ### Create a card before the last sibling. The card at 98304 now sits above it, so this is their midpoint, 114688.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Before the bottom card",
   "before": "{{bottomCardId}}",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 ### Name a card in another list as an anchor. 400 notSibling on after.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Stranger anchor",
   "after": "{{cardId}}",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 ### Create a card at a number. A client number is stored as sent, so 250.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Numbered card",
   "position": 250,
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 ### Create a card at a number sent as a string. It comes back as 0.5.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Numbered card as a string",
   "position": "0.5",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 ### Create a card between two named siblings. The first card and the one after it are neighbours, so it's their midpoint, 81920.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -1637,36 +1639,33 @@ Content-Type: application/json
   "title": "Between two cards",
   "after": "{{firstCardId}}",
   "before": "{{middleCardId}}",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 ### Create a card at position 0. 400 outOfRange on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Zero card",
   "position": 0,
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 ### Create a card at a name that isn't top or bottom. 400 unknownValue on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Middle card",
   "position": "middle",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 ### Send a card's position together with after. 400 mutuallyExclusive with a null field.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -1674,24 +1673,22 @@ Content-Type: application/json
   "title": "Two meanings card",
   "position": "bottom",
   "after": "{{firstCardId}}",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 ### Name a card anchor that doesn't exist. 400 notFound on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Ghost anchor card",
   "before": "{{$uuid}}",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 ### Name card anchors that aren't neighbours in that order. 400 notAdjacent on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{placementListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -1699,52 +1696,48 @@ Content-Type: application/json
   "title": "Wrong order card",
   "after": "{{bottomCardId}}",
   "before": "{{firstCardId}}",
-  "listId": "{{placementListId}}",
   "isDueComplete": false
 }
 
 ### Create the list the respread requests below use.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{placementBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Respread",
-  "boardId": "{{placementBoardId}}"
+  "name": "Respread"
 }
 
 > {% client.global.set("respreadListId", response.body.data.id); %}
 
 ### Fill one gap. These two numbers are neighbouring doubles, so nothing fits between them. Halving a gap over and over reaches this state after about 52 drops.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{respreadListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Gap floor",
   "position": 1,
-  "listId": "{{respreadListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("gapFloorCardId", response.body.data.id); %}
 
 ### The other side of the gap. It comes back as 1.0000000000000002.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{respreadListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Gap ceiling",
   "position": 1.0000000000000002,
-  "listId": "{{respreadListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("gapCeilingCardId", response.body.data.id); %}
 
 ### Drop into that gap. No midpoint fits, so the list is respread and this card comes back at 131072.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{respreadListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -1752,119 +1745,109 @@ Content-Type: application/json
   "title": "No room",
   "after": "{{gapFloorCardId}}",
   "before": "{{gapCeilingCardId}}",
-  "listId": "{{respreadListId}}",
   "isDueComplete": false
 }
 
 ### Read the respread list. The three cards are at 65536, 131072 and 196608, in the order they were placed.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{respreadListId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{respreadListId}}/cards
 Authorization: Bearer {{accessToken}}
 
 ### Create a second board, so the label rules have two boards to work across.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Labels board",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("otherBoardId", response.body.data.id); %}
 
 ### Create a list on the second board.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Other list",
-  "boardId": "{{otherBoardId}}"
+  "name": "Other list"
 }
 
 > {% client.global.set("otherListId", response.body.data.id); %}
 
 ### Create "Bug" on the second board. 201, because the first board's "Bug" is its own.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Bug",
-  "boardId": "{{otherBoardId}}"
+  "name": "Bug"
 }
 
 > {% client.global.set("otherBugId", response.body.data.id); %}
 
 ### Create "bug" on the second board. 409 duplicate on name, because names ignore case.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "bug",
+  "name": "bug"
+}
+
+### Send boardId in the create body as well. 400 unknownField on boardId.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Stray board",
   "boardId": "{{otherBoardId}}"
 }
 
-### Create a label with no board. 400 required on boardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+### Create a label on a board that doesn't exist. 404 "Board not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{$uuid}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "No board"
-}
-
-### Create a label on a board that doesn't exist. 400 notFound on boardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "name": "Nowhere",
-  "boardId": "{{$uuid}}"
+  "name": "Nowhere"
 }
 
 ### Create a label with neither a name nor a color. 400 required on name, with "A label with no color needs a name."
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
-{
-  "boardId": "{{otherBoardId}}"
-}
+{}
 
 ### Create an unnamed red label on the second board. 201, because the first board's red label is its own.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "boardId": "{{otherBoardId}}",
   "color": "Red"
 }
 
 > {% client.global.set("unnamedRedId", response.body.data.id); %}
 
 ### Create a second unnamed red label on that board. 409 duplicate on color.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "boardId": "{{otherBoardId}}",
   "color": "Red"
 }
 
 ### Create a named red label on that board. 201, because a name moves it to the name rule.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Blocker",
-  "boardId": "{{otherBoardId}}",
   "color": "Red"
 }
 
@@ -1900,25 +1883,23 @@ Content-Type: application/json
 }
 
 ### Create a card on the first board's list carrying the second board's label. 400 notOnBoard on labelIds[0].
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Wrong board",
-  "listId": "{{listId}}",
   "isDueComplete": false,
   "labelIds": ["{{otherBugId}}"]
 }
 
 ### Send a label from another board and one that doesn't exist. One 400 holds notOnBoard on labelIds[0] and notFound on labelIds[1].
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{listId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Wrong board and missing",
-  "listId": "{{listId}}",
   "isDueComplete": false,
   "labelIds": ["{{otherBugId}}", "{{$uuid}}"]
 }
@@ -1935,13 +1916,12 @@ Content-Type: application/json
 }
 
 ### Create the card the label endpoints below work on. It starts with no labels.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{otherListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Label toggling",
-  "listId": "{{otherListId}}",
   "isDueComplete": false
 }
 
@@ -1987,47 +1967,49 @@ Authorization: Bearer {{accessToken}}
 DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{toggleCardId}}/labels/{{labelId}}
 Authorization: Bearer {{accessToken}}
 
-### Filter labels by the second board. Unnamed labels come first, then names, then colors.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{otherBoardId}}
+### List the labels of the second board. Unnamed labels come first, then names, then colors.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 
-### Filter labels by a board that doesn't exist. 400 notFound on boardId.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{$uuid}}
+### List the labels of a board that doesn't exist. 404 "Board not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{$uuid}}/labels
+Authorization: Bearer {{accessToken}}
+
+### Send boardId in the query as well. 400 unknownField on boardId.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels?boardId={{otherBoardId}}
 Authorization: Bearer {{accessToken}}
 
 ### Search labels by name, ignoring case. Only names match, never colors.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{otherBoardId}}&searchTerm=bug
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels?searchTerm=bug
 Authorization: Bearer {{accessToken}}
 
 ### Search labels by a color name. No label matches, because searchTerm reads the name only.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{otherBoardId}}&searchTerm=Red
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels?searchTerm=Red
 Authorization: Bearer {{accessToken}}
 
 ### Create a third board. A new board starts with no labels.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Fresh board",
-  "workspaceId": "{{workspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("freshBoardId", response.body.data.id); %}
 
-### Read the new board's labels. data is empty and totalCount is 0.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{freshBoardId}}
+### Read the new board's labels. data is empty and pagination.totalCount is 0.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{freshBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Create the label that gets deleted while a card carries it.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Doomed",
-  "boardId": "{{otherBoardId}}"
+  "name": "Doomed"
 }
 
 > {% client.global.set("doomedLabelId", response.body.data.id); %}
@@ -2061,8 +2043,8 @@ Content-Type: application/json
 DELETE {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}
 Authorization: Bearer {{accessToken}}
 
-### Read the deleted board's labels. 400 notFound on boardId, because the board is gone.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{otherBoardId}}
+### Read the deleted board's labels. 404 "Board not found", because the board is gone.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{otherBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Create the workspace the archive checks work in.
@@ -2108,26 +2090,24 @@ GET {{Laneway_Api_HostAddress}}/api/v1/workspaces?isArchived=false
 Authorization: Bearer {{accessToken}}
 
 ### Create the board the archive checks hide and bring back.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Archive board",
-  "workspaceId": "{{archiveWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("archiveBoardId", response.body.data.id); %}
 
 ### Create a second board in the same workspace, so the workspace delete has two to count.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Spare board",
-  "workspaceId": "{{archiveWorkspaceId}}",
   "visibility": "Private"
 }
 
@@ -2138,13 +2118,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}
 Authorization: Bearer {{accessToken}}
 
 ### Send isArchived on a board create. 400 unknownField on isArchived.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Born archived",
-  "workspaceId": "{{archiveWorkspaceId}}",
   "visibility": "Private",
   "isArchived": true
 }
@@ -2161,36 +2140,33 @@ Content-Type: application/json
 }
 
 ### Create a label on the board. Label search ignores archive, and this one proves it later.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Hidden board label",
-  "boardId": "{{archiveBoardId}}",
   "color": "Red"
 }
 
 ### Create the list the archive checks hide and bring back.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Doing",
-  "boardId": "{{archiveBoardId}}"
+  "name": "Doing"
 }
 
 > {% client.global.set("archiveListId", response.body.data.id); %}
 
 ### Send isArchived on a list create. 400 unknownField on isArchived.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Born archived",
-  "boardId": "{{archiveBoardId}}",
   "isArchived": true
 }
 
@@ -2205,39 +2181,36 @@ Content-Type: application/json
 }
 
 ### Create card A. It stays unarchived while its list is archived.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Card A",
-  "listId": "{{archiveListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("archiveCardA", response.body.data.id); %}
 
 ### Create card B. It gets archived before its list, and stays archived when the list comes back.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Card B",
-  "listId": "{{archiveListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("archiveCardB", response.body.data.id); %}
 
 ### Send isArchived on a card create. 400 unknownField on isArchived.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Born archived",
-  "listId": "{{archiveListId}}",
   "isDueComplete": false,
   "isArchived": true
 }
@@ -2375,47 +2348,47 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{archiveCardB}}
 Authorization: Bearer {{accessToken}}
 
 ### Search cards in the list. The default returns card A only.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{archiveListId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards
 Authorization: Bearer {{accessToken}}
 
 ### Search the card archive view. archived=only returns card B.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{archiveListId}}&archived=only
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Search with archived=include. Both cards come back.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{archiveListId}}&archived=include
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards?archived=include
 Authorization: Bearer {{accessToken}}
 
 ### Send archived in uppercase. 200, because enum keys take names in any case.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{archiveListId}}&archived=ONLY
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards?archived=ONLY
 Authorization: Bearer {{accessToken}}
 
 ### Send an archived name that doesn't exist. 400 unknownValue on archived, and the message lists the names.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?archived=Nope
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards?archived=Nope
 Authorization: Bearer {{accessToken}}
 
 ### Search cards by isArchived. 400 unknownField, because card search took archived in its place.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?isArchived=true
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards?isArchived=true
 Authorization: Bearer {{accessToken}}
 
 ### Search lists by isArchived. 400 unknownField on isArchived.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?isArchived=true
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists?isArchived=true
 Authorization: Bearer {{accessToken}}
 
 ### Search boards by isArchived. 400 unknownField on isArchived.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?isArchived=true
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards?isArchived=true
 Authorization: Bearer {{accessToken}}
 
 ### Send a list an archived name that doesn't exist. 400 unknownValue on archived.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?archived=Nope
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists?archived=Nope
 Authorization: Bearer {{accessToken}}
 
 ### Send a board an archived name that doesn't exist. 400 unknownValue on archived.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?archived=Nope
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards?archived=Nope
 Authorization: Bearer {{accessToken}}
 
 ### Send labels an archived name. 400 unknownField on archived, because label search has no such key.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?archived=only
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/labels?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Archive the list. 204.
@@ -2431,24 +2404,24 @@ Content-Type: application/json
 GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{archiveCardA}}
 Authorization: Bearer {{accessToken}}
 
-### Search cards in the archived list. Nothing comes back, because the default hides cards under an archived list.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{archiveListId}}
+### Search cards in the archived list. Card A comes back, because an archived list still lists its cards.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards
 Authorization: Bearer {{accessToken}}
 
-### Search the card archive view. Card B comes back and card A doesn't, because card A is hidden, not archived.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{archiveListId}}&archived=only
+### Search the card archive view. Card B comes back and card A doesn't, because card A isn't archived.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Search the archived list's cards with archived=include. Both come back.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{archiveListId}}&archived=include
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards?archived=include
 Authorization: Bearer {{accessToken}}
 
 ### Search lists on the board. The archived list is gone under the default.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?boardId={{archiveBoardId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 
 ### Search the list archive view. The list comes back.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?boardId={{archiveBoardId}}&archived=only
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Read the archived list by id. 200 in any state.
@@ -2464,8 +2437,8 @@ Content-Type: application/json
   "value": false
 }
 
-### Search cards in the list. Card A is back and card B is still archived, so the restore brought back exactly what was hidden.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{archiveListId}}
+### Search cards in the list. Card A comes back and card B is still archived.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards
 Authorization: Bearer {{accessToken}}
 
 ### Archive the board. 204.
@@ -2477,20 +2450,20 @@ Content-Type: application/json
   "value": true
 }
 
-### Search lists on the archived board. Nothing comes back under the default.
-GET {{Laneway_Api_HostAddress}}/api/v1/lists?boardId={{archiveBoardId}}
+### Search lists on the archived board. The restored list comes back, because an archived board still lists its lists.
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 
-### Search cards in the list. Nothing comes back, because the board above the list is archived.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{archiveListId}}
+### Search cards in the list. Card A comes back, because the default checks only each card's own flag.
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{archiveListId}}/cards
 Authorization: Bearer {{accessToken}}
 
 ### Search boards in the workspace. The archived board is gone and the spare board stays.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?workspaceId={{archiveWorkspaceId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 
 ### Search the board archive view. The archived board comes back.
-GET {{Laneway_Api_HostAddress}}/api/v1/boards?workspaceId={{archiveWorkspaceId}}&archived=only
+GET {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{archiveWorkspaceId}}/boards?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Read the archived board by id. 200.
@@ -2498,7 +2471,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the archived board's labels. The label still shows, because label search ignores archive.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{archiveBoardId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{archiveBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Delete card A, which isn't archived. 409 notArchived with a null field.
@@ -2563,89 +2536,82 @@ Content-Type: application/json
 > {% client.global.set("readOnlyWorkspaceId", response.body.data.id); %}
 
 ### Create the board the read-only checks archive.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{readOnlyWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Read only board",
-  "workspaceId": "{{readOnlyWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("readOnlyBoardId", response.body.data.id); %}
 
 ### Create a second board, which nothing below archives. Its writes keep working throughout.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{readOnlyWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Untouched board",
-  "workspaceId": "{{readOnlyWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("untouchedBoardId", response.body.data.id); %}
 
 ### Create the list the read-only checks archive.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Doing",
-  "boardId": "{{readOnlyBoardId}}"
+  "name": "Doing"
 }
 
 > {% client.global.set("readOnlyListId", response.body.data.id); %}
 
 ### Create a list on the untouched board.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{untouchedBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Untouched list",
-  "boardId": "{{untouchedBoardId}}"
+  "name": "Untouched list"
 }
 
 > {% client.global.set("untouchedListId", response.body.data.id); %}
 
 ### Create the card the read-only checks block. Its own flag stays off the whole way.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{readOnlyListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Card A",
-  "listId": "{{readOnlyListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("readOnlyCardId", response.body.data.id); %}
 
 ### Create a card on the untouched board.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{untouchedListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Untouched card",
-  "listId": "{{untouchedListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("untouchedCardId", response.body.data.id); %}
 
 ### Create the label the read-only checks block.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Read only label",
-  "boardId": "{{readOnlyBoardId}}",
   "color": "Red"
 }
 
@@ -2697,14 +2663,13 @@ Content-Type: application/json
   "name": "Renamed while archived"
 }
 
-### Create a card in the archived list. 409 archived on listId.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+### Create a card in the archived list. 409 archived with a null field.
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{readOnlyListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Born hidden",
-  "listId": "{{readOnlyListId}}",
   "isDueComplete": false
 }
 
@@ -2743,47 +2708,43 @@ Content-Type: application/json
   "isDueComplete": false
 }
 
-### Create a card in a list that doesn't exist. 400 notFound on listId, which runs before the archive check.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+### Create a card in a list that doesn't exist. 404 "List not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/11111111-1111-1111-1111-111111111111/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Nowhere",
-  "listId": "11111111-1111-1111-1111-111111111111",
   "isDueComplete": false
 }
 
-### Create a card in the archived list naming a label that doesn't exist. 400 notFound, for the same reason.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+### Create a card in the archived list naming a label that doesn't exist. 400 notFound on labelIds[0], because label checks run before the archive check.
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{readOnlyListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Born hidden",
-  "listId": "{{readOnlyListId}}",
   "isDueComplete": false,
   "labelIds": ["11111111-1111-1111-1111-111111111111"]
 }
 
 ### Create a list on the board holding the archived list. 201, because only the list is archived.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Second list",
-  "boardId": "{{readOnlyBoardId}}"
+  "name": "Second list"
 }
 
 ### Create a label on that board. 201, for the same reason.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Second label",
-  "boardId": "{{readOnlyBoardId}}",
   "color": "Blue"
 }
 
@@ -2834,35 +2795,32 @@ Content-Type: application/json
   "visibility": "Private"
 }
 
-### Create a card on the archived board. 409 archived on listId, naming the board.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+### Create a card on the archived board. 409 archived with a null field, naming the board.
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{readOnlyListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Born hidden",
-  "listId": "{{readOnlyListId}}",
   "isDueComplete": false
 }
 
-### Create a list on the archived board. 409 archived on boardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+### Create a list on the archived board. 409 archived with a null field.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Born hidden",
-  "boardId": "{{readOnlyBoardId}}"
+  "name": "Born hidden"
 }
 
-### Create a label on the archived board. 409 archived on boardId, naming the label's board.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+### Create a label on the archived board. 409 archived with a null field.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{readOnlyBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Born hidden",
-  "boardId": "{{readOnlyBoardId}}",
   "color": "Green"
 }
 
@@ -3021,101 +2979,93 @@ Content-Type: application/json
 > {% client.global.set("moveWorkspaceTwoId", response.body.data.id); %}
 
 ### Create board A, which the cards start on.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{moveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Board A",
-  "workspaceId": "{{moveWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("moveBoardA", response.body.data.id); %}
 
 ### Create board B, which a card crosses to.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{moveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Board B",
-  "workspaceId": "{{moveWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("moveBoardB", response.body.data.id); %}
 
 ### Create list A1, which holds the three cards the reorder checks drag.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "A1",
-  "boardId": "{{moveBoardA}}"
+  "name": "A1"
 }
 
 > {% client.global.set("moveListA1", response.body.data.id); %}
 
 ### Create list A2, the second list on board A.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "A2",
-  "boardId": "{{moveBoardA}}"
+  "name": "A2"
 }
 
 > {% client.global.set("moveListA2", response.body.data.id); %}
 
 ### Create list B1, the list on board B.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardB}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "B1",
-  "boardId": "{{moveBoardB}}"
+  "name": "B1"
 }
 
 > {% client.global.set("moveListB1", response.body.data.id); %}
 
 ### Create card 1 on A1. No placement, so 65536.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{moveListA1}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Card 1",
-  "listId": "{{moveListA1}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("moveCard1", response.body.data.id); %}
 
 ### Create card 2 on A1. 131072.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{moveListA1}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Card 2",
-  "listId": "{{moveListA1}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("moveCard2", response.body.data.id); %}
 
 ### Create card 3 on A1. 196608.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{moveListA1}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Card 3",
-  "listId": "{{moveListA1}}",
   "isDueComplete": false
 }
 
@@ -3267,7 +3217,7 @@ Content-Type: application/json
   "before": "{{$uuid}}"
 }
 
-### Send a list and an anchor that both don't exist. 400 notFound on listId alone. Anchors are checked against the destination, so there's nothing to check them against, and a create with a bad listId answers the same way.
+### Send a list and an anchor that both don't exist. 400 notFound on listId alone. Anchors are checked against the destination, so there's nothing to check them against.
 PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{moveCard1}}/position
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -3328,51 +3278,47 @@ Content-Type: application/json
 }
 
 ### Create a red "Bug" on board A.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Bug",
-  "boardId": "{{moveBoardA}}",
   "color": "Red"
 }
 
 > {% client.global.set("moveBugA", response.body.data.id); %}
 
 ### Create an orange "urgent" on board A.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "urgent",
-  "boardId": "{{moveBoardA}}",
   "color": "Orange"
 }
 
 > {% client.global.set("moveUrgentA", response.body.data.id); %}
 
 ### Create an unnamed green label on board A.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "boardId": "{{moveBoardA}}",
   "color": "Green"
 }
 
 > {% client.global.set("moveGreenA", response.body.data.id); %}
 
 ### Create a blue "bug" on board B. Only the name has to match, and the case doesn't.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardB}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "bug",
-  "boardId": "{{moveBoardB}}",
   "color": "Blue"
 }
 
@@ -3399,11 +3345,11 @@ Content-Type: application/json
 }
 
 ### Read board B's labels. Four now: the unnamed green and the orange "urgent" the move created, and the blue "bug", still blue with updatedAt null.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardB}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardB}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Read board A's labels. Still the same three, untouched. Source labels stay where they are.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardA}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Read board A. updatedAt stays null, because a card move never stamps a board.
@@ -3424,7 +3370,7 @@ Content-Type: application/json
 }
 
 ### Read board A's labels again. Still three, and the round trip added nothing.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardA}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardA}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Replace card 2 with board B's "bug". 400 notOnBoard on labelIds[0], checked against the board of the card's current list.
@@ -3495,13 +3441,12 @@ Content-Type: application/json
 }
 
 ### Create a card in A2, which gets archived along with its list.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{moveListA2}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Stuck in A2",
-  "listId": "{{moveListA2}}",
   "isDueComplete": false
 }
 
@@ -3525,7 +3470,7 @@ Content-Type: application/json
   "listId": "{{moveListA1}}"
 }
 
-### Move a live card into the archived list. 409 archived on listId, the same answer a create in there gets.
+### Move a live card into the archived list. 409 archived on listId.
 PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{moveCard1}}/position
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -3581,13 +3526,12 @@ Content-Type: application/json
 }
 
 ### Create the board the workspace endpoint moves around.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{moveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Board C",
-  "workspaceId": "{{moveWorkspaceId}}",
   "visibility": "Private"
 }
 
@@ -3665,75 +3609,69 @@ Content-Type: application/json
 }
 
 ### Create board D, which the lists start on.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{moveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Board D",
-  "workspaceId": "{{moveWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("moveBoardD", response.body.data.id); %}
 
 ### Create board E, which a list crosses to.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{moveWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Board E",
-  "workspaceId": "{{moveWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("moveBoardE", response.body.data.id); %}
 
 ### Create list D1, the one the reorder checks drag. No placement, so 65536.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "D1",
-  "boardId": "{{moveBoardD}}"
+  "name": "D1"
 }
 
 > {% client.global.set("moveListD1", response.body.data.id); %}
 
 ### Create list D2 on board D. 131072.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "D2",
-  "boardId": "{{moveBoardD}}"
+  "name": "D2"
 }
 
 > {% client.global.set("moveListD2", response.body.data.id); %}
 
 ### Create list D3 on board D. 196608.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "D3",
-  "boardId": "{{moveBoardD}}"
+  "name": "D3"
 }
 
 > {% client.global.set("moveListD3", response.body.data.id); %}
 
 ### Create list E1, the only list on board E. 65536.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardE}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "E1",
-  "boardId": "{{moveBoardE}}"
+  "name": "E1"
 }
 
 > {% client.global.set("moveListE1", response.body.data.id); %}
@@ -3945,76 +3883,70 @@ Content-Type: application/json
 }
 
 ### Create a red "Bug" on board D.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Bug",
-  "boardId": "{{moveBoardD}}",
   "color": "Red"
 }
 
 > {% client.global.set("moveBugD", response.body.data.id); %}
 
 ### Create an orange "urgent" on board D.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "urgent",
-  "boardId": "{{moveBoardD}}",
   "color": "Orange"
 }
 
 > {% client.global.set("moveUrgentD", response.body.data.id); %}
 
 ### Create an unnamed green label on board D.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "boardId": "{{moveBoardD}}",
   "color": "Green"
 }
 
 > {% client.global.set("moveGreenD", response.body.data.id); %}
 
 ### Create a blue "bug" on board E. Only the name has to match, and the case doesn't.
-POST {{Laneway_Api_HostAddress}}/api/v1/labels
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardE}}/labels
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "bug",
-  "boardId": "{{moveBoardE}}",
   "color": "Blue"
 }
 
 > {% client.global.set("moveBugE", response.body.data.id); %}
 
 ### Create the labelled list on board D. The bottom of board D, so 262144.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Labelled",
-  "boardId": "{{moveBoardD}}"
+  "name": "Labelled"
 }
 
 > {% client.global.set("moveLabelledList", response.body.data.id); %}
 
 ### Create labelled card 1 with "Bug" and "urgent". Labels come from the create, so updatedAt stays null.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{moveLabelledList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Labelled card 1",
-  "listId": "{{moveLabelledList}}",
   "isDueComplete": false,
   "labelIds": ["{{moveBugD}}", "{{moveUrgentD}}"]
 }
@@ -4022,13 +3954,12 @@ Content-Type: application/json
 > {% client.global.set("moveLabelledCard1", response.body.data.id); %}
 
 ### Create labelled card 2 with "Bug" and the unnamed green.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{moveLabelledList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Labelled card 2",
-  "listId": "{{moveLabelledList}}",
   "isDueComplete": false,
   "labelIds": ["{{moveBugD}}", "{{moveGreenD}}"]
 }
@@ -4036,13 +3967,12 @@ Content-Type: application/json
 > {% client.global.set("moveLabelledCard2", response.body.data.id); %}
 
 ### Create labelled card 3 with "urgent", the label it shares with card 1.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{moveLabelledList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Labelled card 3",
-  "listId": "{{moveLabelledList}}",
   "isDueComplete": false,
   "labelIds": ["{{moveUrgentD}}"]
 }
@@ -4062,7 +3992,7 @@ Content-Type: application/json
 GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{moveLabelledCard3}}
 Authorization: Bearer {{accessToken}}
 
-### Move the labelled list to board E. 200 at the bottom of board E, 131072, and the response carries cardIds but no label ids.
+### Move the labelled list to board E. 200 at the bottom of board E, 131072, and the response carries no card or label ids.
 PUT {{Laneway_Api_HostAddress}}/api/v1/lists/{{moveLabelledList}}/position
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -4072,7 +4002,7 @@ Content-Type: application/json
 }
 
 ### Read board E's labels. Three: the blue "bug", still blue with updatedAt null, plus the orange "urgent" and the unnamed green the move created.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardE}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardE}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Read labelled card 1. labelIds hold board E's blue "bug" and the new "urgent", and updatedAt is still null.
@@ -4088,7 +4018,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{moveLabelledCard3}}
 Authorization: Bearer {{accessToken}}
 
 ### Read board D's labels. Still the same three, untouched. Source labels stay where they are.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardD}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Read board D. updatedAt stays null, because a list move never stamps a board.
@@ -4109,7 +4039,7 @@ Content-Type: application/json
 }
 
 ### Read board D's labels again. Still three, and the round trip added nothing.
-GET {{Laneway_Api_HostAddress}}/api/v1/labels?boardId={{moveBoardD}}
+GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{moveBoardD}}/labels
 Authorization: Bearer {{accessToken}}
 
 ### Archive list D3.
@@ -4225,272 +4155,273 @@ Content-Type: application/json
 > {% client.global.set("checklistWorkspaceId", response.body.data.id); %}
 
 ### Create the board the checklist checks run on.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{checklistWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Checklist board",
-  "workspaceId": "{{checklistWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("checklistBoardId", response.body.data.id); %}
 
 ### Create the list the checklist cards sit in.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{checklistBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Checklist list",
-  "boardId": "{{checklistBoardId}}"
+  "name": "Checklist list"
 }
 
 > {% client.global.set("checklistListId", response.body.data.id); %}
 
 ### Create the card the checklists go on.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checklistListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Release card",
-  "listId": "{{checklistListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("checklistCardId", response.body.data.id); %}
 
 ### Create a second card, so the anchor checks have a checklist on another card to name.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checklistListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Other card",
-  "listId": "{{checklistListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("checklistOtherCardId", response.body.data.id); %}
 
 ### Create a checklist with a padded name and no placement. 201, the name comes back trimmed, position is 65536, isArchived is false, and checkItems is empty until check items land.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "  Release  ",
-  "cardId": "{{checklistCardId}}"
+  "name": "  Release  "
 }
 
 > {% client.global.set("checklistRelease", response.body.data.id); %}
 
 ### Create a second checklist with no placement. It goes to the bottom, 65536 + 65536 = 131072.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Follow-up",
-  "cardId": "{{checklistCardId}}"
+  "name": "Follow-up"
 }
 
 > {% client.global.set("checklistFollowUp", response.body.data.id); %}
 
 ### Create a checklist at the top. The smallest sibling halves, so it's 32768.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Warm-up",
-  "position": "top",
-  "cardId": "{{checklistCardId}}"
+  "position": "top"
 }
 
 > {% client.global.set("checklistWarmUp", response.body.data.id); %}
 
 ### Create a checklist between two siblings. The midpoint of 32768 and 65536 is 49152.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Between",
   "after": "{{checklistWarmUp}}",
-  "before": "{{checklistRelease}}",
-  "cardId": "{{checklistCardId}}"
+  "before": "{{checklistRelease}}"
 }
 
 > {% client.global.set("checklistBetween", response.body.data.id); %}
 
 ### Create a checklist at a number the client picked. It's stored as sent.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Numbered",
-  "position": 200000,
-  "cardId": "{{checklistCardId}}"
+  "position": 200000
 }
 
 > {% client.global.set("checklistNumbered", response.body.data.id); %}
 
 ### Create a second checklist called Follow-up on the same card. 201, because checklist names don't have to be unique.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Follow-up",
-  "cardId": "{{checklistCardId}}"
+  "name": "Follow-up"
 }
 
 > {% client.global.set("checklistSecondFollowUp", response.body.data.id); %}
 
 ### Create a checklist on the other card, for the anchor checks below.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistOtherCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Elsewhere",
-  "cardId": "{{checklistOtherCardId}}"
+  "name": "Elsewhere"
 }
 
 > {% client.global.set("checklistElsewhere", response.body.data.id); %}
 
-### Create a checklist from an empty object. 400 required on name and cardId. Placement is optional.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+### Create a checklist from an empty object. 400 required on name. Placement is optional.
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {}
 
 ### Create a checklist with a blank name. 400 required on name, because the name is trimmed first.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "   ",
-  "cardId": "{{checklistCardId}}"
+  "name": "   "
 }
 
 ### Create a checklist with a name of 101 characters. 400 tooLong on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
-  "cardId": "{{checklistCardId}}"
+  "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
 }
 
 ### Create a checklist with a padded name of 100 characters. 201, so the column takes the full limit.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "  nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn  ",
-  "cardId": "{{checklistCardId}}"
+  "name": "  nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn  "
 }
 
-### Create a checklist on a card that doesn't exist. 400 notFound on cardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+### Create a checklist on a card that doesn't exist. 404 "Card not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{$uuid}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Orphan",
-  "cardId": "{{$uuid}}"
+  "name": "Orphan"
 }
 
 ### Create a checklist with a position and an anchor. 400 mutuallyExclusive with a null field.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Both",
   "position": "top",
-  "before": "{{checklistRelease}}",
-  "cardId": "{{checklistCardId}}"
+  "before": "{{checklistRelease}}"
 }
 
 ### Create a checklist at a position name that doesn't exist. 400 unknownValue on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Middling",
-  "position": "middle",
-  "cardId": "{{checklistCardId}}"
+  "position": "middle"
 }
 
 ### Create a checklist at position 0. 400 outOfRange on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Zeroed",
-  "position": 0,
-  "cardId": "{{checklistCardId}}"
+  "position": 0
 }
 
 ### Create a checklist before an anchor that doesn't exist. 400 notFound on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Anchored",
-  "before": "{{$uuid}}",
-  "cardId": "{{checklistCardId}}"
+  "before": "{{$uuid}}"
 }
 
 ### Create a checklist before a checklist on another card. 400 notSibling on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Anchored",
-  "before": "{{checklistElsewhere}}",
-  "cardId": "{{checklistCardId}}"
+  "before": "{{checklistElsewhere}}"
 }
 
 ### Create a checklist that is already archived. 400 unknownField on isArchived, because a new checklist always starts unarchived.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Born archived",
-  "isArchived": true,
-  "cardId": "{{checklistCardId}}"
+  "isArchived": true
 }
 
 ### Read the card's checklists. 200 in position order: Warm-up, Between, Release, Follow-up, Numbered, Follow-up, and the long one. Each carries an empty checkItems.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
+Authorization: Bearer {{accessToken}}
+
+### Read the first page of two. 200 with two checklists. pagination has totalCount 7, totalPages 4, and hasNextPage true.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?pageNumber=1&pageSize=2
+Authorization: Bearer {{accessToken}}
+
+### List the checklists of a card that doesn't exist. 404 "Card not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{$uuid}}/checklists
+Authorization: Bearer {{accessToken}}
+
+### Send a bad query to a card that doesn't exist. 400 unknownValue on archived, because query errors come before the card lookup.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{$uuid}}/checklists?archived=nope
+Authorization: Bearer {{accessToken}}
+
+### Search checklists by name. 400 unknownField on searchTerm, because checklist search takes archived only.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?searchTerm=Release
+Authorization: Bearer {{accessToken}}
+
+### Send cardId in the query as well. 400 unknownField on cardId.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?cardId={{checklistCardId}}
+Authorization: Bearer {{accessToken}}
+
+### Send cardId in the create body. 400 unknownField on cardId, because the path names the card.
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Doubled",
+  "cardId": "{{checklistCardId}}"
+}
+
+### Search the old flat checklist route. 404, because the route is gone.
 GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}
-Authorization: Bearer {{accessToken}}
-
-### Read the first page of two. 200 with two checklists, totalCount 7, and totalPages 4.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&pageNumber=1&pageSize=2
-Authorization: Bearer {{accessToken}}
-
-### Filter by a card that doesn't exist. 400 notFound on cardId.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{$uuid}}
-Authorization: Bearer {{accessToken}}
-
-### Search checklists by name. 400 unknownField on searchTerm, because checklist search takes cardId and archived only.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?searchTerm=Release
 Authorization: Bearer {{accessToken}}
 
 ### Read one checklist. 200.
@@ -4679,19 +4610,19 @@ Content-Type: application/json
 }
 
 ### Read the card's checklists with the default filter. 200, and the archived Follow-up is gone.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 
 ### Read only the archived ones. 200 with the one archived checklist.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&archived=only
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Read every checklist on the card. 200 with all seven.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&archived=include
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?archived=include
 Authorization: Bearer {{accessToken}}
 
 ### Filter by an archived value that doesn't exist. 400 unknownValue on archived, and the message lists Exclude, Only, and Include.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardId}}&archived=nope
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?archived=nope
 Authorization: Bearer {{accessToken}}
 
 ### Restore the checklist. 204.
@@ -4730,51 +4661,47 @@ Content-Type: application/json
 }
 
 ### Create the board the ancestor checks archive.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{checklistWorkspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Checklist board two",
-  "workspaceId": "{{checklistWorkspaceId}}",
   "visibility": "Private"
 }
 
 > {% client.global.set("checklistBoardTwo", response.body.data.id); %}
 
 ### Create the list the ancestor checks archive.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{checklistBoardTwo}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Checklist list two",
-  "boardId": "{{checklistBoardTwo}}"
+  "name": "Checklist list two"
 }
 
 > {% client.global.set("checklistListTwo", response.body.data.id); %}
 
 ### Create the card the ancestor checks archive.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checklistListTwo}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Ancestor card",
-  "listId": "{{checklistListTwo}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("checklistCardTwo", response.body.data.id); %}
 
 ### Create the checklist the ancestor checks write to.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Steps",
-  "cardId": "{{checklistCardTwo}}"
+  "name": "Steps"
 }
 
 > {% client.global.set("checklistSteps", response.body.data.id); %}
@@ -4788,14 +4715,13 @@ Content-Type: application/json
   "value": true
 }
 
-### Create a checklist on the archived card. 409 archived on cardId.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+### Create a checklist on the archived card. 409 archived with a null field.
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "More steps",
-  "cardId": "{{checklistCardTwo}}"
+  "name": "More steps"
 }
 
 ### Rename the checklist on the archived card. 409 archived with a null field, "The card this checklist is on is archived."
@@ -4820,12 +4746,12 @@ Content-Type: application/json
 DELETE {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checklistSteps}}
 Authorization: Bearer {{accessToken}}
 
-### Read the archived card's checklists. 200 with empty data, because exclude hides checklists on hidden cards.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardTwo}}
+### Read the archived card's checklists. 200 with Steps, because an archived card still lists its checklists.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/checklists
 Authorization: Bearer {{accessToken}}
 
 ### Read them with archived=include. 200 with Steps, whose own flag is still off.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checklistCardTwo}}&archived=include
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/checklists?archived=include
 Authorization: Bearer {{accessToken}}
 
 ### Restore the card.
@@ -4882,14 +4808,13 @@ Content-Type: application/json
   "name": "Steps renamed"
 }
 
-### Create a checklist on a card whose board is archived. 409 archived on cardId, naming the board.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+### Create a checklist on a card whose board is archived. 409 archived with a null field, naming the board.
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardTwo}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "More steps",
-  "cardId": "{{checklistCardTwo}}"
+  "name": "More steps"
 }
 
 ### Restore the board.
@@ -4927,26 +4852,24 @@ DELETE {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checklistBetween}}
 Authorization: Bearer {{accessToken}}
 
 ### Create the card the cascade check deletes.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checklistListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Cascade card",
-  "listId": "{{checklistListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("checklistCascadeCard", response.body.data.id); %}
 
 ### Create the checklist the card takes with it.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCascadeCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Goes with the card",
-  "cardId": "{{checklistCascadeCard}}"
+  "name": "Goes with the card"
 }
 
 > {% client.global.set("checklistCascade", response.body.data.id); %}
@@ -4969,322 +4892,319 @@ GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checklistCascade}}
 Authorization: Bearer {{accessToken}}
 
 ### Create the list the check item cards sit in, so card search below sees only them.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{checklistBoardId}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Check item list",
-  "boardId": "{{checklistBoardId}}"
+  "name": "Check item list"
 }
 
 > {% client.global.set("checkItemListId", response.body.data.id); %}
 
 ### Create the card the check item checklists go on.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checkItemListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Check item card",
-  "listId": "{{checkItemListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("checkItemCardId", response.body.data.id); %}
 
 ### Create the checklist the ordering checks run in.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Release",
-  "cardId": "{{checkItemCardId}}"
+  "name": "Release"
 }
 
 > {% client.global.set("checkItemRelease", response.body.data.id); %}
 
 ### Create the checklist a check item moves into.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Follow-up",
-  "cardId": "{{checkItemCardId}}"
+  "name": "Follow-up"
 }
 
 > {% client.global.set("checkItemFollowUp", response.body.data.id); %}
 
 ### Create the checklist the odd check items go in, so Release keeps its six.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Spare",
-  "cardId": "{{checkItemCardId}}"
+  "name": "Spare"
 }
 
 > {% client.global.set("checkItemSpare", response.body.data.id); %}
 
 ### Create a second card, so the notOnCard check has a checklist on another card to name.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checkItemListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Other check item card",
-  "listId": "{{checkItemListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("checkItemOtherCard", response.body.data.id); %}
 
 ### Create the checklist on the other card.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemOtherCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Elsewhere",
-  "cardId": "{{checkItemOtherCard}}"
+  "name": "Elsewhere"
 }
 
 > {% client.global.set("checkItemElsewhere", response.body.data.id); %}
 
 ### Create a check item on the other card's checklist, for the anchor checks below.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemElsewhere}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Stray",
-  "checklistId": "{{checkItemElsewhere}}"
+  "name": "Stray"
 }
 
 > {% client.global.set("checkItemStray", response.body.data.id); %}
 
 ### Create a check item with a padded name and no placement. 201, the name comes back trimmed, position is 65536, and isChecked is false.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "  Write notes  ",
-  "checklistId": "{{checkItemRelease}}"
+  "name": "  Write notes  "
 }
 
 > {% client.global.set("checkItemWrite", response.body.data.id); %}
 
 ### Create a second check item with no placement. It goes to the bottom, 65536 + 65536 = 131072.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Tag the release",
-  "checklistId": "{{checkItemRelease}}"
+  "name": "Tag the release"
 }
 
 > {% client.global.set("checkItemTag", response.body.data.id); %}
 
 ### Create a check item at the top. The smallest sibling halves, so it's 32768.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Prep",
-  "position": "top",
-  "checklistId": "{{checkItemRelease}}"
+  "position": "top"
 }
 
 > {% client.global.set("checkItemPrep", response.body.data.id); %}
 
 ### Create a check item between two siblings. The midpoint of 32768 and 65536 is 49152.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Middle",
   "after": "{{checkItemPrep}}",
-  "before": "{{checkItemWrite}}",
-  "checklistId": "{{checkItemRelease}}"
+  "before": "{{checkItemWrite}}"
 }
 
 > {% client.global.set("checkItemMiddle", response.body.data.id); %}
 
 ### Create a check item at a number the client picked. It's stored as sent.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Numbered",
-  "position": 200000,
-  "checklistId": "{{checkItemRelease}}"
+  "position": 200000
 }
 
 > {% client.global.set("checkItemNumbered", response.body.data.id); %}
 
 ### Create a check item that's already checked, so a client can paste in a list that's partly done. 201 with isChecked true, at 200000 + 65536 = 265536.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Done already",
-  "isChecked": true,
-  "checklistId": "{{checkItemRelease}}"
+  "isChecked": true
 }
 
 > {% client.global.set("checkItemDone", response.body.data.id); %}
 
 ### Create a second check item called Middle. 201, because check item names don't have to be unique.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemSpare}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Middle",
-  "checklistId": "{{checkItemSpare}}"
+  "name": "Middle"
 }
 
-### Create a check item from an empty object. 400 required on name and checklistId. isChecked and placement are optional.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+### Create a check item from an empty object. 400 required on name. isChecked and placement are optional.
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {}
 
 ### Create a check item with a blank name. 400 required on name, because the name is trimmed first.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "   ",
-  "checklistId": "{{checkItemRelease}}"
+  "name": "   "
 }
 
 ### Create a check item with a name of 501 characters. 400 tooLong on name.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "checklistId": "{{checkItemRelease}}"
+  "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 }
 
 ### Create a check item with a padded name of 500 characters. 201, so the column takes the full limit.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemSpare}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  ",
-  "checklistId": "{{checkItemSpare}}"
+  "name": "  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "
 }
 
-### Create a check item on a checklist that doesn't exist. 400 notFound on checklistId.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+### Create a check item on a checklist that doesn't exist. 404 "Checklist not found".
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Nowhere",
-  "checklistId": "3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b"
+  "name": "Nowhere"
 }
 
 ### Create a check item with a position and an anchor. 400 mutuallyExclusive with a null field.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Both",
   "position": "top",
-  "after": "{{checkItemWrite}}",
-  "checklistId": "{{checkItemRelease}}"
+  "after": "{{checkItemWrite}}"
 }
 
 ### Create a check item at a position name that doesn't exist. 400 unknownValue on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Middling",
-  "position": "middle",
-  "checklistId": "{{checkItemRelease}}"
+  "position": "middle"
 }
 
 ### Create a check item at position 0. 400 outOfRange on position.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Zero",
-  "position": 0,
-  "checklistId": "{{checkItemRelease}}"
+  "position": 0
 }
 
 ### Create a check item before an anchor that doesn't exist. 400 notFound on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Anchored",
-  "before": "3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b",
-  "checklistId": "{{checkItemRelease}}"
+  "before": "3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b"
 }
 
 ### Create a check item before one on another checklist. 400 notSibling on before.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Anchored elsewhere",
-  "before": "{{checkItemStray}}",
-  "checklistId": "{{checkItemRelease}}"
+  "before": "{{checkItemStray}}"
 }
 
 ### Create a check item that's already archived. 400 unknownField on isArchived, because check items have no archive.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Put away",
-  "isArchived": true,
-  "checklistId": "{{checkItemRelease}}"
+  "isArchived": true
 }
 
 ### Read the checklist's check items. 200 in position order: Prep, Middle, Write notes, Tag the release, Numbered, Done already.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemRelease}}
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 
-### Read the second page of three. 200 with Write notes and Tag the release, totalCount 6, and totalPages 3.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemRelease}}&pageSize=2&pageNumber=2
+### Read the second page of three. 200 with Write notes and Tag the release. pagination has pageNumber 2, totalCount 6, and totalPages 3.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items?pageSize=2&pageNumber=2
 Authorization: Bearer {{accessToken}}
 
-### Filter by a checklist that doesn't exist. 400 notFound on checklistId.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId=3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b
+### List the check items of a checklist that doesn't exist. 404 "Checklist not found".
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b/check-items
+Authorization: Bearer {{accessToken}}
+
+### Send a bad query to a checklist that doesn't exist. 400 unknownValue on archived, because query errors come before the checklist lookup.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/3f1a5c5e-1b4e-4a2e-9a5b-2c7d8e9f0a1b/check-items?archived=only
 Authorization: Bearer {{accessToken}}
 
 ### Ask for only the archived check items. 400 unknownValue on archived, and the message lists Exclude and Include, because check items have no archive of their own.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?archived=only
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items?archived=only
 Authorization: Bearer {{accessToken}}
 
-### Search check items by name. 400 unknownField on searchTerm, because check item search takes checklistId and archived only.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?searchTerm=Prep
+### Search check items by name. 400 unknownField on searchTerm, because check item search takes archived only.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items?searchTerm=Prep
+Authorization: Bearer {{accessToken}}
+
+### Send checklistId in the query as well. 400 unknownField on checklistId.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items?checklistId={{checkItemRelease}}
+Authorization: Bearer {{accessToken}}
+
+### Send checklistId in the create body. 400 unknownField on checklistId, because the path names the checklist.
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Doubled",
+  "checklistId": "{{checkItemRelease}}"
+}
+
+### Search the old flat check item route. 404, because the route is gone.
+GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemRelease}}
 Authorization: Bearer {{accessToken}}
 
 ### Read one check item. 200.
@@ -5300,7 +5220,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the card's checklists. 200 with Release carrying six, Follow-up none, and Spare two.
-GET {{Laneway_Api_HostAddress}}/api/v1/checklists?cardId={{checkItemCardId}}
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 
 ### Rename a check item with a padded name. 200, the name comes back trimmed and updatedBy becomes the actor.
@@ -5549,16 +5469,15 @@ Content-Type: application/json
   "checklistId": "{{checkItemRelease}}"
 }
 
-### The 200 check item cap takes 200 creates to reach, so this file stops short of it. A create past the cap, and a move into a checklist that already holds 200, are 409 limitReached on checklistId, with 200 in the message.
+### The 200 check item cap takes 200 creates to reach, so this file stops short of it. A create past the cap is 409 limitReached with a null field, and a move into a checklist that already holds 200 is 409 limitReached on checklistId. Both carry 200 in the message.
 
 ### Create the card the completion checks run on. It has a due date and no check items, so it shows the isDueComplete it was created with.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checkItemListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Completion card",
-  "listId": "{{checkItemListId}}",
   "dueDate": "2026-12-01T09:00:00Z",
   "isDueComplete": false
 }
@@ -5570,38 +5489,35 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Create its first checklist.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemDueCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Release",
-  "cardId": "{{checkItemDueCard}}"
+  "name": "Release"
 }
 
 > {% client.global.set("checkItemDueRelease", response.body.data.id); %}
 
 ### Add an open check item to it.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemDueRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Open",
-  "checklistId": "{{checkItemDueRelease}}"
+  "name": "Open"
 }
 
 > {% client.global.set("checkItemDueA", response.body.data.id); %}
 
 ### Add a checked one.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemDueRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Checked",
-  "isChecked": true,
-  "checklistId": "{{checkItemDueRelease}}"
+  "isChecked": true
 }
 
 ### Read the card. 200 with isDueComplete false, checkItemCount 2, and checkedItemCount 1, for a "1/2" badge.
@@ -5622,25 +5538,23 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemDueCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Add a second checklist to the same card.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemDueCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Follow-up",
-  "cardId": "{{checkItemDueCard}}"
+  "name": "Follow-up"
 }
 
 > {% client.global.set("checkItemDueFollowUp", response.body.data.id); %}
 
 ### Add an open check item to it.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemDueFollowUp}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Still open",
-  "checklistId": "{{checkItemDueFollowUp}}"
+  "name": "Still open"
 }
 
 > {% client.global.set("checkItemDueC", response.body.data.id); %}
@@ -5718,39 +5632,36 @@ Content-Type: application/json
 }
 
 ### Create a card with no due date.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checkItemListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Undated card",
-  "listId": "{{checkItemListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("checkItemUndatedCard", response.body.data.id); %}
 
 ### Give it a checklist.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemUndatedCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Steps",
-  "cardId": "{{checkItemUndatedCard}}"
+  "name": "Steps"
 }
 
 > {% client.global.set("checkItemUndatedList", response.body.data.id); %}
 
 ### Give it one checked check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemUndatedList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Checked",
-  "isChecked": true,
-  "checklistId": "{{checkItemUndatedList}}"
+  "isChecked": true
 }
 
 ### Read it. 200 with isDueComplete false and checkItemCount 1, because a card with no due date is never complete.
@@ -5758,13 +5669,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemUndatedCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Create the card the delete copy rule runs on.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checkItemListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Delete copy card",
-  "listId": "{{checkItemListId}}",
   "dueDate": "2026-12-01T09:00:00Z",
   "isDueComplete": false
 }
@@ -5772,26 +5682,24 @@ Content-Type: application/json
 > {% client.global.set("checkItemCopyCard", response.body.data.id); %}
 
 ### Give it a checklist.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCopyCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Steps",
-  "cardId": "{{checkItemCopyCard}}"
+  "name": "Steps"
 }
 
 > {% client.global.set("checkItemCopyList", response.body.data.id); %}
 
 ### Give it one checked check item, which makes the card complete.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemCopyList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Only",
-  "isChecked": true,
-  "checklistId": "{{checkItemCopyList}}"
+  "isChecked": true
 }
 
 > {% client.global.set("checkItemCopyOnly", response.body.data.id); %}
@@ -5809,13 +5717,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCopyCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Create the card the archive copy rule runs on.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checkItemListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Archive copy card",
-  "listId": "{{checkItemListId}}",
   "dueDate": "2026-12-01T09:00:00Z",
   "isDueComplete": false
 }
@@ -5823,26 +5730,24 @@ Content-Type: application/json
 > {% client.global.set("checkItemArchiveCard", response.body.data.id); %}
 
 ### Give it a checklist.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemArchiveCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Steps",
-  "cardId": "{{checkItemArchiveCard}}"
+  "name": "Steps"
 }
 
 > {% client.global.set("checkItemArchiveList", response.body.data.id); %}
 
 ### Give it one checked check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemArchiveList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Only",
-  "isChecked": true,
-  "checklistId": "{{checkItemArchiveList}}"
+  "isChecked": true
 }
 
 ### Archive the last unarchived checklist that holds check items. 204.
@@ -5859,13 +5764,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemArchiveCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Create the card that shows deleting an archived checklist never copies.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checkItemListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Keep stored card",
-  "listId": "{{checkItemListId}}",
   "dueDate": "2026-12-01T09:00:00Z",
   "isDueComplete": false
 }
@@ -5873,48 +5777,44 @@ Content-Type: application/json
 > {% client.global.set("checkItemKeepCard", response.body.data.id); %}
 
 ### Give it a live checklist with an open check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemKeepCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Live",
-  "cardId": "{{checkItemKeepCard}}"
+  "name": "Live"
 }
 
 > {% client.global.set("checkItemKeepLive", response.body.data.id); %}
 
 ### Add the open check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemKeepLive}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Open",
-  "checklistId": "{{checkItemKeepLive}}"
+  "name": "Open"
 }
 
 ### Give it a second checklist, which gets archived and deleted.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemKeepCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Doomed",
-  "cardId": "{{checkItemKeepCard}}"
+  "name": "Doomed"
 }
 
 > {% client.global.set("checkItemKeepArchived", response.body.data.id); %}
 
 ### Add a checked check item to it.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemKeepArchived}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Checked",
-  "isChecked": true,
-  "checklistId": "{{checkItemKeepArchived}}"
+  "isChecked": true
 }
 
 ### Archive it, so it can be deleted. 204, and the live checklist still holds a counted check item, so nothing is copied.
@@ -5935,70 +5835,65 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemKeepCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Search the check item list for complete cards. 200 with Completion card, Delete copy card, and Archive copy card, because the filter reads the computed value.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{checkItemListId}}&isDueComplete=true&pageSize=100
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{checkItemListId}}/cards?isDueComplete=true&pageSize=100
 Authorization: Bearer {{accessToken}}
 
 ### Search it for cards that aren't complete. 200 with Keep stored card alone, because a card with no due date never matches either way.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{checkItemListId}}&isDueComplete=false&pageSize=100
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{checkItemListId}}/cards?isDueComplete=false&pageSize=100
 Authorization: Bearer {{accessToken}}
 
 ### Create the card the archived checks write to.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{checkItemListId}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Archived checks card",
-  "listId": "{{checkItemListId}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("checkItemHiddenCard", response.body.data.id); %}
 
 ### Give it the checklist that gets archived.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemHiddenCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Put away",
-  "cardId": "{{checkItemHiddenCard}}"
+  "name": "Put away"
 }
 
 > {% client.global.set("checkItemHiddenList", response.body.data.id); %}
 
 ### Give it a check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemHiddenList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Hidden step",
-  "checklistId": "{{checkItemHiddenList}}"
+  "name": "Hidden step"
 }
 
 > {% client.global.set("checkItemHidden", response.body.data.id); %}
 
 ### Give the card a second checklist that stays live.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemHiddenCard}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Still live",
-  "cardId": "{{checkItemHiddenCard}}"
+  "name": "Still live"
 }
 
 > {% client.global.set("checkItemLiveList", response.body.data.id); %}
 
 ### Give that one a check item.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemLiveList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Live step",
-  "checklistId": "{{checkItemLiveList}}"
+  "name": "Live step"
 }
 
 > {% client.global.set("checkItemLive", response.body.data.id); %}
@@ -6012,26 +5907,21 @@ Content-Type: application/json
   "value": true
 }
 
-### Read its check items with the default filter. 200 with empty data, because exclude hides check items on archived checklists.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemHiddenList}}
-Authorization: Bearer {{accessToken}}
-
-### Read them with archived=include. 200 with the hidden step.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemHiddenList}}&archived=include
+### Read its check items with the default filter. 200 with the hidden step, because an archived checklist still lists its check items.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemHiddenList}}/check-items
 Authorization: Bearer {{accessToken}}
 
 ### Read the archived checklist. 200, and checkItems still holds it, because a checklist embeds every check item whatever its state.
 GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemHiddenList}}
 Authorization: Bearer {{accessToken}}
 
-### Create a check item on the archived checklist. 409 archived on checklistId.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+### Create a check item on the archived checklist. 409 archived with a null field.
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemHiddenList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Too late",
-  "checklistId": "{{checkItemHiddenList}}"
+  "name": "Too late"
 }
 
 ### Rename the check item on the archived checklist. 409 archived with a null field, "The checklist this check item is on is archived."
@@ -6092,12 +5982,8 @@ Content-Type: application/json
   "name": "Renamed"
 }
 
-### Read the live checklist's check items. 200 with empty data, because exclude hides check items on hidden cards too.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemLiveList}}
-Authorization: Bearer {{accessToken}}
-
-### Read them with archived=include. 200 with the live step.
-GET {{Laneway_Api_HostAddress}}/api/v1/check-items?checklistId={{checkItemLiveList}}&archived=include
+### Read the live checklist's check items. 200 with the live step, because a checklist under an archived card still lists its check items.
+GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemLiveList}}/check-items
 Authorization: Bearer {{accessToken}}
 
 ### Restore the card.
@@ -6122,25 +6008,23 @@ DELETE {{Laneway_Api_HostAddress}}/api/v1/check-items/{{checkItemLive}}
 Authorization: Bearer {{accessToken}}
 
 ### Create the checklist the cascade check deletes.
-POST {{Laneway_Api_HostAddress}}/api/v1/checklists
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{checkItemCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Goes with the checklist",
-  "cardId": "{{checkItemCardId}}"
+  "name": "Goes with the checklist"
 }
 
 > {% client.global.set("checkItemCascadeList", response.body.data.id); %}
 
 ### Create the check item the checklist takes with it.
-POST {{Laneway_Api_HostAddress}}/api/v1/check-items
+POST {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemCascadeList}}/check-items
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Doomed",
-  "checklistId": "{{checkItemCascadeList}}"
+  "name": "Doomed"
 }
 
 > {% client.global.set("checkItemCascade", response.body.data.id); %}
@@ -6175,64 +6059,59 @@ Content-Type: application/json
 > {% client.global.set("attachmentWorkspace", response.body.data.id); %}
 
 ### Create the board.
-POST {{Laneway_Api_HostAddress}}/api/v1/boards
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{attachmentWorkspace}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "name": "Attachment board",
-  "workspaceId": "{{attachmentWorkspace}}",
   "visibility": "Public"
 }
 
 > {% client.global.set("attachmentBoard", response.body.data.id); %}
 
 ### Create the list.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{attachmentBoard}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Attachment list",
-  "boardId": "{{attachmentBoard}}"
+  "name": "Attachment list"
 }
 
 > {% client.global.set("attachmentList", response.body.data.id); %}
 
 ### Create the card every upload below goes on.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{attachmentList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Card with files",
-  "listId": "{{attachmentList}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("attachmentCard", response.body.data.id); %}
 
 ### Create a second card, for the checks that read across cards.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{attachmentList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Other card",
-  "listId": "{{attachmentList}}",
   "isDueComplete": false
 }
 
 > {% client.global.set("attachmentOtherCard", response.body.data.id); %}
 
 ### cover is gone from card create. 400 unknownField on cover.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{attachmentList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Covered",
-  "listId": "{{attachmentList}}",
   "isDueComplete": false,
   "cover": "Red"
 }
@@ -6253,7 +6132,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Upload a PNG with a name. 201, name "Q3 numbers", fileName "report.png", mimeType "image/png",
-### and url the /content path. The part's own Content-Type is ignored.
+### and url /api/v1/attachments/{id}/content. The part's own Content-Type is ignored.
 POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
 Authorization: Bearer {{accessToken}}
 Content-Type: multipart/form-data; boundary=WebAppBoundary
@@ -6631,23 +6510,19 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments
 Authorization: Bearer {{accessToken}}
 
 ### Read one attachment. 200.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 
 ### Read an unknown attachment. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/11111111-1111-1111-1111-111111111111
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/11111111-1111-1111-1111-111111111111
 Authorization: Bearer {{accessToken}}
 
-### Read the attachment through the wrong card. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentFile}}
-Authorization: Bearer {{accessToken}}
-
-### Read the attachment through an unknown card. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/11111111-1111-1111-1111-111111111111/attachments/{{attachmentFile}}
+### Read it through the old route under the card. 404, because the route is gone.
+GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 
 ### Rename it. 200, name "Q3 report", and fileName still "report.png" so the download keeps its name.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6660,7 +6535,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Rename with no name. 400 required on name.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6668,7 +6543,7 @@ Content-Type: application/json
 }
 
 ### Rename with a blank name. 400 required on name.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6677,7 +6552,7 @@ Content-Type: application/json
 }
 
 ### Rename with 257 characters. 400 tooLong on name.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6686,7 +6561,7 @@ Content-Type: application/json
 }
 
 ### Rename with url. 400 unknownField on url, because a link's URL never changes.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6696,7 +6571,7 @@ Content-Type: application/json
 }
 
 ### Rename with kind. 400 unknownField on kind.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6706,7 +6581,7 @@ Content-Type: application/json
 }
 
 ### Rename with fileName. 400 unknownField on fileName.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6716,7 +6591,7 @@ Content-Type: application/json
 }
 
 ### Rename with file. 400 unknownField on file, because PUT carries no bytes.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6726,16 +6601,7 @@ Content-Type: application/json
 }
 
 ### Rename an unknown attachment. 404.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/11111111-1111-1111-1111-111111111111
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "name": "Q3 report"
-}
-
-### Rename through the wrong card. 404.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentFile}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/11111111-1111-1111-1111-111111111111
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6745,25 +6611,20 @@ Content-Type: application/json
 
 ### Download it. 302 to a signed URL that lasts 300 seconds, with Cache-Control: no-store. Following
 ### it downloads report.png with Content-Disposition: attachment and its original file name.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/{{attachmentFile}}/content
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentFile}}/content
 Authorization: Bearer {{accessToken}}
 
 ### Download an unknown attachment. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments/11111111-1111-1111-1111-111111111111/content
-Authorization: Bearer {{accessToken}}
-
-### Download through the wrong card. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentFile}}/content
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/11111111-1111-1111-1111-111111111111/content
 Authorization: Bearer {{accessToken}}
 
 ### Create the card the archive checks use.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{attachmentList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Archived card",
-  "listId": "{{attachmentList}}",
   "isDueComplete": false
 }
 
@@ -6803,7 +6664,7 @@ Content-Disposition: form-data; name="file"; filename="report.png"
 --WebAppBoundary--
 
 ### Rename on the archived card. 409 archived.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments/{{attachmentOnArchived}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentOnArchived}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -6812,7 +6673,7 @@ Content-Type: application/json
 }
 
 ### Delete on the archived card. 409 archived.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments/{{attachmentOnArchived}}
+DELETE {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentOnArchived}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the archived card's attachments. 200, because reads don't care about the archive.
@@ -6820,7 +6681,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachme
 Authorization: Bearer {{accessToken}}
 
 ### Download from the archived card. 302, because a download is a read.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentArchivedCard}}/attachments/{{attachmentOnArchived}}/content
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentOnArchived}}/content
 Authorization: Bearer {{accessToken}}
 
 ### Restore the card. 204.
@@ -6833,25 +6694,23 @@ Content-Type: application/json
 }
 
 ### Create a list to archive, so an upload under an archived parent can be checked.
-POST {{Laneway_Api_HostAddress}}/api/v1/lists
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{attachmentBoard}}/lists
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Archived list",
-  "boardId": "{{attachmentBoard}}"
+  "name": "Archived list"
 }
 
 > {% client.global.set("attachmentArchivedList", response.body.data.id); %}
 
 ### Create a live card on it.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{attachmentArchivedList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Under an archived list",
-  "listId": "{{attachmentArchivedList}}",
   "isDueComplete": false
 }
 
@@ -6916,13 +6775,12 @@ Content-Type: application/json
 }
 
 ### Create the card the delete checks use.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{attachmentList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Delete card",
-  "listId": "{{attachmentList}}",
   "isDueComplete": false
 }
 
@@ -6942,38 +6800,33 @@ Content-Disposition: form-data; name="file"; filename="rows.csv"
 > {% client.global.set("attachmentDoomed", response.body.data.id); %}
 
 ### Delete an unknown attachment. 404.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/11111111-1111-1111-1111-111111111111
-Authorization: Bearer {{accessToken}}
-
-### Delete through the wrong card. 404.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentOtherCard}}/attachments/{{attachmentDoomed}}
+DELETE {{Laneway_Api_HostAddress}}/api/v1/attachments/11111111-1111-1111-1111-111111111111
 Authorization: Bearer {{accessToken}}
 
 ### Delete it. 204, with no archive step, because attachments have no archive. The trigger queues the
 ### object key, and the drainer removes the object from the bucket within a minute.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}
+DELETE {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentDoomed}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the deleted attachment. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentDoomed}}
 Authorization: Bearer {{accessToken}}
 
 ### Download the deleted attachment. 404.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}/content
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentDoomed}}/content
 Authorization: Bearer {{accessToken}}
 
 ### Delete it again. 404.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentDeleteCard}}/attachments/{{attachmentDoomed}}
+DELETE {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentDoomed}}
 Authorization: Bearer {{accessToken}}
 
 ### Create the card whose delete has to take its files with it.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{attachmentList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Cascade card",
-  "listId": "{{attachmentList}}",
   "isDueComplete": false
 }
 
@@ -7007,7 +6860,7 @@ DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCascadeCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the attachment the deleted card held. 404, because the cascade took its row.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCascadeCard}}/attachments/{{attachmentCascade}}
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{attachmentCascade}}
 Authorization: Bearer {{accessToken}}
 
 ### A card holds at most 100 attachments. The 101st is 409 limitReached with a null field, counted
@@ -7017,13 +6870,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{attachmentCard}}/attachments
 Authorization: Bearer {{accessToken}}
 
 ### Create the card the link checks use.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{attachmentList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Card with links",
-  "listId": "{{attachmentList}}",
   "isDueComplete": false
 }
 
@@ -7204,11 +7056,11 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
 Authorization: Bearer {{accessToken}}
 
 ### Download a link. 404, because a redirect to a stored link would make this an open redirect.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{linkCard}}/attachments/{{linkAttachment}}/content
+GET {{Laneway_Api_HostAddress}}/api/v1/attachments/{{linkAttachment}}/content
 Authorization: Bearer {{accessToken}}
 
 ### Rename a link. 200, name "Renamed", and url unchanged.
-PUT {{Laneway_Api_HostAddress}}/api/v1/cards/{{linkCard}}/attachments/{{linkAttachment}}
+PUT {{Laneway_Api_HostAddress}}/api/v1/attachments/{{linkAttachment}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -7222,13 +7074,12 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{linkCard}}/attachments
 Authorization: Bearer {{accessToken}}
 
 ### Create the card the cover checks use.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{attachmentList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Card with a cover",
-  "listId": "{{attachmentList}}",
   "isDueComplete": false
 }
 
@@ -7297,8 +7148,8 @@ Content-Type: application/json
   "attachmentId": "{{coverImage}}"
 }
 
-### Read the card. 200, cover holds the attachment id, a null color, and the /content path as url,
-### and updatedAt is stamped, because the cover changed.
+### Read the card. 200, cover holds the attachment id, a null color, and
+### /api/v1/attachments/{id}/content as url, and updatedAt is stamped, because the cover changed.
 GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{coverCard}}
 Authorization: Bearer {{accessToken}}
 
@@ -7498,7 +7349,7 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{coverCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Delete the attachment the cover points at. 204.
-DELETE {{Laneway_Api_HostAddress}}/api/v1/cards/{{coverCard}}/attachments/{{coverImage}}
+DELETE {{Laneway_Api_HostAddress}}/api/v1/attachments/{{coverImage}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the card. 200, cover is null, updatedAt is unchanged, because the foreign key cleared the
@@ -7507,17 +7358,16 @@ GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{coverCard}}
 Authorization: Bearer {{accessToken}}
 
 ### Read the cards in the list. 200, and every card carries cover and attachmentCount.
-GET {{Laneway_Api_HostAddress}}/api/v1/cards?listId={{attachmentList}}
+GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{attachmentList}}/cards
 Authorization: Bearer {{accessToken}}
 
 ### Create the card the archive checks use.
-POST {{Laneway_Api_HostAddress}}/api/v1/cards
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{attachmentList}}/cards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "title": "Archived cover",
-  "listId": "{{attachmentList}}",
   "isDueComplete": false
 }
 
@@ -7655,3 +7505,201 @@ Content-Type: application/json
 {
   "value": false
 }
+
+### Create the board the cap checks run on. A board holds at most 5,000 open cards, 500 open lists, and 1,000 labels, and a card holds at most 100 labels.
+POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Cap board {{$uuid}}"
+}
+
+> {% client.global.set("capBoard", response.body.data.id); %}
+
+### Create the list the seeded cards go in.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{capBoard}}/lists
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Cap list"
+}
+
+> {% client.global.set("capList", response.body.data.id); %}
+
+### Create the card the label cap check runs on.
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{capList}}/cards
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Cap card",
+  "isDueComplete": false
+}
+
+> {% client.global.set("capCard", response.body.data.id); %}
+
+### Create the label the card label cap check adds.
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{capBoard}}/labels
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Cap label"
+}
+
+> {% client.global.set("capLabel", response.body.data.id); %}
+
+### Create a card with 101 label ids. 400 tooLong on labelIds, from the validator before any label is looked up.
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{capList}}/cards
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Too many labels",
+  "isDueComplete": false,
+  "labelIds": [
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}",
+    "{{$uuid}}"
+  ]
+}
+
+### Reaching a board cap takes thousands of writes, so seed rows in psql first. Fill the board to 5,000 open cards:
+### INSERT INTO "Cards" ("Id", "Title", "Description", "ListId", "IsDueComplete", "IsArchived", "Position", "CreatedAt", "CreatedBy") SELECT gen_random_uuid(), 'Seeded card ' || n, '', l."Id", false, false, n * 65536.0, now(), l."CreatedBy" FROM "Lists" l, generate_series(1, 4999) AS n WHERE l."Id" = '<capList>';
+### Then create one more card. 409 limitReached with a null field: "A board holds at most 5,000 open cards. This one has 5,000, and this change adds 1."
+POST {{Laneway_Api_HostAddress}}/api/v1/lists/{{capList}}/cards
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "One card too many",
+  "isDueComplete": false
+}
+
+### Fill the board to 500 open lists in psql:
+### INSERT INTO "Lists" ("Id", "Name", "BoardId", "IsArchived", "Position", "CreatedAt", "CreatedBy") SELECT gen_random_uuid(), 'Seeded list ' || n, b."Id", false, n * 65536.0, now(), b."CreatedBy" FROM "Boards" b, generate_series(1, 499) AS n WHERE b."Id" = '<capBoard>';
+### Then create one more list. 409 limitReached with a null field: "A board holds at most 500 open lists. This one has 500, and this change adds 1."
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{capBoard}}/lists
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "One list too many"
+}
+
+### Fill the board to 1,000 labels in psql:
+### INSERT INTO "Labels" ("Id", "Name", "BoardId", "CreatedAt", "CreatedBy") SELECT gen_random_uuid(), 'Seeded label ' || n, b."Id", now(), b."CreatedBy" FROM "Boards" b, generate_series(1, 999) AS n WHERE b."Id" = '<capBoard>';
+### Then create one more label. 409 limitReached with a null field: "A board holds at most 1,000 labels. This one has 1,000, and this change adds 1."
+POST {{Laneway_Api_HostAddress}}/api/v1/boards/{{capBoard}}/labels
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "One label too many"
+}
+
+### Put 100 of the seeded labels on the cap card in psql:
+### INSERT INTO "CardLabels" ("CardsId", "LabelsId") SELECT '<capCard>', "Id" FROM "Labels" WHERE "BoardId" = '<capBoard>' AND "Id" <> '<capLabel>' LIMIT 100;
+### Then add the cap label to the card. 409 limitReached with a null field: "A card holds at most 100 labels."
+POST {{Laneway_Api_HostAddress}}/api/v1/cards/{{capCard}}/labels/{{capLabel}}
+Authorization: Bearer {{accessToken}}

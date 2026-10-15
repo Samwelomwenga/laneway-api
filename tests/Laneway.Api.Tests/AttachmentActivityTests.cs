@@ -63,7 +63,7 @@ public class AttachmentActivityTests : ApiTests
         var card = await CreateCardAsync(list.Id, "Write the brief");
         var attachment = await UploadAttachmentAsync(card.Id, "shot.png", "The mock");
 
-        using var response = await RenameAttachmentAsync(card.Id, attachment.Id, "The final mock");
+        using var response = await RenameAttachmentAsync(attachment.Id, "The final mock");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateAttachment");
@@ -83,12 +83,12 @@ public class AttachmentActivityTests : ApiTests
         var card = await CreateCardAsync((await CreateListAsync(board.Id, "Doing")).Id, "Write the brief");
         var attachment = await UploadAttachmentAsync(card.Id, "shot.png", "The mock");
 
-        using var response = await RenameAttachmentAsync(card.Id, attachment.Id, "The mock");
+        using var response = await RenameAttachmentAsync(attachment.Id, "The mock");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateAttachment");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class AttachmentActivityTests : ApiTests
         var card = await CreateCardAsync(list.Id, "Write the brief");
         var attachment = await UploadAttachmentAsync(card.Id, "notes.txt", "The notes");
 
-        await DeleteAttachmentAsync(card.Id, attachment.Id);
+        await DeleteAttachmentAsync(attachment.Id);
 
         var page = await ActivityAsync($"cardId={card.Id}&type=deleteAttachment");
 
@@ -121,7 +121,7 @@ public class AttachmentActivityTests : ApiTests
         var attachment = await UploadAttachmentAsync(card.Id, "shot.png", "The mock");
         await SetCoverAsync(card.Id, attachmentId: attachment.Id);
 
-        await DeleteAttachmentAsync(card.Id, attachment.Id);
+        await DeleteAttachmentAsync(attachment.Id);
 
         var page = await ActivityAsync($"cardId={card.Id}&type=deleteAttachment");
 
@@ -163,7 +163,7 @@ public class AttachmentActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCardCover");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         var entry = page.Entries[0];
         Assert.Equal(attachment.Id, entry.Data.Id("cover.attachment.id"));
         Assert.Equal("The mock", entry.Data.Text("cover.attachment.name"));
@@ -184,7 +184,7 @@ public class AttachmentActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCardCover");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         var entry = page.Entries[0];
         Assert.False(entry.Data.Has("cover"));
         Assert.Equal(attachment.Id, entry.Data.Id("old.attachment.id"));
@@ -203,7 +203,7 @@ public class AttachmentActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCardCover");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -216,7 +216,7 @@ public class AttachmentActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCardCover");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -226,13 +226,13 @@ public class AttachmentActivityTests : ApiTests
         var card = await CreateCardAsync((await CreateListAsync(board.Id, "Doing")).Id, "Write the brief");
         var attachment = await UploadAttachmentAsync(card.Id, "shot.png", "The mock");
 
-        using var renamed = await RenameAttachmentAsync(card.Id, attachment.Id, "The final mock");
+        using var renamed = await RenameAttachmentAsync(attachment.Id, "The final mock");
         Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
-        await DeleteAttachmentAsync(card.Id, attachment.Id);
+        await DeleteAttachmentAsync(attachment.Id);
 
         var page = await ActivityAsync($"cardId={card.Id}&type=addAttachment,updateAttachment,deleteAttachment");
 
-        Assert.Equal(3, page.TotalCount);
+        Assert.Equal(3, page.Pagination.TotalCount);
         Assert.Equal("The mock", page.Entries[2].Data.Text("attachment.name"));
         Assert.Equal("The final mock", page.Entries[0].Data.Text("attachment.name"));
     }

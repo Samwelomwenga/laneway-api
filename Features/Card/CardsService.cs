@@ -7,8 +7,8 @@ public interface ICardService
     Task<ApiResponse<CardDto>> CreateAsync(CreateCardWrite write);
     Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardWrite write);
     Task<ApiResponse<CardDto>> MoveAsync(Guid id, MoveCardWrite write);
-    Task<ApiResponse<CardDto>> GetByIdAsync(Guid id);
-    Task<ApiResponse<List<CardDto>>> GetAllAsync(CardSearchDto searchDto);
+    Task<ApiResponse<CardViewDto>> GetByIdAsync(Guid id);
+    Task<ApiResponse<List<CardDto>>> GetAllAsync(Guid listId, CardSearchDto searchDto);
     Task<ApiResponse<bool>> AddLabelAsync(Guid cardId, Guid labelId);
     Task<ApiResponse<bool>> RemoveLabelAsync(Guid cardId, Guid labelId);
     Task<ApiResponse<bool>> SetCoverAsync(Guid id, CoverDto coverDto);
@@ -24,9 +24,9 @@ public class CardService : ICardService
     private readonly Placements _placements;
     private readonly ArchiveGuard _archive;
     private readonly LabelMatching _labelMatching;
+    private readonly BoardCaps _caps;
     private readonly CardCompletion _completion;
-    private readonly AttachmentCounts _attachments;
-    private readonly CommentCounts _comments;
+    private readonly CardReads _reads;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
 
@@ -36,9 +36,9 @@ public class CardService : ICardService
         Placements placements,
         ArchiveGuard archive,
         LabelMatching labelMatching,
+        BoardCaps caps,
         CardCompletion completion,
-        AttachmentCounts attachments,
-        CommentCounts comments,
+        CardReads reads,
         ActivityWriter activity,
         ActivityTree tree)
     {
@@ -47,9 +47,9 @@ public class CardService : ICardService
         _placements = placements;
         _archive = archive;
         _labelMatching = labelMatching;
+        _caps = caps;
         _completion = completion;
-        _attachments = attachments;
-        _comments = comments;
+        _reads = reads;
         _activity = activity;
         _tree = tree;
     }
@@ -59,14 +59,14 @@ public class CardService : ICardService
         var listId = write.ListId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var (labels, listExists, errors) = await ResolveReferencesAsync(listId, write.LabelIds);
-        var position = 0d;
-        if (listExists)
+        if (await _context.BoardOfListAsync(listId) is not { } boardId)
         {
-            var placed = await _placements.ResolveInListAsync(listId, Placement.Of(write));
-            errors.AddRange(placed.Errors);
-            position = placed.Position;
+            return ReferenceErrors.ParentNotFound<CardDto>("List");
         }
+
+        var (labels, errors) = await ResolveLabelsAsync(boardId, write.LabelIds);
+        var placed = await _placements.ResolveInListAsync(boardId, listId, Placement.Of(write));
+        errors.AddRange(placed.Errors);
 
         if (errors.Count > 0)
         {
@@ -75,10 +75,15 @@ public class CardService : ICardService
 
         if (await _archive.OnListAsync(listId) is { } archived)
         {
-            return ArchiveErrors.NoCreate<CardDto>(archived, "listId", TreeItem.Card);
+            return ArchiveErrors.NoCreate<CardDto>(archived, null, TreeItem.Card);
         }
 
-        var card = MapToEntity(write, _actor.Id, position);
+        if (await _caps.ExceededAsync(boardId, new BoardGrowth(Cards: 1)) is { } full)
+        {
+            return BoardCaps.Full<CardDto>(full);
+        }
+
+        var card = MapToEntity(write, _actor.Id, placed.Position);
         card.Labels.AddRange(labels);
 
         _context.Cards.Add(card);
@@ -104,6 +109,7 @@ public class CardService : ICardService
     public async Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardWrite write)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
+        await _context.TryLockCardAsync(id);
 
         var card = await _context.Cards
             .Include(c => c.Labels)
@@ -118,7 +124,8 @@ public class CardService : ICardService
             return ArchiveErrors.ReadOnly<CardDto>(archived, TreeItem.Card);
         }
 
-        var (labels, _, referenceErrors) = await ResolveReferencesAsync(card.ListId, write.LabelIds);
+        var (labels, referenceErrors) = await ResolveLabelsAsync(
+            await _context.BoardOfListAsync(card.ListId), write.LabelIds);
         if (referenceErrors.Count > 0)
         {
             return ReferenceErrors.Invalid<CardDto>(referenceErrors);
@@ -156,11 +163,7 @@ public class CardService : ICardService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var cardDto = CardView.Of(
-            card,
-            await _completion.TallyAsync(id),
-            await _attachments.OnCardAsync(id),
-            await _comments.OnCardAsync(id));
+        var cardDto = await _reads.OfAsync(card);
 
         return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card updated successfully");
     }
@@ -236,6 +239,13 @@ public class CardService : ICardService
         var swaps = new List<LabelSwap>();
         if (crossesBoards)
         {
+            var growth = new BoardGrowth(
+                Cards: 1, Labels: await _labelMatching.CountCreatedAsync(card.Labels, boardId));
+            if (await _caps.ExceededAsync(boardId, growth) is { } full)
+            {
+                return BoardCaps.Full<CardDto>(full);
+            }
+
             var matches = await _labelMatching.CarryToBoardAsync([card], boardId);
             swaps.AddRange(matches.ConvertAll(match =>
                 new LabelSwap(LabelRef.Of(match.From), LabelRef.Of(match.To), match.Created)));
@@ -278,40 +288,45 @@ public class CardService : ICardService
         await transaction.CommitAsync();
 
         return ApiResponse<CardDto>.SuccessResponse(
-            CardView.Of(
-                card,
-                await _completion.TallyAsync(id),
-                await _attachments.OnCardAsync(id),
-                await _comments.OnCardAsync(id)),
+            await _reads.OfAsync(card),
             "Card moved successfully");
     }
 
-    public async Task<ApiResponse<CardDto>> GetByIdAsync(Guid id)
+    public async Task<ApiResponse<CardViewDto>> GetByIdAsync(Guid id)
     {
         var card = await _context.Cards
             .Include(c => c.Labels)
             .FirstOrDefaultAsync(c => c.Id == id);
         if (card == null)
         {
-            return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
+            return ApiResponse<CardViewDto>.ErrorResponse("Card not found", 404);
         }
 
-        var cardDto = CardView.Of(
-            card,
-            await _completion.TallyAsync(id),
-            await _attachments.OnCardAsync(id),
-            await _comments.OnCardAsync(id));
+        var checklists = await ArchiveView.Checklists(
+                _context.Checklists.Where(c => c.CardId == id), ArchiveFilter.Exclude)
+            .InSortOrder()
+            .Include(c => c.CheckItems)
+            .ToListAsync();
+        var attachments = await _context.Attachments
+            .Where(attachment => attachment.CardId == id)
+            .NewestFirst()
+            .ToListAsync();
 
-        return ApiResponse<CardDto>.SuccessResponse(cardDto, "Card retrieved successfully");
+        var cardView = new CardViewDto(
+            await _reads.OfAsync(card),
+            checklists.ConvertAll(ChecklistView.Of),
+            attachments.ConvertAll(AttachmentView.Of));
+
+        return ApiResponse<CardViewDto>.SuccessResponse(cardView, "Card retrieved successfully");
     }
-    public async Task<ApiResponse<List<CardDto>>> GetAllAsync(CardSearchDto searchDto)
+    public async Task<ApiResponse<List<CardDto>>> GetAllAsync(Guid listId, CardSearchDto searchDto)
     {
-        if (searchDto.ListId is { } filterListId && !await _context.Lists.AnyAsync(l => l.Id == filterListId))
+        if (!await _context.Lists.AnyAsync(l => l.Id == listId))
         {
-            return ReferenceErrors.NotFound<List<CardDto>>("listId", "List", filterListId);
+            return ReferenceErrors.ParentNotFound<List<CardDto>>("List");
         }
 
-        var query = _context.Cards.AsQueryable();
+        var query = _context.Cards.Where(c => c.ListId == listId);
 
         if (searchDto.SearchTerm is { } term)
         {
@@ -319,12 +334,7 @@ public class CardService : ICardService
                                      c.Description.ToLower().Contains(term.ToLower()));
         }
 
-        if (searchDto.ListId is { } listId)
-        {
-            query = query.Where(c => c.ListId == listId);
-        }
-
-        query = ArchiveView.Cards(query, searchDto.Archived, _context);
+        query = ArchiveView.Cards(query, searchDto.Archived);
 
         if (searchDto.DueDate is { } dueDate)
         {
@@ -355,20 +365,11 @@ public class CardService : ICardService
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var cardIds = cards.ConvertAll(c => c.Id);
-        var tallies = await _completion.TallyAsync(cardIds);
-        var attachmentCounts = await _attachments.OnCardsAsync(cardIds);
-        var commentCounts = await _comments.OnCardsAsync(cardIds);
-
         return PagedResponse<CardDto>.SuccessResponse(
-            cards.ConvertAll(card => CardView.Of(
-                card,
-                tallies.GetValueOrDefault(card.Id),
-                attachmentCounts.GetValueOrDefault(card.Id),
-                commentCounts.GetValueOrDefault(card.Id))),
+            await _reads.OfAsync(cards),
             totalCount,
             pageSize: searchDto.PageSize,
-            currentPage: searchDto.PageNumber,
+            pageNumber: searchDto.PageNumber,
             message: "Cards retrieved successfully"
         );
     }
@@ -380,6 +381,9 @@ public class CardService : ICardService
 
     private async Task<ApiResponse<bool>> ChangeLabelAsync(Guid cardId, Guid labelId, bool add)
     {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await _context.TryLockCardAsync(cardId);
+
         var card = await _context.Cards
             .Include(c => c.Labels)
             .FirstOrDefaultAsync(c => c.Id == cardId);
@@ -413,6 +417,15 @@ public class CardService : ICardService
             return ApiResponse<bool>.SuccessResponse(true, message, 204);
         }
 
+        if (add && card.Labels.Count >= FieldLimits.LabelsPerCard)
+        {
+            return ApiResponse<bool>.ErrorResponse("The card is full", 409,
+            [
+                new ApiError(null, ErrorCodes.LimitReached,
+                    $"A card holds at most {FieldLimits.LabelsPerCard} labels. This one has {card.Labels.Count}.")
+            ]);
+        }
+
         if (add)
         {
             card.Labels.Add(label);
@@ -435,6 +448,7 @@ public class CardService : ICardService
                 CardRef.Of(card),
                 LabelRef.Of(label)));
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         return ApiResponse<bool>.SuccessResponse(true, message, 204);
     }
@@ -529,7 +543,16 @@ public class CardService : ICardService
             return ArchiveErrors.RestoreFirst<bool>(holder, TreeItem.Card);
         }
 
-        return await _context.SetArchivedAsync(card, _actor, archived, "Card", async archiving =>
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        if (card.IsArchived && !archived.Value
+            && await _context.BoardOfListAsync(card.ListId) is { } boardId
+            && await _caps.ExceededAsync(boardId, new BoardGrowth(Cards: 1)) is { } full)
+        {
+            return BoardCaps.Full<bool>(full);
+        }
+
+        var response = await _context.SetArchivedAsync(card, _actor, archived, "Card", async archiving =>
         {
             var chain = await _tree.ListAsync(card.ListId);
             await _activity.AddAsync(
@@ -538,6 +561,9 @@ public class CardService : ICardService
                 actor => new ArchiveCardData(
                     actor, chain.Workspace, chain.Board, chain.List, CardRef.Of(card)));
         });
+        await transaction.CommitAsync();
+
+        return response;
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
@@ -569,15 +595,10 @@ public class CardService : ICardService
 
     private static IReadOnlyList<LabelRef> LabelRefs(List<Label> labels) => labels.ConvertAll(LabelRef.Of);
 
-    private async Task<(List<Label> Labels, bool ListExists, List<ApiError> Errors)> ResolveReferencesAsync(
-        Guid listId, List<Guid>? labelIds)
+    private async Task<(List<Label> Labels, List<ApiError> Errors)> ResolveLabelsAsync(
+        Guid? boardId, List<Guid>? labelIds)
     {
         var errors = new List<ApiError>();
-        var boardId = await _context.BoardOfListAsync(listId);
-        if (boardId is null)
-        {
-            errors.Add(new ApiError("listId", ErrorCodes.NotFound, $"List {listId} does not exist."));
-        }
 
         var ids = labelIds ?? [];
         var labels = await _context.Labels.Where(l => ids.Contains(l.Id)).ToListAsync();
@@ -602,7 +623,7 @@ public class CardService : ICardService
             }
         }
 
-        return (labels, boardId is not null, errors);
+        return (labels, errors);
     }
 
     private static ApiError NotOnBoard(string field, Guid labelId, Guid boardId) =>

@@ -12,10 +12,7 @@ public sealed record ApiPage<T>(
     List<T>? Data,
     int StatusCode,
     List<ApiError>? Errors,
-    int TotalCount,
-    int PageSize,
-    int CurrentPage,
-    int TotalPages)
+    Pagination Pagination)
 {
     public List<T> Entries => Data ?? [];
 }

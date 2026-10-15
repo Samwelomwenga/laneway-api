@@ -155,7 +155,7 @@ public class CardCopyActivityTests : ApiTests
 
         var entry = Assert.Single((await ActivityAsync($"listId={from.Id}&type=copyCard")).Entries);
         Assert.Equal(copy.Id, entry.CardId);
-        Assert.Equal(0, (await ActivityAsync($"cardId={source.Id}&type=copyCard")).TotalCount);
+        Assert.Equal(0, (await ActivityAsync($"cardId={source.Id}&type=copyCard")).Pagination.TotalCount);
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public class CardCopyActivityTests : ApiTests
         using var response = await SendCardCopyAsync(source.Id, new { listId = there.Id });
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
 
-        Assert.Equal(0, (await ActivityAsync("type=copyCard")).TotalCount);
+        Assert.Equal(0, (await ActivityAsync("type=copyCard")).Pagination.TotalCount);
     }
 
     private async Task<List<string>> KeepAsync(Guid cardId)

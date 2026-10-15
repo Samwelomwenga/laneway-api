@@ -16,6 +16,7 @@ public sealed class CardCopyService : ICardCopyService
     private readonly Placements _placements;
     private readonly ArchiveGuard _archive;
     private readonly LabelMatching _labelMatching;
+    private readonly BoardCaps _caps;
     private readonly CardSnapshots _snapshots;
     private readonly ObjectCopies _objects;
     private readonly ActivityWriter _activity;
@@ -27,6 +28,7 @@ public sealed class CardCopyService : ICardCopyService
         Placements placements,
         ArchiveGuard archive,
         LabelMatching labelMatching,
+        BoardCaps caps,
         CardSnapshots snapshots,
         ObjectCopies objects,
         ActivityWriter activity,
@@ -37,6 +39,7 @@ public sealed class CardCopyService : ICardCopyService
         _placements = placements;
         _archive = archive;
         _labelMatching = labelMatching;
+        _caps = caps;
         _snapshots = snapshots;
         _objects = objects;
         _activity = activity;
@@ -146,12 +149,7 @@ public sealed class CardCopyService : ICardCopyService
             return ReferenceErrors.NotFound<CardDto>("listId", "List", listId);
         }
 
-        if (plan.Keep.Labels)
-        {
-            await _context.TryLockBoardAsync(boardId);
-        }
-
-        var placed = await _placements.ResolveInListAsync(listId, placement);
+        var placed = await _placements.ResolveInListAsync(boardId, listId, placement);
 
         if (await _context.BoardOfListAsync(listId) != boardId)
         {
@@ -166,6 +164,16 @@ public sealed class CardCopyService : ICardCopyService
         if (await _archive.OnListAsync(listId) is { } archived)
         {
             return ArchiveErrors.NoCreate<CardDto>(archived, "listId", TreeItem.Card);
+        }
+
+        var growth = new BoardGrowth(
+            Cards: 1,
+            Labels: plan.Keep.Labels && boardId != snapshot.BoardId
+                ? await _labelMatching.CountCreatedAsync(snapshot.Labels, boardId)
+                : 0);
+        if (await _caps.ExceededAsync(boardId, growth) is { } full)
+        {
+            return BoardCaps.Full<CardDto>(full);
         }
 
         var (labels, swaps) = await LabelsOnAsync(snapshot, plan.Keep, boardId);

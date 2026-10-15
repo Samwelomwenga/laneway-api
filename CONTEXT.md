@@ -30,8 +30,12 @@ A new card, list, or board made from an existing one, which stays unchanged. Com
 _Avoid_: Duplicate, clone
 
 **Archived**:
-A board, list, card, or checklist put away without being deleted, which can be restored. Archiving a board, list, card, or checklist hides what it holds but doesn't archive it. Nothing archived, and nothing an archived item holds, can be edited. A board, list, card, or checklist has to be archived before it can be deleted, and deleting it can't be undone. A workspace, label, or check item can't be archived.
+A board, list, card, or checklist put away without being deleted, which can be restored. Archiving a board, list, card, or checklist doesn't archive what it holds. It hides it from views above the archived item, so a card in an archived list doesn't show on its board. The archived item's own collection route still lists its unarchived children. Nothing archived, and nothing an archived item holds, can be edited. A board, list, card, or checklist has to be archived before it can be deleted, and deleting it can't be undone. A workspace, label, or check item can't be archived.
 _Avoid_: Closed
+
+**Open**:
+A card or list that a board shows: not archived, and not hidden inside an archived list. A board holds at most 5,000 open cards and 500 open lists.
+_Avoid_: Active, visible, unarchived
 
 **Due date**:
 When the work on a card should be finished. A card may have none.
@@ -44,7 +48,7 @@ _Avoid_: Status, done
 How long before a card's due date someone should be reminded. Only a card with a due date can have one. Nothing sends reminders yet.
 
 **Label**:
-A tag on one board, attached to that board's cards to group them. It has a name, a color, or both.
+A tag on one board, attached to that board's cards to group them. It has a name, a color, or both. A board holds at most 1,000 labels, and a card carries at most 100.
 _Avoid_: Tag
 
 **Checklist**:

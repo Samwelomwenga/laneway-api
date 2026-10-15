@@ -385,8 +385,8 @@ public class ListCopyTests : ApiTests
         Assert.NotEqual(uploaded.Id, attachment.Id);
         Assert.Equal(attachment.Id, copied.Cover!.AttachmentId);
         Assert.Equal(
-            await DownloadAttachmentAsync(card.Id, uploaded.Id),
-            await DownloadAttachmentAsync(copied.Id, attachment.Id));
+            await DownloadAttachmentAsync(uploaded.Id),
+            await DownloadAttachmentAsync(attachment.Id));
         Assert.Empty(await FromDatabaseAsync(context => context.PendingObjectDeletes.ToListAsync()));
     }
 
@@ -430,7 +430,7 @@ public class ListCopyTests : ApiTests
         var carried = Assert.Single(room.LabelIds);
         Assert.NotEqual(green.Id, carried);
         Assert.Contains(carried, brief.LabelIds);
-        Assert.Equal(2, (await ReadLabelsAsync(to.Id)).Count);
+        Assert.Equal(2, (await ReadLabelsOfBoardAsync(to.Id)).Count);
     }
 
     [Fact]
@@ -620,15 +620,8 @@ public class ListCopyTests : ApiTests
 
     private async Task<List<ListDto>> ReadListsAsync(Guid boardId)
     {
-        using var response = await GetAsync($"/api/v1/lists?boardId={boardId}&archived=Include");
+        using var response = await GetAsync($"{ListsPath(boardId)}?archived=Include");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.ReadPage<ListDto>()).Entries;
-    }
-
-    private async Task<List<LabelDto>> ReadLabelsAsync(Guid boardId)
-    {
-        using var response = await GetAsync($"/api/v1/labels?boardId={boardId}");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return (await response.ReadPage<LabelDto>()).Entries;
     }
 }

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Laneway.Api;
@@ -10,18 +11,31 @@ public record BoardDto
     Guid WorkspaceId,
     BoardVisibility Visibility,
     bool IsArchived,
-    List<Guid> ListIds,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     Guid CreatedBy,
     Guid? UpdatedBy
 );
 
+public record BoardViewDto : BoardDto
+{
+    public BoardViewDto(BoardDto board, List<LabelDto> labels, List<BoardListDto> lists) : base(board)
+    {
+        Labels = labels;
+        Lists = lists;
+    }
+
+    [JsonPropertyOrder(1)]
+    public List<LabelDto> Labels { get; init; }
+
+    [JsonPropertyOrder(1)]
+    public List<BoardListDto> Lists { get; init; }
+}
+
 public record CreateBoardDto
 (
     string? Name,
     string? Description,
-    Guid? WorkspaceId,
     BoardVisibility? Visibility
 )
 {
@@ -59,7 +73,6 @@ public record BoardSearchDto
     int PageNumber,
     int PageSize,
     string? SearchTerm,
-    Guid? WorkspaceId,
     ArchiveFilter Archived,
     BoardVisibility? Visibility
 ) : ISearchQuery<BoardSearchDto>
@@ -68,7 +81,6 @@ public record BoardSearchDto
         query.PageNumber(),
         query.PageSize(),
         query.Text("searchTerm"),
-        query.Id("workspaceId"),
         query.EnumName<ArchiveFilter>("archived") ?? ArchiveFilter.Exclude,
         query.EnumName<BoardVisibility>("visibility"));
 }

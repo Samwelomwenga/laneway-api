@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Laneway.Api;
@@ -10,12 +11,22 @@ public record ListDto
     Guid BoardId,
     Color? Color,
     bool IsArchived,
-    List<Guid> CardIds,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     Guid CreatedBy,
     Guid? UpdatedBy
 );
+
+public record BoardListDto : ListDto
+{
+    public BoardListDto(ListDto list, List<BoardCardDto> cards) : base(list)
+    {
+        Cards = cards;
+    }
+
+    [JsonPropertyOrder(1)]
+    public List<BoardCardDto> Cards { get; init; }
+}
 
 public record CreateListDto
 (
@@ -23,7 +34,6 @@ public record CreateListDto
     PositionValue? Position,
     Guid? Before,
     Guid? After,
-    Guid? BoardId,
     Color? Color
 ) : IPlacing
 {
@@ -65,7 +75,6 @@ public record ListSearchDto
     int PageNumber,
     int PageSize,
     string? SearchTerm,
-    Guid? BoardId,
     ArchiveFilter Archived
 ) : ISearchQuery<ListSearchDto>
 {
@@ -73,6 +82,5 @@ public record ListSearchDto
         query.PageNumber(),
         query.PageSize(),
         query.Text("searchTerm"),
-        query.Id("boardId"),
         query.EnumName<ArchiveFilter>("archived") ?? ArchiveFilter.Exclude);
 }

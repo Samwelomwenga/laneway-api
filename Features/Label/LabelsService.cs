@@ -4,7 +4,7 @@ namespace Laneway.Api;
 
 public interface ILabelService
 {
-    Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto);
+    Task<ApiResponse<List<LabelDto>>> GetAllAsync(Guid boardId, LabelSearchDto searchDto);
     Task<ApiResponse<LabelDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<LabelDto>> CreateAsync(CreateLabelWrite write);
     Task<ApiResponse<LabelDto>> UpdateAsync(Guid id, UpdateLabelWrite write);
@@ -16,6 +16,7 @@ public class LabelService : ILabelService
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
     private readonly ArchiveGuard _archive;
+    private readonly BoardCaps _caps;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
 
@@ -23,46 +24,43 @@ public class LabelService : ILabelService
         ApplicationDbContext context,
         Actor actor,
         ArchiveGuard archive,
+        BoardCaps caps,
         ActivityWriter activity,
         ActivityTree tree)
     {
         _context = context;
         _actor = actor;
         _archive = archive;
+        _caps = caps;
         _activity = activity;
         _tree = tree;
     }
 
-    public async Task<ApiResponse<List<LabelDto>>> GetAllAsync(LabelSearchDto searchDto)
+    public async Task<ApiResponse<List<LabelDto>>> GetAllAsync(Guid boardId, LabelSearchDto searchDto)
     {
-        if (searchDto.BoardId is { } filterBoardId && !await _context.Boards.AnyAsync(b => b.Id == filterBoardId))
+        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
         {
-            return ReferenceErrors.NotFound<List<LabelDto>>("boardId", "Board", filterBoardId);
+            return ReferenceErrors.ParentNotFound<List<LabelDto>>("Board");
         }
 
-        var query = _context.Labels.AsQueryable();
+        var query = _context.Labels.Where(l => l.BoardId == boardId);
         if (searchDto.SearchTerm is { } term)
         {
             query = query.Where(l => l.Name.ToLower().Contains(term.ToLower()));
         }
 
-        if (searchDto.BoardId is { } boardId)
-        {
-            query = query.Where(l => l.BoardId == boardId);
-        }
-
         var (labels, totalCount) = await PagedQuery.ReadAsync(
-            query.OrderBy(l => l.Name).ThenBy(l => l.Color).ThenBy(l => l.CreatedAt).ThenBy(l => l.Id),
+            query.InNameOrder(),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var labelDtos = labels.Select(MapToDto).ToList();
+        var labelDtos = labels.Select(LabelView.Of).ToList();
 
         return PagedResponse<LabelDto>.SuccessResponse(
             labelDtos,
             totalCount,
             pageSize: searchDto.PageSize,
-            currentPage: searchDto.PageNumber,
+            pageNumber: searchDto.PageNumber,
             message: "Labels retrieved successfully"
         );
     }
@@ -74,7 +72,7 @@ public class LabelService : ILabelService
         {
             return ApiResponse<LabelDto>.ErrorResponse("Label not found", 404);
         }
-        var labelDto = MapToDto(label);
+        var labelDto = LabelView.Of(label);
         return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label retrieved successfully", 200);
     }
 
@@ -85,17 +83,22 @@ public class LabelService : ILabelService
 
         if (!await _context.TryLockBoardAsync(boardId))
         {
-            return ReferenceErrors.NotFound<LabelDto>("boardId", "Board", boardId);
+            return ReferenceErrors.ParentNotFound<LabelDto>("Board");
         }
 
         if (await _archive.OnBoardAsync(boardId) is { } archived)
         {
-            return ArchiveErrors.NoCreate<LabelDto>(archived, "boardId", TreeItem.Label);
+            return ArchiveErrors.NoCreate<LabelDto>(archived, null, TreeItem.Label);
         }
 
         if (await FindDuplicateAsync(boardId, write.Name, write.Color, self: null) is { } duplicate)
         {
             return duplicate;
+        }
+
+        if (await _caps.ExceededAsync(boardId, new BoardGrowth(Labels: 1)) is { } full)
+        {
+            return BoardCaps.Full<LabelDto>(full);
         }
 
         var newLabel = MapToEntity(write, _actor.Id);
@@ -108,7 +111,7 @@ public class LabelService : ILabelService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var labelDto = MapToDto(newLabel);
+        var labelDto = LabelView.Of(newLabel);
         return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label created successfully", 201);
     }
 
@@ -153,7 +156,7 @@ public class LabelService : ILabelService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        var labelDto = MapToDto(existingLabel);
+        var labelDto = LabelView.Of(existingLabel);
         return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label updated successfully", 200);
     }
 
@@ -206,21 +209,6 @@ public class LabelService : ILabelService
             ? ApiResponse<LabelDto>.ErrorResponse("Label with the same color already exists", 409,
                 [new ApiError("color", ErrorCodes.Duplicate, "This board already has an unnamed label in this color.")])
             : null;
-    }
-
-    private static LabelDto MapToDto(Label label)
-    {
-        return new LabelDto
-        (
-            label.Id,
-            label.Name,
-            label.BoardId,
-            label.Color,
-            label.CreatedAt,
-            label.UpdatedAt,
-            label.CreatedBy,
-            label.UpdatedBy
-        );
     }
 
     private static Label MapToEntity(CreateLabelWrite write, Guid actorId)

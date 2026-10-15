@@ -73,7 +73,7 @@ public class CheckItemActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCheckItem");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public class CheckItemActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=moveCheckItem");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class CheckItemActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=checkCheckItem,uncheckCheckItem");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.Equal(ActivityType.UncheckCheckItem, page.Entries[0].Type);
         Assert.Equal(ActivityType.CheckCheckItem, page.Entries[1].Type);
         ActivityAssert.Place(
@@ -186,7 +186,7 @@ public class CheckItemActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=checkCheckItem");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]

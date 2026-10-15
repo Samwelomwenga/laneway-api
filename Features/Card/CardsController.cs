@@ -15,24 +15,27 @@ public class CardsController : ApiControllerBase
         _cardCopyService = cardCopyService;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<PagedResponse<CardDto>>> GetCards([FromQuery] CardSearchDto searchDto)
+    [HttpGet("/api/v1/lists/{listId}/cards")]
+    public async Task<ActionResult<PagedResponse<CardDto>>> GetCards(
+        Guid listId, [FromQuery] CardSearchDto searchDto)
     {
-        var response = await _cardService.GetAllAsync(searchDto);
+        var response = await _cardService.GetAllAsync(listId, searchDto);
         return ToActionResult(response);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<ApiResponse<CardDto>>> GetCard(Guid id)
+    [NoQuery]
+    public async Task<ActionResult<ApiResponse<CardViewDto>>> GetCard(Guid id)
     {
         var response = await _cardService.GetByIdAsync(id);
         return ToActionResult(response);
     }
 
-    [HttpPost]
-    public async Task<ActionResult<ApiResponse<CardDto>>> CreateCard([FromBody] CreateCardDto createCardDto)
+    [HttpPost("/api/v1/lists/{listId}/cards")]
+    public async Task<ActionResult<ApiResponse<CardDto>>> CreateCard(
+        Guid listId, [FromBody] CreateCardDto createCardDto)
     {
-        var response = await _cardService.CreateAsync(CreateCardWrite.Of(createCardDto));
+        var response = await _cardService.CreateAsync(CreateCardWrite.Of(listId, createCardDto));
         if (!response.Success)
         {
             return ToActionResult(response);

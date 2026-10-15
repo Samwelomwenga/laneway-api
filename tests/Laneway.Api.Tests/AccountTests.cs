@@ -21,8 +21,24 @@ public class AccountTests : ApiTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var page = await response.ReadPage<AccountDto>();
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
         Assert.Equal(other.Id, Assert.Single(page.Entries).UserId);
+    }
+
+    [Fact]
+    public async Task An_account_search_without_a_page_size_returns_twenty_items()
+    {
+        for (var i = 0; i < 21; i++)
+        {
+            await CreateAccountAsync($"Account {i}");
+        }
+
+        using var response = await GetAsync("/api/v1/accounts");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var page = await response.ReadPage<AccountDto>();
+        Assert.Equal(20, page.Entries.Count);
+        Assert.Equal(20, page.Pagination.PageSize);
     }
 
     [Fact]

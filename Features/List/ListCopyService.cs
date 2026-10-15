@@ -13,6 +13,8 @@ public sealed class ListCopyService : IListCopyService
     private readonly Actor _actor;
     private readonly Placements _placements;
     private readonly ArchiveGuard _archive;
+    private readonly LabelMatching _labelMatching;
+    private readonly BoardCaps _caps;
     private readonly CopyJobSignal _signal;
 
     public ListCopyService(
@@ -20,12 +22,16 @@ public sealed class ListCopyService : IListCopyService
         Actor actor,
         Placements placements,
         ArchiveGuard archive,
+        LabelMatching labelMatching,
+        BoardCaps caps,
         CopyJobSignal signal)
     {
         _context = context;
         _actor = actor;
         _placements = placements;
         _archive = archive;
+        _labelMatching = labelMatching;
+        _caps = caps;
         _signal = signal;
     }
 
@@ -86,9 +92,29 @@ public sealed class ListCopyService : IListCopyService
             return ArchiveErrors.NoCreate<CopyJobDto>(archived, "boardId", TreeItem.List);
         }
 
-        return await CountedOverCapAsync(id, keep) is { } capped
-            ? ApiResponse<CopyJobDto>.ErrorResponse("This copy is too big", 409, capped)
+        if (await CountedOverCapAsync(id, keep) is { } capped)
+        {
+            return ApiResponse<CopyJobDto>.ErrorResponse("This copy is too big", 409, capped);
+        }
+
+        return await _caps.ExceededAsync(boardId, await GrowthAsync(id, boardId, keep)) is { } full
+            ? BoardCaps.Full<CopyJobDto>(full)
             : null;
+    }
+
+    private async Task<BoardGrowth> GrowthAsync(Guid id, Guid boardId, CopyKeep keep)
+    {
+        var cards = await _context.Cards.CountAsync(card => card.ListId == id && !card.IsArchived);
+        if (!keep.Labels || await _context.BoardOfListAsync(id) == boardId)
+        {
+            return new BoardGrowth(Cards: cards, Lists: 1);
+        }
+
+        var labels = await _context.Labels
+            .Where(label => label.Cards.Any(card => card.ListId == id && !card.IsArchived))
+            .ToListAsync();
+
+        return new BoardGrowth(Cards: cards, Lists: 1, Labels: await _labelMatching.CountCreatedAsync(labels, boardId));
     }
 
     private async Task<List<ApiError>?> CountedOverCapAsync(Guid id, CopyKeep keep)

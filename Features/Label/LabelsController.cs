@@ -12,10 +12,11 @@ public class LabelsController : ApiControllerBase
         _labelService = labelService;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<PagedResponse<LabelDto>>> GetLabels([FromQuery] LabelSearchDto searchDto)
+    [HttpGet("/api/v1/boards/{boardId}/labels")]
+    public async Task<ActionResult<PagedResponse<LabelDto>>> GetLabels(
+        Guid boardId, [FromQuery] LabelSearchDto searchDto)
     {
-        var response = await _labelService.GetAllAsync(searchDto);
+        var response = await _labelService.GetAllAsync(boardId, searchDto);
         return ToActionResult(response);
     }
 
@@ -26,10 +27,11 @@ public class LabelsController : ApiControllerBase
         return ToActionResult(response);
     }
 
-    [HttpPost]
-    public async Task<ActionResult<ApiResponse<LabelDto>>> CreateLabel([FromBody] CreateLabelDto createLabelDto)
+    [HttpPost("/api/v1/boards/{boardId}/labels")]
+    public async Task<ActionResult<ApiResponse<LabelDto>>> CreateLabel(
+        Guid boardId, [FromBody] CreateLabelDto createLabelDto)
     {
-        var response = await _labelService.CreateAsync(CreateLabelWrite.Of(createLabelDto));
+        var response = await _labelService.CreateAsync(CreateLabelWrite.Of(boardId, createLabelDto));
         if (!response.Success)
         {
             return ToActionResult(response);

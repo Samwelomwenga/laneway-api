@@ -68,7 +68,7 @@ public class ChecklistActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateChecklist");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class ChecklistActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=moveChecklist");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public class ChecklistActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=archiveChecklist,restoreChecklist");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.Equal(ActivityType.RestoreChecklist, page.Entries[0].Type);
         Assert.Equal(ActivityType.ArchiveChecklist, page.Entries[1].Type);
         ActivityAssert.Place(
@@ -151,7 +151,7 @@ public class ChecklistActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=archiveChecklist");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]

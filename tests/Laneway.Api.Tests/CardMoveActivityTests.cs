@@ -44,7 +44,7 @@ public class CardMoveActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=moveCard");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public class CardMoveActivityTests : ApiTests
         Assert.Equal(waiting.Id, reused.Id("to.id"));
 
         var labelEntries = await ActivityAsync($"boardId={to.Id}&type=createLabel");
-        Assert.Equal(1, labelEntries.TotalCount);
+        Assert.Equal(1, labelEntries.Pagination.TotalCount);
     }
 
     [Fact]

@@ -15,24 +15,27 @@ public class BoardsController : ApiControllerBase
         _boardCopyService = boardCopyService;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<PagedResponse<BoardDto>>> GetBoards([FromQuery] BoardSearchDto searchDto)
+    [HttpGet("/api/v1/workspaces/{workspaceId}/boards")]
+    public async Task<ActionResult<PagedResponse<BoardDto>>> GetBoards(
+        Guid workspaceId, [FromQuery] BoardSearchDto searchDto)
     {
-        var boards = await _boardService.GetAllAsync(searchDto);
+        var boards = await _boardService.GetAllAsync(workspaceId, searchDto);
         return ToActionResult(boards);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<ApiResponse<BoardDto>>> GetBoard(Guid id)
+    [NoQuery]
+    public async Task<ActionResult<ApiResponse<BoardViewDto>>> GetBoard(Guid id)
     {
         var response = await _boardService.GetByIdAsync(id);
         return ToActionResult(response);
     }
 
-    [HttpPost]
-    public async Task<ActionResult<ApiResponse<BoardDto>>> CreateBoard([FromBody] CreateBoardDto createBoardDto)
+    [HttpPost("/api/v1/workspaces/{workspaceId}/boards")]
+    public async Task<ActionResult<ApiResponse<BoardDto>>> CreateBoard(
+        Guid workspaceId, [FromBody] CreateBoardDto createBoardDto)
     {
-        var response = await _boardService.CreateAsync(CreateBoardWrite.Of(createBoardDto));
+        var response = await _boardService.CreateAsync(CreateBoardWrite.Of(workspaceId, createBoardDto));
         if (!response.Success)
         {
             return ToActionResult(response);

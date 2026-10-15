@@ -21,8 +21,7 @@ public record CreateChecklistDto
     string? Name,
     PositionValue? Position,
     Guid? Before,
-    Guid? After,
-    Guid? CardId
+    Guid? After
 ) : IPlacing
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -47,13 +46,11 @@ public record ChecklistSearchDto
 (
     int PageNumber,
     int PageSize,
-    Guid? CardId,
     ArchiveFilter Archived
 ) : ISearchQuery<ChecklistSearchDto>
 {
     public static ChecklistSearchDto Read(QueryReader query) => new(
         query.PageNumber(),
         query.PageSize(),
-        query.Id("cardId"),
         query.EnumName<ArchiveFilter>("archived") ?? ArchiveFilter.Exclude);
 }

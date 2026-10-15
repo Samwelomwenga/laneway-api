@@ -8,14 +8,14 @@ public sealed record CreateCheckItemWrite(
     Guid? Before,
     Guid? After) : IPlacing
 {
-    public static CreateCheckItemWrite Of(CreateCheckItemDto dto)
+    public static CreateCheckItemWrite Of(Guid checklistId, CreateCheckItemDto dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
         return new CreateCheckItemWrite(
             Writes.Required(dto.Name, "name"),
             dto.IsChecked ?? false,
-            Writes.Required(dto.ChecklistId, "checklistId"),
+            checklistId,
             dto.Position,
             dto.Before,
             dto.After);

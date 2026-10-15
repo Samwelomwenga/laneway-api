@@ -8,7 +8,6 @@ public sealed class CreateListDtoValidator : AbstractValidator<CreateListDto>
     {
         RuleFor(x => x.Name).Required().MaxLength(FieldLimits.ListName);
         this.ValidPlacement();
-        RuleFor(x => x.BoardId).Required();
     }
 }
 

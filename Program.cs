@@ -65,7 +65,9 @@ builder.Services.AddScoped<ActivityTree>();
 builder.Services.AddScoped<Placements>();
 builder.Services.AddScoped<ArchiveGuard>();
 builder.Services.AddScoped<LabelMatching>();
+builder.Services.AddScoped<BoardCaps>();
 builder.Services.AddScoped<CardCompletion>();
+builder.Services.AddScoped<CardReads>();
 builder.Services.AddScoped<CardSnapshots>();
 builder.Services.AddScoped<ListSnapshots>();
 builder.Services.AddScoped<BoardSnapshots>();
@@ -127,7 +129,8 @@ app.UseExceptionHandler();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
-    app.MapScalarApiReference().AllowAnonymous();
+    app.MapScalarApiReference(options => options.WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient))
+        .AllowAnonymous();
     app.MapGet("/", () => Results.Redirect("/scalar/v1")).AllowAnonymous().ExcludeFromDescription();
 }
 
