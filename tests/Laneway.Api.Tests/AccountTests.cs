@@ -21,7 +21,7 @@ public class AccountTests : ApiTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var page = await response.ReadPage<AccountDto>();
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
         Assert.Equal(other.Id, Assert.Single(page.Entries).UserId);
     }
 
@@ -38,7 +38,7 @@ public class AccountTests : ApiTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var page = await response.ReadPage<AccountDto>();
         Assert.Equal(20, page.Entries.Count);
-        Assert.Equal(20, page.PageSize);
+        Assert.Equal(20, page.Pagination.PageSize);
     }
 
     [Fact]

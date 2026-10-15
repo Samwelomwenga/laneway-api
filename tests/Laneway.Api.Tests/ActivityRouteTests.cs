@@ -18,7 +18,7 @@ public class ActivityRouteTests : ApiTests
 
         var page = await ActivityAsync();
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.Equal(second.Id, page.Entries[0].WorkspaceId);
         Assert.Equal(first.Id, page.Entries[1].WorkspaceId);
         Assert.True(page.Entries[0].CreatedAt > page.Entries[1].CreatedAt);
@@ -34,7 +34,7 @@ public class ActivityRouteTests : ApiTests
         var both = await ActivityAsync("type=CREATEWORKSPACE,updateworkspace");
         var one = await ActivityAsync("type=updateWorkspace");
 
-        Assert.Equal(2, both.TotalCount);
+        Assert.Equal(2, both.Pagination.TotalCount);
         Assert.Equal(ActivityType.UpdateWorkspace, Assert.Single(one.Entries).Type);
     }
 
@@ -128,7 +128,7 @@ public class ActivityRouteTests : ApiTests
 
         var page = await ActivityAsync($"workspaceId={workspace.Id}");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public class ActivityRouteTests : ApiTests
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCard");
 
         Assert.Empty(page.Entries);
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -152,6 +152,6 @@ public class ActivityRouteTests : ApiTests
         var page = await ActivityAsync($"workspaceId={workspace.Id}&type=deleteWorkspace");
 
         Assert.Empty(page.Entries);
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 }

@@ -284,7 +284,7 @@ public class ChecklistService : IChecklistService
             checklists.Select(ChecklistView.Of).ToList(),
             totalCount,
             pageSize: searchDto.PageSize,
-            currentPage: searchDto.PageNumber,
+            pageNumber: searchDto.PageNumber,
             message: "Checklists retrieved successfully"
         );
     }

@@ -947,7 +947,7 @@ Content-Type: application/json
   "isDueComplete": true
 }
 
-### Ask for a page size of 0. 400 outOfRange on pageSize, the message names 1 and 100, and the body is the plain envelope with no totalCount, pageSize, currentPage or totalPages.
+### Ask for a page size of 0. 400 outOfRange on pageSize, the message names 1 and 100, and the body is the plain envelope with no pagination object.
 GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageSize=0
 Authorization: Bearer {{accessToken}}
 
@@ -963,7 +963,7 @@ Authorization: Bearer {{accessToken}}
 GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageNumber=0
 Authorization: Bearer {{accessToken}}
 
-### Ask for a page past the end. 200 with empty data and the real totalCount and totalPages.
+### Ask for a page past the end. 200 with empty data. pagination has the real totalCount and totalPages, hasNextPage false, and hasPreviousPage true.
 GET {{Laneway_Api_HostAddress}}/api/v1/lists/{{pagingListId}}/cards?pageNumber=9999&pageSize=2
 Authorization: Bearer {{accessToken}}
 
@@ -1999,7 +1999,7 @@ Content-Type: application/json
 
 > {% client.global.set("freshBoardId", response.body.data.id); %}
 
-### Read the new board's labels. data is empty and totalCount is 0.
+### Read the new board's labels. data is empty and pagination.totalCount is 0.
 GET {{Laneway_Api_HostAddress}}/api/v1/boards/{{freshBoardId}}/labels
 Authorization: Bearer {{accessToken}}
 
@@ -4390,7 +4390,7 @@ Content-Type: application/json
 GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists
 Authorization: Bearer {{accessToken}}
 
-### Read the first page of two. 200 with two checklists, totalCount 7, and totalPages 4.
+### Read the first page of two. 200 with two checklists. pagination has totalCount 7, totalPages 4, and hasNextPage true.
 GET {{Laneway_Api_HostAddress}}/api/v1/cards/{{checklistCardId}}/checklists?pageNumber=1&pageSize=2
 Authorization: Bearer {{accessToken}}
 
@@ -5169,7 +5169,7 @@ Content-Type: application/json
 GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items
 Authorization: Bearer {{accessToken}}
 
-### Read the second page of three. 200 with Write notes and Tag the release, totalCount 6, and totalPages 3.
+### Read the second page of three. 200 with Write notes and Tag the release. pagination has pageNumber 2, totalCount 6, and totalPages 3.
 GET {{Laneway_Api_HostAddress}}/api/v1/checklists/{{checkItemRelease}}/check-items?pageSize=2&pageNumber=2
 Authorization: Bearer {{accessToken}}
 

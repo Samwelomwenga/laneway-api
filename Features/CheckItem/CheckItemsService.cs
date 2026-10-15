@@ -341,7 +341,7 @@ public class CheckItemService : ICheckItemService
             checkItems.ConvertAll(CheckItemView.Of),
             totalCount,
             pageSize: searchDto.PageSize,
-            currentPage: searchDto.PageNumber,
+            pageNumber: searchDto.PageNumber,
             message: "Check items retrieved successfully"
         );
     }

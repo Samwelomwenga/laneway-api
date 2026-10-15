@@ -60,7 +60,7 @@ public class LabelService : ILabelService
             labelDtos,
             totalCount,
             pageSize: searchDto.PageSize,
-            currentPage: searchDto.PageNumber,
+            pageNumber: searchDto.PageNumber,
             message: "Labels retrieved successfully"
         );
     }

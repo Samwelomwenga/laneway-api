@@ -67,7 +67,7 @@ public class ActivityService : IActivityService
             entries.ConvertAll(ActivityView.Of),
             totalCount,
             pageSize: searchDto.PageSize,
-            currentPage: searchDto.PageNumber,
+            pageNumber: searchDto.PageNumber,
             message: "Activity retrieved successfully"
         );
     }

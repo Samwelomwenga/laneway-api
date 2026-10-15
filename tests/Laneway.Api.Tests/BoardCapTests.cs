@@ -282,7 +282,7 @@ public class BoardCapTests : ApiTests
         Assert.Equal(ErrorCodes.LimitReached, error.Code);
         Assert.Contains("500 open lists", error.Message, StringComparison.Ordinal);
         using var boards = await GetAsync(BoardsPath(workspaceId));
-        Assert.Equal(1, (await boards.ReadPage<BoardDto>()).TotalCount);
+        Assert.Equal(1, (await boards.ReadPage<BoardDto>()).Pagination.TotalCount);
     }
 
     [Fact]
@@ -422,12 +422,12 @@ public class BoardCapTests : ApiTests
         Assert.Contains(message, error.Message, StringComparison.Ordinal);
     }
 
-    private async Task<int> CardCountAsync(Guid listId) => (await ReadCardsAsync(listId, "pageSize=1")).TotalCount;
+    private async Task<int> CardCountAsync(Guid listId) => (await ReadCardsAsync(listId, "pageSize=1")).Pagination.TotalCount;
 
     private async Task<int> LabelCountAsync(Guid boardId)
     {
         using var response = await GetAsync($"{LabelsPath(boardId)}?pageSize=1");
-        return (await response.ReadPage<LabelDto>()).TotalCount;
+        return (await response.ReadPage<LabelDto>()).Pagination.TotalCount;
     }
 
     private async Task<List<ActivityEntryDto>> EntriesAsync(Guid boardId, string type) =>

@@ -236,7 +236,7 @@ public class CommentTests : ApiTests
         var comment = await CreateCommentAsync(card.Id, "I'll take it.", ben);
 
         Assert.Equal(ben.Id, comment.CreatedBy);
-        Assert.Equal(2, (await ActivityAsync($"cardId={card.Id}&type=comment")).TotalCount);
+        Assert.Equal(2, (await ActivityAsync($"cardId={card.Id}&type=comment")).Pagination.TotalCount);
     }
 
     [Fact]

@@ -71,7 +71,7 @@ public class BoardService : IBoardService
             boardDtos,
             totalCount,
             pageSize: searchDto.PageSize,
-            currentPage: searchDto.PageNumber,
+            pageNumber: searchDto.PageNumber,
             message: "Boards retrieved successfully"
         );
     }

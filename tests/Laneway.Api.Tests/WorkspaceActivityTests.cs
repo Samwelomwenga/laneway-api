@@ -77,7 +77,7 @@ public class WorkspaceActivityTests : ApiTests
 
         var page = await ActivityAsync($"workspaceId={workspace.Id}&type=updateWorkspace");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class WorkspaceActivityTests : ApiTests
 
         var page = await ActivityAsync($"workspaceId={workspace.Id}");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         var entry = page.Entries[0];
         Assert.Equal(ActivityType.DeleteWorkspace, entry.Type);
         ActivityAssert.Place(entry, workspaceId: workspace.Id);

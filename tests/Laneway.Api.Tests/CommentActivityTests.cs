@@ -59,7 +59,7 @@ public class CommentActivityTests : ApiTests
         await CreateCommentAsync(card.Id, "The client wants it by Friday.");
 
         var page = await ActivityAsync($"cardId={card.Id}");
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.Equal(ActivityType.Comment, page.Entries[0].Type);
         Assert.Equal(ActivityType.CreateCard, page.Entries[1].Type);
 
@@ -153,7 +153,7 @@ public class CommentActivityTests : ApiTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var page = await ActivityAsync($"cardId={card.Id}");
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.Equal(ActivityType.Comment, page.Entries[0].Type);
 
         var read = await ReadCardAsync(card.Id);
@@ -188,7 +188,7 @@ public class CommentActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=comment");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.Equal("The client agreed.", page.Entries[0].Text);
         Assert.Equal("By Friday.", page.Entries[1].Text);
     }

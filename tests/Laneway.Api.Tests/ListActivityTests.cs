@@ -62,7 +62,7 @@ public class ListActivityTests : ApiTests
 
         var page = await ActivityAsync($"listId={list.Id}&type=updateList");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.True(page.Entries[0].Data.Has("old.color"));
         Assert.Equal(JsonValueKind.Null, page.Entries[0].Data.At("old.color").ValueKind);
         Assert.Equal(nameof(Color.Red), page.Entries[0].Data.Text("list.color"));
@@ -83,7 +83,7 @@ public class ListActivityTests : ApiTests
 
         var page = await ActivityAsync($"listId={list.Id}&type=updateList");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class ListActivityTests : ApiTests
 
         var page = await ActivityAsync($"listId={list.Id}&type=archiveList,restoreList");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.Equal(ActivityType.RestoreList, page.Entries[0].Type);
         Assert.Equal(ActivityType.ArchiveList, page.Entries[1].Type);
         ActivityAssert.Place(page.Entries[1], workspaceId: workspace.Id, boardId: board.Id, listId: list.Id);
@@ -116,7 +116,7 @@ public class ListActivityTests : ApiTests
 
         var page = await ActivityAsync($"listId={list.Id}&type=archiveList");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class ListActivityTests : ApiTests
 
         var page = await ActivityAsync($"listId={list.Id}&type=moveList");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -231,7 +231,7 @@ public class ListActivityTests : ApiTests
         await CreateLabelAsync(to.Id, "Bug", Color.Green);
         await AddLabelAsync(card.Id, carried.Id);
         await AddLabelAsync(card.Id, matched.Id);
-        var onCardBefore = (await ActivityAsync($"cardId={card.Id}")).TotalCount;
+        var onCardBefore = (await ActivityAsync($"cardId={card.Id}")).Pagination.TotalCount;
 
         using var response = await MoveListAsync(list.Id, to.Id);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -243,9 +243,9 @@ public class ListActivityTests : ApiTests
         Assert.Equal(nameof(Color.Red), created[0].Text("color"));
 
         var onCard = await ActivityAsync($"cardId={card.Id}");
-        Assert.Equal(onCardBefore, onCard.TotalCount);
+        Assert.Equal(onCardBefore, onCard.Pagination.TotalCount);
         var labelEntries = await ActivityAsync($"boardId={to.Id}&type=createLabel");
-        Assert.Equal(1, labelEntries.TotalCount);
+        Assert.Equal(1, labelEntries.Pagination.TotalCount);
     }
 
     [Fact]
@@ -261,7 +261,7 @@ public class ListActivityTests : ApiTests
 
         var page = await ActivityAsync($"listId={list.Id}");
 
-        Assert.Equal(3, page.TotalCount);
+        Assert.Equal(3, page.Pagination.TotalCount);
         var entry = page.Entries[0];
         Assert.Equal(ActivityType.DeleteList, entry.Type);
         ActivityAssert.Place(entry, workspaceId: workspace.Id, boardId: board.Id, listId: list.Id);

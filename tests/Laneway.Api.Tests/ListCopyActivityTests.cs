@@ -126,7 +126,7 @@ public class ListCopyActivityTests : ApiTests
         var entry = Assert.Single((await ActivityAsync($"listId={copy.Id}")).Entries);
         Assert.Equal(ActivityType.CopyList, entry.Type);
         var copied = Assert.Single(await ReadCardsOfListAsync(copy.Id));
-        Assert.Equal(0, (await ActivityAsync($"cardId={copied.Id}")).TotalCount);
+        Assert.Equal(0, (await ActivityAsync($"cardId={copied.Id}")).Pagination.TotalCount);
     }
 
     [Fact]
@@ -156,7 +156,7 @@ public class ListCopyActivityTests : ApiTests
         });
         await AwaitCopyJobAsync(id, CopyJobStatus.Failed);
 
-        Assert.Equal(0, (await ActivityAsync("type=copyList")).TotalCount);
+        Assert.Equal(0, (await ActivityAsync("type=copyList")).Pagination.TotalCount);
     }
 
     private async Task<List<string>> KeepAsync(Guid listId)

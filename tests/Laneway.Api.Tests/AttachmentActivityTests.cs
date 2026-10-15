@@ -88,7 +88,7 @@ public class AttachmentActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateAttachment");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -163,7 +163,7 @@ public class AttachmentActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCardCover");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         var entry = page.Entries[0];
         Assert.Equal(attachment.Id, entry.Data.Id("cover.attachment.id"));
         Assert.Equal("The mock", entry.Data.Text("cover.attachment.name"));
@@ -184,7 +184,7 @@ public class AttachmentActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCardCover");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         var entry = page.Entries[0];
         Assert.False(entry.Data.Has("cover"));
         Assert.Equal(attachment.Id, entry.Data.Id("old.attachment.id"));
@@ -203,7 +203,7 @@ public class AttachmentActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCardCover");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -216,7 +216,7 @@ public class AttachmentActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=updateCardCover");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -232,7 +232,7 @@ public class AttachmentActivityTests : ApiTests
 
         var page = await ActivityAsync($"cardId={card.Id}&type=addAttachment,updateAttachment,deleteAttachment");
 
-        Assert.Equal(3, page.TotalCount);
+        Assert.Equal(3, page.Pagination.TotalCount);
         Assert.Equal("The mock", page.Entries[2].Data.Text("attachment.name"));
         Assert.Equal("The final mock", page.Entries[0].Data.Text("attachment.name"));
     }

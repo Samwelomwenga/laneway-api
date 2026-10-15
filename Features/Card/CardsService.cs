@@ -369,7 +369,7 @@ public class CardService : ICardService
             await _reads.OfAsync(cards),
             totalCount,
             pageSize: searchDto.PageSize,
-            currentPage: searchDto.PageNumber,
+            pageNumber: searchDto.PageNumber,
             message: "Cards retrieved successfully"
         );
     }

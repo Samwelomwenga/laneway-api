@@ -76,7 +76,7 @@ public class LabelActivityTests : ApiTests
 
         var page = await ActivityAsync($"boardId={board.Id}&type=updateLabel");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public class LabelActivityTests : ApiTests
         var card = await CreateCardAsync(list.Id, "Write the brief");
         var label = await CreateLabelAsync(board.Id, "Urgent", Color.Red);
         await AddLabelAsync(card.Id, label.Id);
-        var onCardBefore = (await ActivityAsync($"cardId={card.Id}")).TotalCount;
+        var onCardBefore = (await ActivityAsync($"cardId={card.Id}")).Pagination.TotalCount;
 
         using var response = await DeleteAsync($"/api/v1/labels/{label.Id}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -102,7 +102,7 @@ public class LabelActivityTests : ApiTests
         Assert.Equal("Urgent", entry.Data.Text("label.name"));
 
         var onCard = await ActivityAsync($"cardId={card.Id}");
-        Assert.Equal(onCardBefore, onCard.TotalCount);
+        Assert.Equal(onCardBefore, onCard.Pagination.TotalCount);
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public class LabelActivityTests : ApiTests
 
         var page = await ActivityAsync($"boardId={to.Id}&type=createLabel");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]

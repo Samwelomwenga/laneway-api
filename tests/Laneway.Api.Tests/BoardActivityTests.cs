@@ -73,7 +73,7 @@ public class BoardActivityTests : ApiTests
 
         var page = await ActivityAsync($"boardId={board.Id}&type=updateBoard");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class BoardActivityTests : ApiTests
 
         var page = await ActivityAsync($"boardId={board.Id}&type=archiveBoard,restoreBoard");
 
-        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Pagination.TotalCount);
         Assert.Equal(ActivityType.RestoreBoard, page.Entries[0].Type);
         Assert.Equal(ActivityType.ArchiveBoard, page.Entries[1].Type);
         ActivityAssert.Place(page.Entries[1], workspaceId: workspace.Id, boardId: board.Id);
@@ -107,7 +107,7 @@ public class BoardActivityTests : ApiTests
 
         var page = await ActivityAsync($"boardId={board.Id}&type=archiveBoard");
 
-        Assert.Equal(1, page.TotalCount);
+        Assert.Equal(1, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public class BoardActivityTests : ApiTests
 
         var page = await ActivityAsync($"boardId={board.Id}&type=moveBoard");
 
-        Assert.Equal(0, page.TotalCount);
+        Assert.Equal(0, page.Pagination.TotalCount);
     }
 
     [Fact]
@@ -161,7 +161,7 @@ public class BoardActivityTests : ApiTests
 
         var page = await ActivityAsync($"boardId={board.Id}");
 
-        Assert.Equal(3, page.TotalCount);
+        Assert.Equal(3, page.Pagination.TotalCount);
         var entry = page.Entries[0];
         Assert.Equal(ActivityType.DeleteBoard, entry.Type);
         ActivityAssert.Place(entry, workspaceId: workspace.Id, boardId: board.Id);

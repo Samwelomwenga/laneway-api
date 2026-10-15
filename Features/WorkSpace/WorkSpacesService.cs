@@ -50,7 +50,7 @@ public class WorkSpaceService : IWorkSpaceService
             workSpaceDtos,
             totalCount,
             pageSize: searchDto.PageSize,
-            currentPage: searchDto.PageNumber,
+            pageNumber: searchDto.PageNumber,
             message: "Workspaces retrieved successfully"
         );
     }

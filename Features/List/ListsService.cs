@@ -312,7 +312,7 @@ public class ListService : IListService
             listDtos,
             totalCount,
             pageSize: searchDto.PageSize,
-            currentPage: searchDto.PageNumber,
+            pageNumber: searchDto.PageNumber,
             message: "Lists retrieved successfully"
         );
     }
