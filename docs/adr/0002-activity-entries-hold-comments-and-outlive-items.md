@@ -1,6 +1,6 @@
 # Activity entries hold comments and outlive their items
 
-A comment is an activity entry of type `comment`, stored in `ActivityEntries` with every other entry, the way Trello stores a comment as a `commentCard` action. Entries point at their workspace, board, list, and card by plain ids with no foreign keys, so deleting any of those leaves its entries in place. We chose this over a separate `Comment` table and over entries that cascade with their item, so a card's comments and history read through one route and stay after the card is deleted.
+A comment is an activity entry of type `comment`, stored in `ActivityEntries` with every other entry. Entries point at their workspace, board, list, and card by plain ids with no foreign keys, so deleting any of those leaves its entries in place. We chose this over a separate `Comment` table and over entries that cascade with their item, so a card's comments and history read through one route and stay after the card is deleted.
 
 ## Consequences
 

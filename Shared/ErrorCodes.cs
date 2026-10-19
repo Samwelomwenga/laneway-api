@@ -40,4 +40,10 @@ public static class ErrorCodes
     public const string WrongPassword = "wrongPassword";
     public const string SameAsCurrent = "sameAsCurrent";
     public const string TooManyRequests = "tooManyRequests";
+    public const string RequiresBoardMember = "requiresBoardMember";
+    public const string ReadOnlyRole = "readOnlyRole";
+    public const string RequiresBoardAdmin = "requiresBoardAdmin";
+    public const string RequiresWorkspaceMember = "requiresWorkspaceMember";
+    public const string RequiresWorkspaceAdmin = "requiresWorkspaceAdmin";
+    public const string CommentingDisabled = "commentingDisabled";
 }

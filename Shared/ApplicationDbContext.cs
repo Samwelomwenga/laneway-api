@@ -11,6 +11,8 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<WorkSpace> WorkSpaces { get; set; }
     public DbSet<Board> Boards { get; set; }
+    public DbSet<WorkspaceMember> WorkspaceMembers { get; set; }
+    public DbSet<BoardMember> BoardMembers { get; set; }
     public DbSet<List> Lists { get; set; }
     public DbSet<Card> Cards { get; set; }
     public DbSet<Label> Labels { get; set; }
@@ -150,6 +152,36 @@ public class ApplicationDbContext : DbContext
                 .WithMany(ws => ws.Boards)
                 .HasForeignKey(b => b.WorkspaceId)
                 .OnDelete(DeleteBehavior.Restrict);
+            ActorKeys(entity);
+        });
+
+        modelBuilder.Entity<WorkspaceMember>(entity =>
+        {
+            entity.HasOne<WorkSpace>()
+                .WithMany()
+                .HasForeignKey(m => m.WorkspaceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(m => m.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(m => new { m.WorkspaceId, m.UserId }).IsUnique();
+            entity.HasIndex(m => m.UserId);
+            ActorKeys(entity);
+        });
+
+        modelBuilder.Entity<BoardMember>(entity =>
+        {
+            entity.HasOne<Board>()
+                .WithMany()
+                .HasForeignKey(m => m.BoardId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(m => m.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(m => new { m.BoardId, m.UserId }).IsUnique();
+            entity.HasIndex(m => m.UserId);
             ActorKeys(entity);
         });
 

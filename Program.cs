@@ -60,6 +60,10 @@ builder.Services.AddHttpClient<BreachedPasswords>(BreachedPasswords.Configure).R
 builder.Services.AddScoped<PasswordPolicy>();
 
 builder.Services.AddScoped<Actor>();
+builder.Services.AddScoped<Readable>();
+builder.Services.AddSingleton<DenialMeter>();
+builder.Services.AddSingleton<DenialLog>();
+builder.Services.AddHostedService<DenialDrainer>();
 builder.Services.AddScoped<ActivityWriter>();
 builder.Services.AddScoped<ActivityTree>();
 builder.Services.AddScoped<Placements>();

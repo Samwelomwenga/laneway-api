@@ -128,6 +128,7 @@ public sealed class BoardCopyRunner : ICopyJobRunner
         var cards = BuildCards(snapshot, plan, labels, copied);
 
         _context.Boards.Add(board);
+        _context.BoardMembers.Add(BoardMember.AdminOf(board));
         _context.Labels.AddRange(labels.Values);
         _context.Lists.AddRange(lists);
         foreach (var card in cards)

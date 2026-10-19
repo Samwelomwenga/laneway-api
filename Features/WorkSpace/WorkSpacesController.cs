@@ -16,14 +16,14 @@ public class WorkSpacesController : ApiControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<WorkSpaceDto>>> GetWorkSpaces([FromQuery] WorkSpaceSearchDto searchDto)
+    public async Task<ActionResult<PagedResponse<WorkspaceSummaryDto>>> GetWorkSpaces([FromQuery] WorkSpaceSearchDto searchDto)
     {
         var response = await _workSpaceService.GetAllAsync(searchDto);
         return ToActionResult(response);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<ApiResponse<WorkSpaceDto>>> GetWorkSpace(Guid id)
+    public async Task<ActionResult<ApiResponse<WorkspaceSummaryDto>>> GetWorkSpace(Guid id)
     {
         var response = await _workSpaceService.GetByIdAsync(id);
         return ToActionResult(response);

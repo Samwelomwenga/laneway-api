@@ -21,6 +21,7 @@ public class BoardService : IBoardService
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
     private readonly CardReads _cards;
+    private readonly Readable _readable;
 
     public BoardService(
         ApplicationDbContext context,
@@ -28,7 +29,8 @@ public class BoardService : IBoardService
         ArchiveGuard archive,
         ActivityWriter activity,
         ActivityTree tree,
-        CardReads cards)
+        CardReads cards,
+        Readable readable)
     {
         _context = context;
         _actor = actor;
@@ -36,16 +38,25 @@ public class BoardService : IBoardService
         _activity = activity;
         _tree = tree;
         _cards = cards;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(Guid workspaceId, BoardSearchDto searchDto)
     {
-        if (!await _context.WorkSpaces.AnyAsync(ws => ws.Id == workspaceId))
+        var userId = _actor.Id;
+        if (await _readable.WorkspaceAsync(workspaceId, userId) is not { } workspace)
         {
-            return ReferenceErrors.ParentNotFound<List<BoardDto>>("Workspace");
+            return _readable.NotFound<List<BoardDto>>(AccessTarget.Workspace, workspaceId, userId);
         }
 
-        var query = _context.Boards.Where(b => b.WorkspaceId == workspaceId);
+        var query = _readable.Boards(userId).Where(b => b.WorkspaceId == workspaceId);
+        if (!workspace.Standing.IsMember)
+        {
+            var publicWorkspace = workspace.Place.Visibility == WorkspaceVisibility.Public;
+            query = query.Where(b =>
+                _context.BoardMembers.Any(member => member.BoardId == b.Id && member.UserId == userId)
+                || (publicWorkspace && b.Visibility == BoardVisibility.Public));
+        }
 
         if (searchDto.SearchTerm is { } term)
         {
@@ -78,11 +89,12 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<BoardViewDto>> GetByIdAsync(Guid id)
     {
-        var existingBoard = await _context.Boards.FirstOrDefaultAsync(b => b.Id == id);
-        if (existingBoard == null)
+        if (await _readable.BoardAsync(id, _actor.Id) is not { } found)
         {
-            return ApiResponse<BoardViewDto>.ErrorResponse("Board not found", 404);
+            return _readable.NotFound<BoardViewDto>(AccessTarget.Board, id, _actor.Id);
         }
+
+        var existingBoard = found.Place;
 
         var labels = await _context.Labels.Where(l => l.BoardId == id).InNameOrder().ToListAsync();
         var lists = await ArchiveView.Lists(_context.Lists.Where(l => l.BoardId == id), ArchiveFilter.Exclude)
@@ -106,13 +118,20 @@ public class BoardService : IBoardService
     public async Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardWrite write)
     {
         var workspaceId = write.WorkspaceId;
-        if (await _tree.FindWorkspaceAsync(workspaceId) is not { } workspace)
+        if (await _readable.WorkspaceAsync(workspaceId, _actor.Id) is not { } found)
         {
-            return ReferenceErrors.ParentNotFound<BoardDto>("Workspace");
+            return _readable.NotFound<BoardDto>(AccessTarget.Workspace, workspaceId, _actor.Id);
         }
 
+        if (WorkspaceRules.Refusal(found.Standing, WorkspaceAction.CreateBoard) is { } refusal)
+        {
+            return _readable.Refused<BoardDto>(refusal, AccessTarget.Workspace, workspaceId, _actor.Id);
+        }
+
+        var workspace = WorkspaceRef.Of(found.Place);
         var boardEntity = MapToEntity(write, _actor.Id);
         _context.Boards.Add(boardEntity);
+        _context.BoardMembers.Add(BoardMember.AdminOf(boardEntity));
         await _activity.AddAsync(
             ActivityType.CreateBoard,
             new ActivityPlace(WorkspaceId: workspaceId, BoardId: boardEntity.Id),
@@ -124,10 +143,14 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardWrite write)
     {
-        var existingBoard = await _context.Boards.FirstOrDefaultAsync(b => b.Id == id);
-        if (existingBoard == null)
+        if (await _readable.BoardAsync(id, _actor.Id) is not { } found)
         {
-            return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
+            return _readable.NotFound<BoardDto>(AccessTarget.Board, id, _actor.Id);
+        }
+
+        if (BoardRules.Refusal(found.Standing, BoardAction.Administer) is { } refusal)
+        {
+            return _readable.Refused<BoardDto>(refusal, AccessTarget.Board, id, _actor.Id);
         }
 
         if (await _archive.OnBoardAsync(id) is { } archived)
@@ -135,6 +158,7 @@ public class BoardService : IBoardService
             return ArchiveErrors.ReadOnly<BoardDto>(archived, TreeItem.Board);
         }
 
+        var existingBoard = found.Place;
         existingBoard.Name = write.Name;
         existingBoard.Description = write.Description;
         existingBoard.Visibility = write.Visibility;
@@ -198,12 +222,17 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived)
     {
-        var board = await _context.Boards.FindAsync(id);
-        if (board == null)
+        if (await _readable.BoardAsync(id, _actor.Id) is not { } found)
         {
-            return ApiResponse<bool>.ErrorResponse("Board not found", 404);
+            return _readable.NotFound<bool>(AccessTarget.Board, id, _actor.Id);
         }
 
+        if (BoardRules.Refusal(found.Standing, BoardAction.Administer) is { } refusal)
+        {
+            return _readable.Refused<bool>(refusal, AccessTarget.Board, id, _actor.Id);
+        }
+
+        var board = found.Place;
         return await _context.SetArchivedAsync(board, _actor, archived, "Board", async archiving =>
         {
             var workspace = await _tree.WorkspaceAsync(board.WorkspaceId);
@@ -216,12 +245,17 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        var existingBoard = await _context.Boards.FindAsync(id);
-        if (existingBoard == null)
+        if (await _readable.BoardAsync(id, _actor.Id) is not { } found)
         {
-            return ApiResponse<bool>.ErrorResponse("Board not found", 404);
+            return _readable.NotFound<bool>(AccessTarget.Board, id, _actor.Id);
         }
 
+        if (BoardRules.Refusal(found.Standing, BoardAction.Administer) is { } refusal)
+        {
+            return _readable.Refused<bool>(refusal, AccessTarget.Board, id, _actor.Id);
+        }
+
+        var existingBoard = found.Place;
         if (!existingBoard.IsArchived)
         {
             return ArchiveErrors.NotArchived<bool>(TreeItem.Board);

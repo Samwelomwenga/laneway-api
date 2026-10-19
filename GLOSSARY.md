@@ -1,6 +1,6 @@
 # Laneway
 
-A Trello-style board API. Work is organized as a tree: workspace, board, list, card, label.
+A kanban board API. Work is organized as a tree: workspace, board, list, card, label.
 
 ## Language
 
@@ -88,7 +88,27 @@ _Avoid_: Note, reply
 
 **User**:
 A person who works on boards.
-_Avoid_: Member, account
+_Avoid_: Account
+
+**Member**:
+A user who belongs to a workspace or a board, with one role there. A user can be a member of many places, with a different role in each.
+_Avoid_: Collaborator, participant
+
+**Role**:
+What a member may do in the workspace or board they belong to. A workspace member is an admin or normal. A board member is an admin, normal, or an observer, who can read the board but not change it. The board settings decide whether observers may comment.
+_Avoid_: User type, permission level, access level
+
+**Guest**:
+A board member who isn't a member of the board's workspace. Being a guest is a state, not a role: a guest is still an admin, normal, or observer on their board.
+_Avoid_: External member, outside collaborator
+
+**Visibility**:
+Who can read a workspace or board without being its member. A board is Private, Workspace, or Public. A workspace is Private or Public. Public means any signed-in user.
+_Avoid_: Privacy, access level, permission level
+
+**Board settings**:
+The rules a board admin sets for a board: who may comment on it, who may add members to it, whether workspace members may join it on their own, and its visibility.
+_Avoid_: Prefs, permissions, board permissions
 
 **Actor**:
 The user who makes a change. Every change has exactly one.
