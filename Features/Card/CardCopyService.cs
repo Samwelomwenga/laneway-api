@@ -21,6 +21,7 @@ public sealed class CardCopyService : ICardCopyService
     private readonly ObjectCopies _objects;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly Readable _readable;
 
     public CardCopyService(
         ApplicationDbContext context,
@@ -32,7 +33,8 @@ public sealed class CardCopyService : ICardCopyService
         CardSnapshots snapshots,
         ObjectCopies objects,
         ActivityWriter activity,
-        ActivityTree tree)
+        ActivityTree tree,
+        Readable readable)
     {
         _context = context;
         _actor = actor;
@@ -44,6 +46,7 @@ public sealed class CardCopyService : ICardCopyService
         _objects = objects;
         _activity = activity;
         _tree = tree;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<CardDto>> CopyAsync(Guid id, CopyCardWrite write)
@@ -53,9 +56,16 @@ public sealed class CardCopyService : ICardCopyService
         var listId = write.ListId;
         var placement = Placement.Of(write);
 
-        if (!await _context.Cards.AnyAsync(card => card.Id == id))
+        var access = await _readable.CardAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Card, id, _actor.Id, out ApiResponse<CardDto>? denied))
         {
-            return CardNotFound();
+            return denied;
+        }
+
+        var target = await _readable.ListAsync(listId, _actor.Id);
+        if (_readable.TargetDenies(target, BoardAction.Edit, "listId", AccessTarget.List, listId, _actor.Id, out denied))
+        {
+            return denied;
         }
 
         if (await RefusesAsync(listId, placement) is { } refused)
@@ -96,16 +106,7 @@ public sealed class CardCopyService : ICardCopyService
 
     private async Task<ApiResponse<CardDto>?> RefusesAsync(Guid listId, Placement placement)
     {
-        var errors = new List<ApiError>();
-        if (await _context.BoardOfListAsync(listId) is null)
-        {
-            errors.Add(new ApiError("listId", ErrorCodes.NotFound, $"List {listId} does not exist."));
-        }
-        else
-        {
-            errors.AddRange((await _placements.CheckInListAsync(listId, placement, _actor.Id)).Errors);
-        }
-
+        var errors = (await _placements.CheckInListAsync(listId, placement, _actor.Id)).Errors;
         if (errors.Count > 0)
         {
             return ReferenceErrors.Invalid<CardDto>(errors);

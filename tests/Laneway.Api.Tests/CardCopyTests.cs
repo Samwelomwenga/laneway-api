@@ -416,6 +416,14 @@ public class CardCopyTests : ApiTests
     {
         var other = await CreateUserAsync();
         var list = await NewListAsync();
+        await FromDatabaseAsync(async database =>
+        {
+            database.BoardMembers.Add(new BoardMember
+            {
+                Id = Guid.NewGuid(), BoardId = list.BoardId, UserId = other.Id, Role = BoardRole.Normal, CreatedBy = other.Id
+            });
+            return await database.SaveChangesAsync();
+        });
         var source = await CreateCardAsync(list.Id, "Write the brief");
         var checklist = await CreateChecklistAsync(source.Id, "Steps");
         await CreateCheckItemAsync(checklist.Id, "Draft it");

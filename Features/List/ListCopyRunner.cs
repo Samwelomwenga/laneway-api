@@ -14,6 +14,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
     private readonly ObjectCopies _objects;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly Readable _readable;
     private readonly ILogger<ListCopyRunner> _logger;
 
     public ListCopyRunner(
@@ -27,6 +28,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
         ObjectCopies objects,
         ActivityWriter activity,
         ActivityTree tree,
+        Readable readable,
         ILogger<ListCopyRunner> logger)
     {
         _context = context;
@@ -39,6 +41,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
         _objects = objects;
         _activity = activity;
         _tree = tree;
+        _readable = readable;
         _logger = logger;
     }
 
@@ -57,6 +60,11 @@ public sealed class ListCopyRunner : ICopyJobRunner
         {
             _logger.LogError(missing, "Copy job {JobId} stored a body this runner can't read.", job.Id);
             return CopyRunResult.Refused([CopyJobEnd.InternalError]);
+        }
+
+        if (await RefusesAsync(job.SourceId, request.BoardId, token) is { } refused)
+        {
+            return refused;
         }
 
         var keep = CopyKeep.Of(request.Keep);
@@ -92,6 +100,22 @@ public sealed class ListCopyRunner : ICopyJobRunner
         }
 
         return written;
+    }
+
+    private async Task<CopyRunResult?> RefusesAsync(Guid sourceId, Guid boardId, CancellationToken token)
+    {
+        var actorId = _actor.Id;
+        if (!await _context.Users.AnyAsync(user => user.Id == actorId, token)
+            || !await _readable.Lists(actorId).AnyAsync(list => list.Id == sourceId, token))
+        {
+            return CopyRunResult.Refused([SourceGone(sourceId)]);
+        }
+
+        var target = await _readable.BoardAsync(boardId, actorId);
+        return _readable.TargetDenies(
+            target, BoardAction.Edit, "boardId", AccessTarget.Board, boardId, actorId, out ApiResponse<CopyJobDto>? denied)
+            ? CopyRunResult.Refused(denied.Errors)
+            : null;
     }
 
     private async Task<CopyRunResult> WriteAsync(ListCopy copy, CancellationToken token)

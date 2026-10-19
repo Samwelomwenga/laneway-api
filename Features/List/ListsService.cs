@@ -132,27 +132,29 @@ public class ListService : IListService
         var boardId = write.BoardId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var list = await _context.Lists.FirstOrDefaultAsync(l => l.Id == id);
-        if (list == null)
+        var access = await _readable.ListAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.List, id, _actor.Id, out ApiResponse<ListDto>? denied))
         {
-            return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
+            return denied;
         }
 
-        if (await _archive.OnListAsync(id) is { } readOnly)
+        var target = await _readable.BoardAsync(boardId, _actor.Id);
+        if (_readable.TargetDenies(target, BoardAction.Edit, "boardId", AccessTarget.Board, boardId, _actor.Id, out denied))
         {
-            return ArchiveErrors.ReadOnly<ListDto>(readOnly, TreeItem.List);
+            return denied;
         }
 
-        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
-        {
-            return ReferenceErrors.NotFound<ListDto>("boardId", "Board", boardId);
-        }
-
+        var list = access.Target;
         var crossesBoards = boardId != list.BoardId;
         var placed = await _placements.ResolveMoveOnBoardAsync(list, boardId, Placement.Of(write), _actor.Id);
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<ListDto>(placed.Errors);
+        }
+
+        if (await _archive.OnListAsync(id) is { } readOnly)
+        {
+            return ArchiveErrors.ReadOnly<ListDto>(readOnly, TreeItem.List);
         }
 
         if (await _archive.OnBoardAsync(boardId) is { } archived)

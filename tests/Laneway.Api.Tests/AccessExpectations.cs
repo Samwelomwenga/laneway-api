@@ -22,10 +22,19 @@ public enum Act
     CreateBoard
 }
 
-public sealed record Expect(int Status, string? Code, bool Limited)
+public sealed record Expect(int Status, string? Code, bool Limited, string? Field = null)
 {
+    public Expect OnField(string field) => Status switch
+    {
+        404 => new Expect(400, ErrorCodes.NotFound, false, field),
+        403 => this with { Field = field },
+        _ => this
+    };
+
     public override string ToString() =>
-        Code is not null ? $"{Status} {Code}" : Limited ? $"{Status} limited" : $"{Status}";
+        Code is null ? Limited ? $"{Status} limited" : $"{Status}"
+        : Field is null ? $"{Status} {Code}"
+        : $"{Status} {Field} {Code}";
 }
 
 // Columns follow the Caller order.

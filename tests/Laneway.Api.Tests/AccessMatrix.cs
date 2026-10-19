@@ -259,6 +259,80 @@ public abstract class AccessMatrix : ApiTests
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
+    protected async Task RunMoveRowAsync(
+        Act source,
+        string slot,
+        int success,
+        Func<Place, Place, TestUser, Task<HttpResponseMessage>> send,
+        string routeObject)
+    {
+        var callers = await CallersAsync();
+        var failures = new List<string>();
+        var target = slot == "workspaceId" ? Act.CreateBoard : Act.EditBoard;
+
+        foreach (var visibility in Enum.GetValues<BoardVisibility>())
+        {
+            foreach (var caller in Enum.GetValues<Caller>())
+            {
+                var from = await SeedPlaceAsync(WorkspaceVisibility.Private, visibility);
+                var to = await SeedOwnPlaceAsync(callers[caller]);
+                var expect = AccessExpectations.For(source, caller, visibility, success);
+                await CheckCellAsync(failures, $"source on a {visibility} board, {caller}", expect, routeObject,
+                    from, () => send(from, to, callers[caller]));
+            }
+        }
+
+        foreach (var caller in Enum.GetValues<Caller>())
+        {
+            if (target == Act.CreateBoard)
+            {
+                foreach (var visibility in Enum.GetValues<WorkspaceVisibility>())
+                {
+                    var to = await SeedPlaceAsync(visibility, BoardVisibility.Private);
+                    var expect = AccessExpectations.For(target, caller, visibility, success).OnField(slot);
+                    await CheckTargetCellAsync(failures, $"{slot} in a {visibility} workspace, {caller}", expect, to);
+                }
+            }
+            else
+            {
+                foreach (var visibility in Enum.GetValues<BoardVisibility>())
+                {
+                    var to = await SeedPlaceAsync(WorkspaceVisibility.Private, visibility);
+                    var expect = AccessExpectations.For(target, caller, visibility, success).OnField(slot);
+                    await CheckTargetCellAsync(failures, $"{slot} on a {visibility} board, {caller}", expect, to);
+                }
+            }
+
+            async Task CheckTargetCellAsync(List<string> failed, string cell, Expect expect, Place to)
+            {
+                var from = await SeedOwnPlaceAsync(callers[caller]);
+                await CheckCellAsync(
+                    failed, cell, expect, routeObject, to, () => send(from, to, callers[caller]), source: from);
+            }
+        }
+
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
+    private async Task<Place> SeedOwnPlaceAsync(TestUser owner)
+    {
+        var workspace = NewWorkspace(WorkspaceVisibility.Private);
+        var board = NewBoard(workspace.Id, BoardVisibility.Private, archived: false);
+        var content = NewContent(await CallersAsync());
+
+        await FromDatabaseAsync(async database =>
+        {
+            database.WorkSpaces.Add(workspace);
+            database.Boards.Add(board);
+            AddContent(database, workspace.Id, board.Id, content);
+            AddWorkspaceMember(database, workspace.Id, owner.Id, WorkspaceRole.Admin);
+            AddBoardMember(database, board.Id, owner.Id, BoardRole.Admin);
+            return await database.SaveChangesAsync();
+        });
+
+        return new Place(workspace.Id, board.Id, content);
+    }
+
     protected async Task RunBoardListRowAsync(
         string routeObject, Func<Place, string> path, Func<Content, Guid[]> expected)
     {
@@ -336,9 +410,10 @@ public abstract class AccessMatrix : ApiTests
         Expect expect,
         string routeObject,
         Place place,
-        Func<Task<HttpResponseMessage>> send)
+        Func<Task<HttpResponseMessage>> send,
+        Place? source = null)
     {
-        var before = await SnapshotAsync(place);
+        var before = await SnapshotAsync(place, source);
         using var response = await send();
         var body = await response.Content.ReadAsStringAsync();
         var problems = new List<string>();
@@ -359,7 +434,7 @@ public abstract class AccessMatrix : ApiTests
         {
             var errors = JsonDocument.Parse(body).RootElement.GetProperty("errors");
             if (errors.GetArrayLength() != 1 || errors[0].GetProperty("code").GetString() != code
-                || errors[0].GetProperty("field").ValueKind != JsonValueKind.Null)
+                || errors[0].GetProperty("field").GetString() != expect.Field)
             {
                 problems.Add($"errors {errors.GetRawText()}");
             }
@@ -374,7 +449,7 @@ public abstract class AccessMatrix : ApiTests
             }
         }
 
-        if (expect.Status >= 400 && await SnapshotAsync(place) != before)
+        if (expect.Status >= 400 && await SnapshotAsync(place, source) != before)
         {
             problems.Add("the target changed");
         }
@@ -384,6 +459,9 @@ public abstract class AccessMatrix : ApiTests
             failures.Add($"{cell}: expected {expect}, got {string.Join(", ", problems)}. {body}");
         }
     }
+
+    private async Task<string> SnapshotAsync(Place place, Place? source) =>
+        source is null ? await SnapshotAsync(place) : await SnapshotAsync(place) + await SnapshotAsync(source);
 
     private Task<string> SnapshotAsync(Place place) =>
         FromDatabaseAsync(async database => JsonSerializer.Serialize(new

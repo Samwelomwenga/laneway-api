@@ -38,4 +38,16 @@ public class ListAccessTests : AccessMatrix
     public Task DELETE_a_list() =>
         RunBoardRowAsync(Act.EditBoard, 204, (place, caller) =>
             DeleteAsync($"/api/v1/lists/{place.Content.ArchivedListId}", caller), routeObject: "List");
+
+    [Fact]
+    public Task PUT_a_lists_position() =>
+        RunMoveRowAsync(Act.EditBoard, "boardId", 200, (from, to, caller) =>
+            PutAsync($"/api/v1/lists/{from.Content.ListId}/position", new { boardId = to.BoardId }, caller),
+            routeObject: "List");
+
+    [Fact]
+    public Task POST_a_list_copy() =>
+        RunMoveRowAsync(Act.ReadBoard, "boardId", 202, (from, to, caller) =>
+            PostAsync($"/api/v1/lists/{from.Content.ListId}/copies", new { boardId = to.BoardId }, caller),
+            routeObject: "List");
 }

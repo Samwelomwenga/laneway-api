@@ -163,7 +163,8 @@ public sealed class Readable
         return ApiResponse<T>.ErrorResponse($"{AccessTargets.Name(target)} not found", StatusCodes.Status404NotFound);
     }
 
-    public ApiResponse<T> Refused<T>(Refusal refusal, AccessTarget target, Guid id, Guid userId)
+    public ApiResponse<T> Refused<T>(
+        Refusal refusal, AccessTarget target, Guid id, Guid userId, string? field = null)
     {
         ArgumentNullException.ThrowIfNull(refusal);
 
@@ -171,7 +172,7 @@ public sealed class Readable
         return ApiResponse<T>.ErrorResponse(
             refusal.Message,
             StatusCodes.Status403Forbidden,
-            [new ApiError(null, refusal.Code, refusal.Message)]);
+            [new ApiError(field, refusal.Code, refusal.Message)]);
     }
 
     public bool ReadDenies<TTarget, TStanding, T>(
@@ -219,6 +220,39 @@ public sealed class Readable
         denied = WorkspaceRules.Refusal(access.Standing, action) is { } refusal
             ? Refused<T>(refusal, AccessTarget.Workspace, id, userId)
             : null;
+        return denied is not null;
+    }
+
+    public bool TargetDenies<TTarget, T>(
+        [NotNullWhen(false)] Found<TTarget, BoardStanding>? access,
+        BoardAction action,
+        string field,
+        AccessTarget target,
+        Guid id,
+        Guid userId,
+        [NotNullWhen(true)] out ApiResponse<T>? denied)
+    {
+        denied = access is null
+            ? ReferenceErrors.NotFound<T>(field, AccessTargets.Name(target), id)
+            : BoardRules.Refusal(access.Standing, action) is { } refusal
+                ? Refused<T>(refusal, target, id, userId, field)
+                : null;
+        return denied is not null;
+    }
+
+    public bool TargetDenies<T>(
+        [NotNullWhen(false)] Found<WorkSpace, WorkspaceStanding>? access,
+        WorkspaceAction action,
+        string field,
+        Guid id,
+        Guid userId,
+        [NotNullWhen(true)] out ApiResponse<T>? denied)
+    {
+        denied = access is null
+            ? ReferenceErrors.NotFound<T>(field, AccessTargets.Name(AccessTarget.Workspace), id)
+            : WorkspaceRules.Refusal(access.Standing, action) is { } refusal
+                ? Refused<T>(refusal, AccessTarget.Workspace, id, userId, field)
+                : null;
         return denied is not null;
     }
 

@@ -178,10 +178,17 @@ public class BoardService : IBoardService
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        var board = await _context.Boards.FirstOrDefaultAsync(b => b.Id == id);
-        if (board == null)
+        var access = await _readable.BoardAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Administer, AccessTarget.Board, id, _actor.Id, out ApiResponse<BoardDto>? denied))
         {
-            return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
+            return denied;
+        }
+
+        var workspaceId = write.WorkspaceId;
+        var target = await _readable.WorkspaceAsync(workspaceId, _actor.Id);
+        if (_readable.TargetDenies(target, WorkspaceAction.CreateBoard, "workspaceId", workspaceId, _actor.Id, out denied))
+        {
+            return denied;
         }
 
         if (await _archive.OnBoardAsync(id) is { } archived)
@@ -189,11 +196,8 @@ public class BoardService : IBoardService
             return ArchiveErrors.ReadOnly<BoardDto>(archived, TreeItem.Board);
         }
 
-        var workspaceId = write.WorkspaceId;
-        if (await _tree.FindWorkspaceAsync(workspaceId) is not { } workspace)
-        {
-            return ReferenceErrors.NotFound<BoardDto>("workspaceId", "Workspace", workspaceId);
-        }
+        var board = access.Target;
+        var workspace = await _tree.WorkspaceAsync(workspaceId);
 
         var leaving = board.WorkspaceId;
         board.WorkspaceId = workspaceId;

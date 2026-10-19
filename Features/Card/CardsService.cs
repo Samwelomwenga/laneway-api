@@ -198,24 +198,22 @@ public class CardService : ICardService
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var card = await _context.Cards
-            .Include(c => c.Labels)
-            .FirstOrDefaultAsync(c => c.Id == id);
-        if (card == null)
+        var access = await _readable.CardAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Card, id, _actor.Id, out ApiResponse<CardDto>? denied))
         {
-            return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
+            return denied;
         }
 
-        if (await _archive.OnCardAsync(id) is { } readOnly)
+        var target = await _readable.ListAsync(listId, _actor.Id);
+        if (_readable.TargetDenies(target, BoardAction.Edit, "listId", AccessTarget.List, listId, _actor.Id, out denied))
         {
-            return ArchiveErrors.ReadOnly<CardDto>(readOnly, TreeItem.Card);
+            return denied;
         }
 
+        var card = access.Target;
+        await _context.Entry(card).Collection(c => c.Labels).LoadAsync();
         var sourceBoardId = await _context.BoardOfListAsync(card.ListId);
-        if (await _context.BoardOfListAsync(listId) is not { } boardId)
-        {
-            return ReferenceErrors.NotFound<CardDto>("listId", "List", listId);
-        }
+        var boardId = target.Target.BoardId;
 
         var crossesBoards = boardId != sourceBoardId;
         if (crossesBoards)
@@ -234,6 +232,11 @@ public class CardService : ICardService
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<CardDto>(placed.Errors);
+        }
+
+        if (await _archive.OnCardAsync(id) is { } readOnly)
+        {
+            return ArchiveErrors.ReadOnly<CardDto>(readOnly, TreeItem.Card);
         }
 
         if (await _archive.OnListAsync(listId) is { } archived)

@@ -58,4 +58,16 @@ public class CardAccessTests : AccessMatrix
         RunBoardRowAsync(Act.EditBoard, 204, (place, caller) =>
             DeleteAsync($"/api/v1/cards/{place.Content.CardId}/labels/{place.Content.CardLabelId}", caller),
             routeObject: "Card");
+
+    [Fact]
+    public Task PUT_a_cards_position() =>
+        RunMoveRowAsync(Act.EditBoard, "listId", 200, (from, to, caller) =>
+            PutAsync($"/api/v1/cards/{from.Content.CardId}/position", new { listId = to.Content.ListId }, caller),
+            routeObject: "Card");
+
+    [Fact]
+    public Task POST_a_card_copy() =>
+        RunMoveRowAsync(Act.ReadBoard, "listId", 201, (from, to, caller) =>
+            PostAsync($"/api/v1/cards/{from.Content.CardId}/copies", new { listId = to.Content.ListId }, caller),
+            routeObject: "Card");
 }
