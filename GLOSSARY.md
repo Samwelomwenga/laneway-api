@@ -81,7 +81,7 @@ The record of one change a user made: who made it, when, and what changed. It st
 _Avoid_: Action, event, log entry
 
 **Comment**:
-An activity entry holding text a user wrote on a card. Only the user who wrote it can edit or delete it, and no other activity entry can change.
+An activity entry holding text a user wrote on a card. Only the user who wrote it can edit or delete it, and only while they may still comment on its board. A board admin can delete any comment. No other activity entry can change.
 _Avoid_: Note, reply
 
 ### People
@@ -101,6 +101,10 @@ _Avoid_: User type, permission level, access level
 **Guest**:
 A board member who isn't a member of the board's workspace. Being a guest is a state, not a role: a guest is still an admin, normal, or observer on their board.
 _Avoid_: External member, outside collaborator
+
+**Former reader**:
+A user who was a member of a workspace or board when it was deleted. A deleted Workspace or Public board also keeps every member of its workspace. Former readers keep reading its activity. Someone who joins the workspace later doesn't.
+_Avoid_: Past member
 
 **Visibility**:
 Who can read a workspace or board without being its member. A board is Private, Workspace, or Public. A workspace is Private or Public. Public means any signed-in user.

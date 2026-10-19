@@ -13,7 +13,8 @@ public enum AccessTarget
     Label,
     Checklist,
     CheckItem,
-    Attachment
+    Attachment,
+    Comment
 }
 
 public static class AccessTargets
@@ -146,6 +147,8 @@ public sealed class DenialDrainer : BackgroundService
             AccessTarget.Checklist => await context.Checklists.AnyAsync(found => found.Id == denial.TargetId, token),
             AccessTarget.CheckItem => await context.CheckItems.AnyAsync(found => found.Id == denial.TargetId, token),
             AccessTarget.Attachment => await context.Attachments.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.Comment => await context.ActivityEntries.AnyAsync(
+                found => found.Id == denial.TargetId && found.Type == ActivityType.Comment, token),
             _ => throw new ArgumentOutOfRangeException(nameof(denial), denial.Target, null)
         };
     }

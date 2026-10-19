@@ -18,7 +18,8 @@ public sealed record Content(
     Guid FileAttachmentId,
     Guid ArchivedListId,
     Guid ArchivedCardId,
-    Guid ArchivedChecklistId);
+    Guid ArchivedChecklistId,
+    IReadOnlyDictionary<Guid, Guid> CommentIds);
 
 public abstract class AccessMatrix : ApiTests
 {
@@ -54,13 +55,13 @@ public abstract class AccessMatrix : ApiTests
         var callers = await CallersAsync();
         var workspace = NewWorkspace(workspaceVisibility);
         var board = NewBoard(workspace.Id, boardVisibility, archived);
-        var content = NewContent();
+        var content = NewContent(callers);
 
         await FromDatabaseAsync(async database =>
         {
             database.WorkSpaces.Add(workspace);
             database.Boards.Add(board);
-            AddContent(database, board.Id, content);
+            AddContent(database, workspace.Id, board.Id, content);
             AddWorkspaceMember(database, workspace.Id, ActorId, WorkspaceRole.Admin);
             AddBoardMember(database, board.Id, ActorId, BoardRole.Admin);
 
@@ -82,21 +83,27 @@ public abstract class AccessMatrix : ApiTests
 
     protected async Task<Content> SeedContentAsync(Guid boardId)
     {
-        var content = NewContent();
+        var callers = await CallersAsync();
+        var content = NewContent(callers);
         await FromDatabaseAsync(async database =>
         {
-            AddContent(database, boardId, content);
+            var workspaceId = await database.Boards
+                .Where(board => board.Id == boardId)
+                .Select(board => board.WorkspaceId)
+                .SingleAsync();
+            AddContent(database, workspaceId, boardId, content);
             return await database.SaveChangesAsync();
         });
 
         return content;
     }
 
-    private static Content NewContent() => new(
+    private static Content NewContent(IReadOnlyDictionary<Caller, TestUser> callers) => new(
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-        Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+        callers.Values.ToDictionary(caller => caller.Id, _ => Guid.NewGuid()));
 
-    private void AddContent(ApplicationDbContext database, Guid boardId, Content content)
+    private void AddContent(ApplicationDbContext database, Guid workspaceId, Guid boardId, Content content)
     {
         var cardLabel = new Label { Id = content.CardLabelId, Name = "On the card", BoardId = boardId, CreatedBy = ActorId };
         database.Labels.Add(new Label { Id = content.LabelId, Name = "Free", BoardId = boardId, CreatedBy = ActorId });
@@ -175,6 +182,21 @@ public abstract class AccessMatrix : ApiTests
             ObjectKey = MatrixFileKey,
             CreatedBy = ActorId
         });
+        foreach (var (authorId, commentId) in content.CommentIds)
+        {
+            database.ActivityEntries.Add(new ActivityEntry
+            {
+                Id = commentId,
+                Type = ActivityType.Comment,
+                CreatedBy = authorId,
+                WorkspaceId = workspaceId,
+                BoardId = boardId,
+                ListId = content.ListId,
+                CardId = content.CardId,
+                Data = JsonDocument.Parse("{}"),
+                Text = "A matrix comment"
+            });
+        }
     }
 
     protected async Task StoreMatrixFileAsync()
@@ -415,6 +437,11 @@ public abstract class AccessMatrix : ApiTests
                 .Where(attachment => attachment.CardId == place.Content.CardId)
                 .OrderBy(attachment => attachment.Id)
                 .Select(attachment => new { attachment.Id, attachment.Name, attachment.UpdatedAt })
+                .ToListAsync(),
+            Comments = await database.ActivityEntries.AsNoTracking()
+                .Where(entry => entry.Type == ActivityType.Comment && entry.CardId == place.Content.CardId)
+                .OrderBy(entry => entry.Id)
+                .Select(entry => new { entry.Id, entry.Text, entry.UpdatedAt })
                 .ToListAsync()
         }));
 

@@ -16,6 +16,7 @@ public enum Act
     ReadBoard,
     EditBoard,
     AdministerBoard,
+    CommentOnBoard,
     ReadWorkspace,
     AdministerWorkspace,
     CreateBoard
@@ -43,6 +44,10 @@ public static class AccessExpectations
         [(Act.AdministerBoard, BoardVisibility.Private)] = ["ok", "admin", "readOnly", "admin", "404", "404", "404"],
         [(Act.AdministerBoard, BoardVisibility.Workspace)] = ["ok", "admin", "readOnly", "admin", "ok", "member", "404"],
         [(Act.AdministerBoard, BoardVisibility.Public)] = ["ok", "admin", "readOnly", "admin", "ok", "member", "member"],
+
+        [(Act.CommentOnBoard, BoardVisibility.Private)] = ["ok", "ok", "readOnly", "ok", "404", "404", "404"],
+        [(Act.CommentOnBoard, BoardVisibility.Workspace)] = ["ok", "ok", "readOnly", "ok", "ok", "member", "404"],
+        [(Act.CommentOnBoard, BoardVisibility.Public)] = ["ok", "ok", "readOnly", "ok", "ok", "member", "member"],
     };
 
     private static readonly Dictionary<(Act, WorkspaceVisibility), string[]> Workspaces = new()

@@ -518,6 +518,25 @@ namespace Laneway.Api.Migrations
                     b.ToTable("CopyJobs");
                 });
 
+            modelBuilder.Entity("Laneway.Api.FormerReader", b =>
+                {
+                    b.Property<Guid>("PlaceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PlaceType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("PlaceId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("FormerReaders");
+                });
+
             modelBuilder.Entity("Laneway.Api.Label", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1049,6 +1068,15 @@ namespace Laneway.Api.Migrations
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Laneway.Api.FormerReader", b =>
+                {
+                    b.HasOne("Laneway.Api.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

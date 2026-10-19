@@ -147,6 +147,7 @@ public class WorkSpaceService : IWorkSpaceService
                     $"Move or delete this workspace's {boardCount} {(boardCount == 1 ? "board" : "boards")} first.")]);
         }
 
+        await _context.KeepWorkspaceReadersAsync(workSpace.Id);
         _context.WorkSpaces.Remove(workSpace);
         await _activity.AddAsync(
             ActivityType.DeleteWorkspace,

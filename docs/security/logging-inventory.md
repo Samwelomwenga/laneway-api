@@ -58,7 +58,7 @@ Denials log under the `Laneway.Authorization` category, which meets ASVS 16.3.2.
 |---|---|---|---|
 | 1 | `AccessDenied` | Warning | `sub`, `targetType`, `targetId`, `status`, `code` |
 
-`targetType` is `Workspace` or `Board`. `status` is 404 when the caller couldn't read the object, and `code` is then `notFound`. `status` is 403 when they could read it but their role forbids the action, and `code` is the 403 code, such as `readOnlyRole` or `requiresWorkspaceAdmin`.
+`targetType` names the route object: `Workspace`, `Board`, `List`, `Card`, `Label`, `Checklist`, `CheckItem`, `Attachment`, or `Comment`. `status` is 404 when the caller couldn't read the object, and `code` is then `notFound`. `status` is 403 when they could read it but their role forbids the action, and `code` is the 403 code, such as `readOnlyRole`, `requiresWorkspaceAdmin`, or `notAuthor`.
 
 The service puts each denial on a bounded channel and answers at once, so a hiding 404 is as fast as a missing one. `DenialDrainer` reads the channel in the background. For a 404 it checks whether the object exists, and drops the entry when it doesn't. A random id is a miss, not a denial. So every logged `targetId` names a real object.
 

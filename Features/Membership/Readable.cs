@@ -65,6 +65,19 @@ public sealed class Readable
         return _context.Attachments.Where(attachment => cards.Any(card => card.Id == attachment.CardId));
     }
 
+    public IQueryable<ActivityEntry> ActivityEntries(Guid userId)
+    {
+        var boards = Boards(userId);
+        var former = _context.FormerReaders.Where(reader => reader.UserId == userId);
+        return _context.ActivityEntries.Where(entry =>
+            entry.BoardId == null
+                ? _context.WorkspaceMembers.Any(member => member.WorkspaceId == entry.WorkspaceId && member.UserId == userId)
+                    || former.Any(reader => reader.PlaceType == ReaderPlace.Workspace && reader.PlaceId == entry.WorkspaceId)
+                : boards.Any(board => board.Id == entry.BoardId || board.Id == entry.FromBoardId)
+                    || former.Any(reader => reader.PlaceType == ReaderPlace.Board
+                        && (reader.PlaceId == entry.BoardId || reader.PlaceId == entry.FromBoardId)));
+    }
+
     public async Task<Found<WorkSpace, WorkspaceStanding>?> WorkspaceAsync(Guid id, Guid userId)
     {
         var found = await Workspaces(userId)
@@ -133,6 +146,15 @@ public sealed class Readable
             join card in _context.Cards on attachment.CardId equals card.Id
             join list in _context.Lists on card.ListId equals list.Id
             select new OnBoard<Attachment> { Target = attachment, BoardId = list.BoardId },
+            userId);
+
+    public Task<Found<ActivityEntry, BoardStanding>?> CommentAsync(Guid id, Guid userId) =>
+        OnBoardAsync(
+            ActivityEntries(userId)
+                .Where(entry => entry.Id == id
+                    && entry.Type == ActivityType.Comment
+                    && _context.Cards.Any(card => card.Id == entry.CardId))
+                .Select(entry => new OnBoard<ActivityEntry> { Target = entry, BoardId = entry.BoardId!.Value }),
             userId);
 
     public ApiResponse<T> NotFound<T>(AccessTarget target, Guid id, Guid userId)

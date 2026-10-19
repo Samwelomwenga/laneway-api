@@ -248,6 +248,7 @@ public class BoardService : IBoardService
         }
 
         var workspace = await _tree.WorkspaceAsync(existingBoard.WorkspaceId);
+        await _context.KeepBoardReadersAsync(existingBoard);
         _context.Boards.Remove(existingBoard);
         await _activity.AddAsync(
             ActivityType.DeleteBoard,

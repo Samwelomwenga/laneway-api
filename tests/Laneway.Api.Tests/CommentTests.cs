@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -209,7 +210,7 @@ public class CommentTests : ApiTests
     {
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
-        var ben = await CreateUserAsync();
+        var ben = await BoardNormalAsync(card.Id);
 
         using var edited = await EditCommentAsync(comment.Id, new { text = "By Monday." }, ben);
         using var removed = await RemoveCommentAsync(comment.Id, ben);
@@ -231,7 +232,7 @@ public class CommentTests : ApiTests
     {
         var card = await CardAsync();
         await CreateCommentAsync(card.Id, "By Friday.");
-        var ben = await CreateUserAsync();
+        var ben = await BoardNormalAsync(card.Id);
 
         var comment = await CreateCommentAsync(card.Id, "I'll take it.", ben);
 
@@ -307,7 +308,7 @@ public class CommentTests : ApiTests
         var card = await CardAsync();
         var comment = await CreateCommentAsync(card.Id, "By Friday.");
         await SetCardArchivedAsync(card.Id, true);
-        var ben = await CreateUserAsync();
+        var ben = await BoardNormalAsync(card.Id);
 
         using var edited = await EditCommentAsync(comment.Id, new { text = "By Monday." }, ben);
         using var removed = await RemoveCommentAsync(comment.Id, ben);
@@ -382,6 +383,25 @@ public class CommentTests : ApiTests
         Assert.Equal(comment.Id, entry.Id);
         Assert.Equal("By Friday.", entry.Text);
         Assert.Null(entry.UpdatedAt);
+    }
+
+    private async Task<TestUser> BoardNormalAsync(Guid cardId)
+    {
+        var user = await CreateUserAsync();
+        await FromDatabaseAsync(async database =>
+        {
+            var boardId = await database.Cards
+                .Where(card => card.Id == cardId)
+                .Join(database.Lists, card => card.ListId, list => list.Id, (_, list) => list.BoardId)
+                .SingleAsync();
+            database.BoardMembers.Add(new BoardMember
+            {
+                Id = Guid.NewGuid(), BoardId = boardId, UserId = user.Id, Role = BoardRole.Normal, CreatedBy = user.Id
+            });
+            return await database.SaveChangesAsync();
+        });
+
+        return user;
     }
 
     private async Task<CardDto> CardAsync()
