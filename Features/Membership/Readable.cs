@@ -163,6 +163,21 @@ public sealed class Readable
         return ApiResponse<T>.ErrorResponse($"{AccessTargets.Name(target)} not found", StatusCodes.Status404NotFound);
     }
 
+    public async Task<bool> SeesAsync<T>(IQueryable<T> readable, AccessTarget target, Guid id, Guid userId)
+        where T : BaseEntity
+    {
+        if (await readable.AnyAsync(found => found.Id == id))
+        {
+            return true;
+        }
+
+        HiddenField(target, id, userId);
+        return false;
+    }
+
+    public void HiddenField(AccessTarget target, Guid id, Guid userId) =>
+        _denials.Add(new Denial(userId, target, id, null, FromField: true));
+
     public ApiResponse<T> Refused<T>(
         Refusal refusal, AccessTarget target, Guid id, Guid userId, string? field = null)
     {
@@ -232,11 +247,16 @@ public sealed class Readable
         Guid userId,
         [NotNullWhen(true)] out ApiResponse<T>? denied)
     {
-        denied = access is null
-            ? ReferenceErrors.NotFound<T>(field, AccessTargets.Name(target), id)
-            : BoardRules.Refusal(access.Standing, action) is { } refusal
-                ? Refused<T>(refusal, target, id, userId, field)
-                : null;
+        if (access is null)
+        {
+            HiddenField(target, id, userId);
+            denied = ReferenceErrors.NotFound<T>(field, AccessTargets.Name(target), id);
+            return true;
+        }
+
+        denied = BoardRules.Refusal(access.Standing, action) is { } refusal
+            ? Refused<T>(refusal, target, id, userId, field)
+            : null;
         return denied is not null;
     }
 
@@ -248,11 +268,16 @@ public sealed class Readable
         Guid userId,
         [NotNullWhen(true)] out ApiResponse<T>? denied)
     {
-        denied = access is null
-            ? ReferenceErrors.NotFound<T>(field, AccessTargets.Name(AccessTarget.Workspace), id)
-            : WorkspaceRules.Refusal(access.Standing, action) is { } refusal
-                ? Refused<T>(refusal, AccessTarget.Workspace, id, userId, field)
-                : null;
+        if (access is null)
+        {
+            HiddenField(AccessTarget.Workspace, id, userId);
+            denied = ReferenceErrors.NotFound<T>(field, AccessTargets.Name(AccessTarget.Workspace), id);
+            return true;
+        }
+
+        denied = WorkspaceRules.Refusal(access.Standing, action) is { } refusal
+            ? Refused<T>(refusal, AccessTarget.Workspace, id, userId, field)
+            : null;
         return denied is not null;
     }
 

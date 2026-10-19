@@ -89,17 +89,17 @@ public class ActivityService : IActivityService
     {
         var errors = new List<ApiError>();
         var userId = _actor.Id;
-        await AddUnknownAsync(errors, "workspaceId", "Workspace", searchDto.WorkspaceId, _readable.Workspaces(userId), AtWorkspace);
-        await AddUnknownAsync(errors, "boardId", "Board", searchDto.BoardId, _readable.Boards(userId), AtBoard);
-        await AddUnknownAsync(errors, "listId", "List", searchDto.ListId, _readable.Lists(userId), AtList);
-        await AddUnknownAsync(errors, "cardId", "Card", searchDto.CardId, _readable.Cards(userId), AtCard);
+        await AddUnknownAsync(errors, "workspaceId", AccessTarget.Workspace, searchDto.WorkspaceId, _readable.Workspaces(userId), AtWorkspace);
+        await AddUnknownAsync(errors, "boardId", AccessTarget.Board, searchDto.BoardId, _readable.Boards(userId), AtBoard);
+        await AddUnknownAsync(errors, "listId", AccessTarget.List, searchDto.ListId, _readable.Lists(userId), AtList);
+        await AddUnknownAsync(errors, "cardId", AccessTarget.Card, searchDto.CardId, _readable.Cards(userId), AtCard);
         return errors;
     }
 
     private async Task AddUnknownAsync<TItem>(
         List<ApiError> errors,
         string key,
-        string resource,
+        AccessTarget target,
         Guid? id,
         IQueryable<TItem> readable,
         Func<Guid, Expression<Func<ActivityEntry, bool>>> named)
@@ -112,6 +112,7 @@ public class ActivityService : IActivityService
             return;
         }
 
-        errors.Add(new ApiError(key, ErrorCodes.NotFound, $"{resource} {value} does not exist."));
+        _readable.HiddenField(target, value, _actor.Id);
+        errors.Add(new ApiError(key, ErrorCodes.NotFound, $"{AccessTargets.Name(target)} {value} does not exist."));
     }
 }

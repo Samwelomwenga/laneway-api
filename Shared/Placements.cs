@@ -85,7 +85,7 @@ public sealed class Placements
         var siblings = lists.ConvertAll(list => new Sibling(list, list.IsArchived));
 
         return await ResolveAsync(siblings, placement, moving, "List", "board",
-            id => _readable.Lists(userId).AnyAsync(list => list.Id == id));
+            id => _readable.SeesAsync(_readable.Lists(userId), AccessTarget.List, id, userId));
     }
 
     private async Task<PlacementResult> InListAsync(Guid listId, Placement placement, Card? moving, Guid userId)
@@ -94,7 +94,7 @@ public sealed class Placements
         var siblings = cards.ConvertAll(card => new Sibling(card, card.IsArchived));
 
         return await ResolveAsync(siblings, placement, moving, "Card", "list",
-            id => _readable.Cards(userId).AnyAsync(card => card.Id == id));
+            id => _readable.SeesAsync(_readable.Cards(userId), AccessTarget.Card, id, userId));
     }
 
     private async Task<PlacementResult> OnCardAsync(Guid cardId, Placement placement, Checklist? moving, Guid userId)
@@ -104,7 +104,7 @@ public sealed class Placements
         var siblings = checklists.ConvertAll(checklist => new Sibling(checklist, checklist.IsArchived));
 
         return await ResolveAsync(siblings, placement, moving, "Checklist", "card",
-            id => _readable.Checklists(userId).AnyAsync(checklist => checklist.Id == id));
+            id => _readable.SeesAsync(_readable.Checklists(userId), AccessTarget.Checklist, id, userId));
     }
 
     private async Task<PlacementResult> InChecklistAsync(Guid checklistId, Placement placement, CheckItem? moving, Guid userId)
@@ -114,7 +114,7 @@ public sealed class Placements
         var siblings = checkItems.ConvertAll(checkItem => new Sibling(checkItem, IsArchived: false));
 
         return await ResolveAsync(siblings, placement, moving, "Check item", "checklist",
-            id => _readable.CheckItems(userId).AnyAsync(checkItem => checkItem.Id == id));
+            id => _readable.SeesAsync(_readable.CheckItems(userId), AccessTarget.CheckItem, id, userId));
     }
 
     private static async Task<PlacementResult> ResolveAsync(

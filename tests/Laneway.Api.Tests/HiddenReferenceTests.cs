@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -102,6 +103,27 @@ public class HiddenReferenceTests : AccessMatrix
             $"/api/v1/cards/{place.Content.CardId}/cover", new { attachmentId = hidden.AttachmentId }, member)));
         Assert.Equal(["checklistId notFound"], await ErrorsAsync(PutAsync(
             $"/api/v1/check-items/{place.Content.CheckItemId}/position", new { checklistId = hidden.ChecklistId }, member)));
+    }
+
+    [Fact]
+    public async Task Move_targets_and_anchors_are_checked_before_the_archived_source()
+    {
+        var (place, hidden, _, member) = await SeedAsync();
+        var card = $"/api/v1/cards/{place.Content.ArchivedCardId}/position";
+        var list = $"/api/v1/lists/{place.Content.ArchivedListId}/position";
+        var hiddenBoardId = await FromDatabaseAsync(database => database.Lists
+            .Where(found => found.Id == hidden.ListId)
+            .Select(found => found.BoardId)
+            .SingleAsync());
+
+        Assert.Equal(["listId notFound"],
+            await ErrorsAsync(PutAsync(card, new { listId = hidden.ListId }, member)));
+        Assert.Equal(["before notFound"],
+            await ErrorsAsync(PutAsync(card, new { listId = place.Content.ListId, before = hidden.CardId }, member)));
+        Assert.Equal(["boardId notFound"],
+            await ErrorsAsync(PutAsync(list, new { boardId = hiddenBoardId }, member)));
+        Assert.Equal(["after notFound"],
+            await ErrorsAsync(PutAsync(list, new { boardId = place.BoardId, after = hidden.ListId }, member)));
     }
 
     private async Task<(Place Place, Content Hidden, Content Readable, TestUser Member)> SeedAsync()

@@ -160,6 +160,7 @@ public class CheckItemService : ICheckItemService
         var errors = new List<ApiError>();
         if (destinationCardId is null)
         {
+            _readable.HiddenField(AccessTarget.Checklist, checklistId, _actor.Id);
             errors.Add(new ApiError("checklistId", ErrorCodes.NotFound, $"Checklist {checklistId} does not exist."));
         }
         else if (destinationCardId != cardId)

@@ -14,7 +14,8 @@ public enum AccessTarget
     Checklist,
     CheckItem,
     Attachment,
-    Comment
+    Comment,
+    CopyJob
 }
 
 public static class AccessTargets
@@ -22,13 +23,18 @@ public static class AccessTargets
     public static string Name(AccessTarget target) => target switch
     {
         AccessTarget.CheckItem => "Check item",
+        AccessTarget.CopyJob => "Copy job",
         _ => target.ToString()
     };
 }
 
-public sealed record Denial(Guid ActorId, AccessTarget Target, Guid TargetId, string? Code)
+public sealed record Denial(Guid ActorId, AccessTarget Target, Guid TargetId, string? Code, bool FromField = false)
 {
     public bool IsHidingNotFound => Code is null;
+
+    public int Status => Code is not null ? StatusCodes.Status403Forbidden
+        : FromField ? StatusCodes.Status400BadRequest
+        : StatusCodes.Status404NotFound;
 }
 
 public sealed class DenialMeter
@@ -127,7 +133,7 @@ public sealed class DenialDrainer : BackgroundService
             denial.ActorId,
             denial.Target,
             denial.TargetId,
-            denial.IsHidingNotFound ? StatusCodes.Status404NotFound : StatusCodes.Status403Forbidden,
+            denial.Status,
             denial.Code ?? ErrorCodes.NotFound,
             null);
     }
@@ -149,6 +155,7 @@ public sealed class DenialDrainer : BackgroundService
             AccessTarget.Attachment => await context.Attachments.AnyAsync(found => found.Id == denial.TargetId, token),
             AccessTarget.Comment => await context.ActivityEntries.AnyAsync(
                 found => found.Id == denial.TargetId && found.Type == ActivityType.Comment, token),
+            AccessTarget.CopyJob => await context.CopyJobs.AnyAsync(found => found.Id == denial.TargetId, token),
             _ => throw new ArgumentOutOfRangeException(nameof(denial), denial.Target, null)
         };
     }

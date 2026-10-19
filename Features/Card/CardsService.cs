@@ -531,6 +531,7 @@ public class CardService : ICardService
 
         if (attachment is null)
         {
+            _readable.HiddenField(AccessTarget.Attachment, attachmentId, _actor.Id);
             return new ApiError("attachmentId", ErrorCodes.NotFound, $"Attachment {attachmentId} does not exist.");
         }
 
@@ -643,6 +644,7 @@ public class CardService : ICardService
             var label = labels.Find(l => l.Id == id);
             if (label is null)
             {
+                _readable.HiddenField(AccessTarget.Label, id, _actor.Id);
                 errors.Add(new ApiError(field, ErrorCodes.NotFound, $"Label {id} does not exist."));
             }
             else if (boardId is { } board && label.BoardId != board)
