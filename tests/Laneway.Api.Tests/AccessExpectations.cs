@@ -14,16 +14,27 @@ public enum Caller
 public enum Act
 {
     ReadBoard,
+    EditBoard,
     AdministerBoard,
+    CommentOnBoard,
     ReadWorkspace,
     AdministerWorkspace,
     CreateBoard
 }
 
-public sealed record Expect(int Status, string? Code, bool Limited)
+public sealed record Expect(int Status, string? Code, bool Limited, string? Field = null)
 {
+    public Expect OnField(string field) => Status switch
+    {
+        404 => new Expect(400, ErrorCodes.NotFound, false, field),
+        403 => this with { Field = field },
+        _ => this
+    };
+
     public override string ToString() =>
-        Code is not null ? $"{Status} {Code}" : Limited ? $"{Status} limited" : $"{Status}";
+        Code is null ? Limited ? $"{Status} limited" : $"{Status}"
+        : Field is null ? $"{Status} {Code}"
+        : $"{Status} {Field} {Code}";
 }
 
 // Columns follow the Caller order.
@@ -35,9 +46,17 @@ public static class AccessExpectations
         [(Act.ReadBoard, BoardVisibility.Workspace)] = ["ok", "ok", "ok", "ok", "ok", "ok", "404"],
         [(Act.ReadBoard, BoardVisibility.Public)] = ["ok", "ok", "ok", "ok", "ok", "ok", "ok"],
 
+        [(Act.EditBoard, BoardVisibility.Private)] = ["ok", "ok", "readOnly", "ok", "404", "404", "404"],
+        [(Act.EditBoard, BoardVisibility.Workspace)] = ["ok", "ok", "readOnly", "ok", "ok", "member", "404"],
+        [(Act.EditBoard, BoardVisibility.Public)] = ["ok", "ok", "readOnly", "ok", "ok", "member", "member"],
+
         [(Act.AdministerBoard, BoardVisibility.Private)] = ["ok", "admin", "readOnly", "admin", "404", "404", "404"],
         [(Act.AdministerBoard, BoardVisibility.Workspace)] = ["ok", "admin", "readOnly", "admin", "ok", "member", "404"],
         [(Act.AdministerBoard, BoardVisibility.Public)] = ["ok", "admin", "readOnly", "admin", "ok", "member", "member"],
+
+        [(Act.CommentOnBoard, BoardVisibility.Private)] = ["ok", "ok", "readOnly", "ok", "404", "404", "404"],
+        [(Act.CommentOnBoard, BoardVisibility.Workspace)] = ["ok", "ok", "readOnly", "ok", "ok", "member", "404"],
+        [(Act.CommentOnBoard, BoardVisibility.Public)] = ["ok", "ok", "readOnly", "ok", "ok", "member", "member"],
     };
 
     private static readonly Dictionary<(Act, WorkspaceVisibility), string[]> Workspaces = new()

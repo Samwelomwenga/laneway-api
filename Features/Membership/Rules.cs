@@ -35,6 +35,9 @@ public static class Refusals
     public static readonly Refusal RequiresWorkspaceAdmin =
         new(ErrorCodes.RequiresWorkspaceAdmin, "Only a workspace admin can do this. Ask one to do it for you.");
 
+    public static readonly Refusal NotAuthor =
+        new(ErrorCodes.NotAuthor, "Only the author can edit or delete a comment.");
+
     public static readonly Refusal CommentingDisabled =
         new(ErrorCodes.CommentingDisabled, "Comments are turned off on this board. A board admin can turn them on.");
 }

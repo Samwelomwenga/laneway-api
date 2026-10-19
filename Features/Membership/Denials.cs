@@ -7,12 +7,34 @@ namespace Laneway.Api;
 public enum AccessTarget
 {
     Workspace,
-    Board
+    Board,
+    List,
+    Card,
+    Label,
+    Checklist,
+    CheckItem,
+    Attachment,
+    Comment,
+    CopyJob
 }
 
-public sealed record Denial(Guid ActorId, AccessTarget Target, Guid TargetId, string? Code)
+public static class AccessTargets
+{
+    public static string Name(AccessTarget target) => target switch
+    {
+        AccessTarget.CheckItem => "Check item",
+        AccessTarget.CopyJob => "Copy job",
+        _ => target.ToString()
+    };
+}
+
+public sealed record Denial(Guid ActorId, AccessTarget Target, Guid TargetId, string? Code, bool FromField = false)
 {
     public bool IsHidingNotFound => Code is null;
+
+    public int Status => Code is not null ? StatusCodes.Status403Forbidden
+        : FromField ? StatusCodes.Status400BadRequest
+        : StatusCodes.Status404NotFound;
 }
 
 public sealed class DenialMeter
@@ -111,7 +133,7 @@ public sealed class DenialDrainer : BackgroundService
             denial.ActorId,
             denial.Target,
             denial.TargetId,
-            denial.IsHidingNotFound ? StatusCodes.Status404NotFound : StatusCodes.Status403Forbidden,
+            denial.Status,
             denial.Code ?? ErrorCodes.NotFound,
             null);
     }
@@ -125,6 +147,15 @@ public sealed class DenialDrainer : BackgroundService
         {
             AccessTarget.Workspace => await context.WorkSpaces.AnyAsync(found => found.Id == denial.TargetId, token),
             AccessTarget.Board => await context.Boards.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.List => await context.Lists.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.Card => await context.Cards.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.Label => await context.Labels.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.Checklist => await context.Checklists.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.CheckItem => await context.CheckItems.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.Attachment => await context.Attachments.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.Comment => await context.ActivityEntries.AnyAsync(
+                found => found.Id == denial.TargetId && found.Type == ActivityType.Comment, token),
+            AccessTarget.CopyJob => await context.CopyJobs.AnyAsync(found => found.Id == denial.TargetId, token),
             _ => throw new ArgumentOutOfRangeException(nameof(denial), denial.Target, null)
         };
     }

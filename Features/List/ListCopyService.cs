@@ -16,6 +16,7 @@ public sealed class ListCopyService : IListCopyService
     private readonly LabelMatching _labelMatching;
     private readonly BoardCaps _caps;
     private readonly CopyJobSignal _signal;
+    private readonly Readable _readable;
 
     public ListCopyService(
         ApplicationDbContext context,
@@ -24,7 +25,8 @@ public sealed class ListCopyService : IListCopyService
         ArchiveGuard archive,
         LabelMatching labelMatching,
         BoardCaps caps,
-        CopyJobSignal signal)
+        CopyJobSignal signal,
+        Readable readable)
     {
         _context = context;
         _actor = actor;
@@ -33,6 +35,7 @@ public sealed class ListCopyService : IListCopyService
         _labelMatching = labelMatching;
         _caps = caps;
         _signal = signal;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<CopyJobDto>> CopyAsync(Guid id, CopyListWrite write)
@@ -41,9 +44,16 @@ public sealed class ListCopyService : IListCopyService
 
         var boardId = write.BoardId;
 
-        if (!await _context.Lists.AnyAsync(list => list.Id == id))
+        var access = await _readable.ListAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.List, id, _actor.Id, out ApiResponse<CopyJobDto>? denied))
         {
-            return ApiResponse<CopyJobDto>.ErrorResponse("List not found", 404);
+            return denied;
+        }
+
+        var target = await _readable.BoardAsync(boardId, _actor.Id);
+        if (_readable.TargetDenies(target, BoardAction.Edit, "boardId", AccessTarget.Board, boardId, _actor.Id, out denied))
+        {
+            return denied;
         }
 
         if (await RefusesAsync(id, boardId, Placement.Of(write), CopyKeep.Of(write.Keep)) is { } refused)
@@ -72,16 +82,7 @@ public sealed class ListCopyService : IListCopyService
     private async Task<ApiResponse<CopyJobDto>?> RefusesAsync(
         Guid id, Guid boardId, Placement placement, CopyKeep keep)
     {
-        var errors = new List<ApiError>();
-        if (!await _context.Boards.AnyAsync(board => board.Id == boardId))
-        {
-            errors.Add(new ApiError("boardId", ErrorCodes.NotFound, $"Board {boardId} does not exist."));
-        }
-        else
-        {
-            errors.AddRange((await _placements.CheckOnBoardAsync(boardId, placement)).Errors);
-        }
-
+        var errors = (await _placements.CheckOnBoardAsync(boardId, placement, _actor.Id)).Errors;
         if (errors.Count > 0)
         {
             return ReferenceErrors.Invalid<CopyJobDto>(errors);

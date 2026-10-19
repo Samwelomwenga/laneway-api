@@ -63,6 +63,50 @@ public class DenialLogTests : ApiTests
     }
 
     [Fact]
+    public async Task A_hidden_body_target_is_logged_as_a_400()
+    {
+        var (member, list, _, hidden) = await SeedHiddenBoardAsync();
+
+        using var response = await PutAsync($"/api/v1/lists/{list.Id}/position", new { boardId = hidden.Id }, member);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var denied = await DeniedAsync(hidden.Id);
+        Assert.Equal(member.Id.ToString(), denied.GetStructuredStateValue("sub"));
+        Assert.Equal("Board", denied.GetStructuredStateValue("targetType"));
+        Assert.Equal("400", denied.GetStructuredStateValue("status"));
+        Assert.Equal(ErrorCodes.NotFound, denied.GetStructuredStateValue("code"));
+    }
+
+    [Fact]
+    public async Task A_hidden_anchor_is_logged_as_a_400()
+    {
+        var (member, _, board, hidden) = await SeedHiddenBoardAsync();
+        var anchor = await CreateListAsync(hidden.Id, "Hidden");
+
+        using var response = await PostAsync(ListsPath(board.Id), new { name = "Anchored", after = anchor.Id }, member);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var denied = await DeniedAsync(anchor.Id);
+        Assert.Equal("List", denied.GetStructuredStateValue("targetType"));
+        Assert.Equal("400", denied.GetStructuredStateValue("status"));
+    }
+
+    [Fact]
+    public async Task Someone_elses_copy_job_is_logged_as_a_404()
+    {
+        var (member, list, board, _) = await SeedHiddenBoardAsync();
+        var job = await CopyListAsync(list.Id, board.Id);
+
+        using var response = await GetAsync(CopyJobPath(job.Id), member);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var denied = await DeniedAsync(job.Id);
+        Assert.Equal("CopyJob", denied.GetStructuredStateValue("targetType"));
+        Assert.Equal("404", denied.GetStructuredStateValue("status"));
+        Assert.Equal(ErrorCodes.NotFound, denied.GetStructuredStateValue("code"));
+    }
+
+    [Fact]
     public void A_full_channel_drops_the_entry_and_counts_it()
     {
         var meters = Services.GetRequiredService<IMeterFactory>();
@@ -74,6 +118,25 @@ public class DenialLogTests : ApiTests
 
         Assert.Equal(1, dropped.GetMeasurementSnapshot().Sum(measurement => measurement.Value));
         Assert.Equal(1, log.Reader.Count);
+    }
+
+    private async Task<(TestUser Member, ListDto List, BoardDto Board, BoardDto Hidden)> SeedHiddenBoardAsync()
+    {
+        var member = await CreateUserAsync();
+        var workspace = await CreateWorkspaceAsync("Finance", visibility: WorkspaceVisibility.Private);
+        var board = await CreateBoardAsync(workspace.Id, "Budget", BoardVisibility.Private);
+        var hidden = await CreateBoardAsync(workspace.Id, "Payroll", BoardVisibility.Private);
+        var list = await CreateListAsync(board.Id, "Doing");
+        await FromDatabaseAsync(async database =>
+        {
+            database.BoardMembers.Add(new BoardMember
+            {
+                Id = Guid.NewGuid(), BoardId = board.Id, UserId = member.Id, Role = BoardRole.Normal, CreatedBy = member.Id
+            });
+            return await database.SaveChangesAsync();
+        });
+
+        return (member, list, board, hidden);
     }
 
     private async Task<FakeLogRecord> DeniedAsync(Guid targetId)

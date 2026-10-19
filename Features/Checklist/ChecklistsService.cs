@@ -22,6 +22,7 @@ public class ChecklistService : IChecklistService
     private readonly CardCompletion _completion;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly Readable _readable;
 
     public ChecklistService(
         ApplicationDbContext context,
@@ -30,7 +31,8 @@ public class ChecklistService : IChecklistService
         ArchiveGuard archive,
         CardCompletion completion,
         ActivityWriter activity,
-        ActivityTree tree)
+        ActivityTree tree,
+        Readable readable)
     {
         _context = context;
         _actor = actor;
@@ -39,6 +41,7 @@ public class ChecklistService : IChecklistService
         _completion = completion;
         _activity = activity;
         _tree = tree;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<ChecklistDto>> CreateAsync(CreateChecklistWrite write)
@@ -46,12 +49,13 @@ public class ChecklistService : IChecklistService
         var cardId = write.CardId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        if (!await _context.Cards.AnyAsync(c => c.Id == cardId))
+        var access = await _readable.CardAsync(cardId, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Card, cardId, _actor.Id, out ApiResponse<ChecklistDto>? denied))
         {
-            return ReferenceErrors.ParentNotFound<ChecklistDto>("Card");
+            return denied;
         }
 
-        var placed = await _placements.ResolveOnCardAsync(cardId, Placement.Of(write));
+        var placed = await _placements.ResolveOnCardAsync(cardId, Placement.Of(write), _actor.Id);
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<ChecklistDto>(placed.Errors);
@@ -80,11 +84,13 @@ public class ChecklistService : IChecklistService
 
     public async Task<ApiResponse<ChecklistDto>> UpdateAsync(Guid id, UpdateChecklistWrite write)
     {
-        var checklist = await WithCheckItemsAsync(id);
-        if (checklist == null)
+        var access = await _readable.ChecklistAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Checklist, id, _actor.Id, out ApiResponse<ChecklistDto>? denied))
         {
-            return ApiResponse<ChecklistDto>.ErrorResponse("Checklist not found", 404);
+            return denied;
         }
+
+        var checklist = await WithCheckItemsAsync(access.Target);
 
         if (await _archive.OnChecklistAsync(id) is { } archived)
         {
@@ -124,18 +130,20 @@ public class ChecklistService : IChecklistService
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var checklist = await WithCheckItemsAsync(id);
-        if (checklist == null)
+        var access = await _readable.ChecklistAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Checklist, id, _actor.Id, out ApiResponse<ChecklistDto>? denied))
         {
-            return ApiResponse<ChecklistDto>.ErrorResponse("Checklist not found", 404);
+            return denied;
         }
+
+        var checklist = await WithCheckItemsAsync(access.Target);
 
         if (await _archive.OnChecklistAsync(id) is { } archived)
         {
             return ArchiveErrors.ReadOnly<ChecklistDto>(archived, TreeItem.Checklist);
         }
 
-        var placed = await _placements.ResolveReorderOnCardAsync(checklist, Placement.Of(reorderChecklistDto));
+        var placed = await _placements.ResolveReorderOnCardAsync(checklist, Placement.Of(reorderChecklistDto), _actor.Id);
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<ChecklistDto>(placed.Errors);
@@ -174,11 +182,13 @@ public class ChecklistService : IChecklistService
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var checklist = await _context.Checklists.FindAsync(id);
-        if (checklist == null)
+        var access = await _readable.ChecklistAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Checklist, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return ApiResponse<bool>.ErrorResponse("Checklist not found", 404);
+            return denied;
         }
+
+        var checklist = access.Target;
 
         if (await _archive.OnCardAsync(checklist.CardId) is { } holder)
         {
@@ -224,11 +234,13 @@ public class ChecklistService : IChecklistService
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        var checklist = await _context.Checklists.FindAsync(id);
-        if (checklist == null)
+        var access = await _readable.ChecklistAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Checklist, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return ApiResponse<bool>.ErrorResponse("Checklist not found", 404);
+            return denied;
         }
+
+        var checklist = access.Target;
 
         if (await _archive.OnCardAsync(checklist.CardId) is { } archived)
         {
@@ -254,13 +266,13 @@ public class ChecklistService : IChecklistService
 
     public async Task<ApiResponse<ChecklistDto>> GetByIdAsync(Guid id)
     {
-        var checklist = await WithCheckItemsAsync(id);
-        if (checklist == null)
+        var access = await _readable.ChecklistAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Checklist, id, _actor.Id, out ApiResponse<ChecklistDto>? denied))
         {
-            return ApiResponse<ChecklistDto>.ErrorResponse("Checklist not found", 404);
+            return denied;
         }
 
-        var checklistDto = ChecklistView.Of(checklist);
+        var checklistDto = ChecklistView.Of(await WithCheckItemsAsync(access.Target));
         return ApiResponse<ChecklistDto>.SuccessResponse(checklistDto, "Checklist retrieved successfully", 200);
     }
 
@@ -268,12 +280,14 @@ public class ChecklistService : IChecklistService
     {
         ArgumentNullException.ThrowIfNull(searchDto);
 
-        if (!await _context.Cards.AnyAsync(c => c.Id == cardId))
+        var access = await _readable.CardAsync(cardId, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Card, cardId, _actor.Id, out ApiResponse<List<ChecklistDto>>? denied))
         {
-            return ReferenceErrors.ParentNotFound<List<ChecklistDto>>("Card");
+            return denied;
         }
 
-        var query = ArchiveView.Checklists(_context.Checklists.Where(c => c.CardId == cardId), searchDto.Archived);
+        var query = ArchiveView.Checklists(
+            _readable.Checklists(_actor.Id).Where(c => c.CardId == cardId), searchDto.Archived);
 
         var (checklists, totalCount) = await PagedQuery.ReadAsync(
             query.InSortOrder().Include(c => c.CheckItems),
@@ -289,8 +303,11 @@ public class ChecklistService : IChecklistService
         );
     }
 
-    private async Task<Checklist?> WithCheckItemsAsync(Guid id) =>
-        await _context.Checklists.Include(c => c.CheckItems).FirstOrDefaultAsync(c => c.Id == id);
+    private async Task<Checklist> WithCheckItemsAsync(Checklist checklist)
+    {
+        await _context.Entry(checklist).Collection(c => c.CheckItems).LoadAsync();
+        return checklist;
+    }
 
     private static Checklist MapToEntity(CreateChecklistWrite write, Guid actorId, double position)
     {

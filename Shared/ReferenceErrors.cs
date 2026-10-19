@@ -6,9 +6,6 @@ public static class ReferenceErrors
         ApiResponse<T>.ErrorResponse("A referenced resource does not exist", 400,
             [new ApiError(field, ErrorCodes.NotFound, $"{resource} {id} does not exist.")]);
 
-    public static ApiResponse<T> ParentNotFound<T>(string resource) =>
-        ApiResponse<T>.ErrorResponse($"{resource} not found", 404);
-
     public static ApiResponse<T> Invalid<T>(List<ApiError> errors) =>
         ApiResponse<T>.ErrorResponse(
             errors.TrueForAll(error => error.Code == ErrorCodes.NotFound)

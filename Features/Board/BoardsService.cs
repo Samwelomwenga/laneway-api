@@ -44,15 +44,16 @@ public class BoardService : IBoardService
     public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(Guid workspaceId, BoardSearchDto searchDto)
     {
         var userId = _actor.Id;
-        if (await _readable.WorkspaceAsync(workspaceId, userId) is not { } workspace)
+        var access = await _readable.WorkspaceAsync(workspaceId, userId);
+        if (_readable.ReadDenies(access, AccessTarget.Workspace, workspaceId, userId, out ApiResponse<List<BoardDto>>? denied))
         {
-            return _readable.NotFound<List<BoardDto>>(AccessTarget.Workspace, workspaceId, userId);
+            return denied;
         }
 
         var query = _readable.Boards(userId).Where(b => b.WorkspaceId == workspaceId);
-        if (!workspace.Standing.IsMember)
+        if (!access.Standing.IsMember)
         {
-            var publicWorkspace = workspace.Place.Visibility == WorkspaceVisibility.Public;
+            var publicWorkspace = access.Target.Visibility == WorkspaceVisibility.Public;
             query = query.Where(b =>
                 _context.BoardMembers.Any(member => member.BoardId == b.Id && member.UserId == userId)
                 || (publicWorkspace && b.Visibility == BoardVisibility.Public));
@@ -89,12 +90,13 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<BoardViewDto>> GetByIdAsync(Guid id)
     {
-        if (await _readable.BoardAsync(id, _actor.Id) is not { } found)
+        var access = await _readable.BoardAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Board, id, _actor.Id, out ApiResponse<BoardViewDto>? denied))
         {
-            return _readable.NotFound<BoardViewDto>(AccessTarget.Board, id, _actor.Id);
+            return denied;
         }
 
-        var existingBoard = found.Place;
+        var existingBoard = access.Target;
 
         var labels = await _context.Labels.Where(l => l.BoardId == id).InNameOrder().ToListAsync();
         var lists = await ArchiveView.Lists(_context.Lists.Where(l => l.BoardId == id), ArchiveFilter.Exclude)
@@ -118,17 +120,13 @@ public class BoardService : IBoardService
     public async Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardWrite write)
     {
         var workspaceId = write.WorkspaceId;
-        if (await _readable.WorkspaceAsync(workspaceId, _actor.Id) is not { } found)
+        var access = await _readable.WorkspaceAsync(workspaceId, _actor.Id);
+        if (_readable.Denies(access, WorkspaceAction.CreateBoard, workspaceId, _actor.Id, out ApiResponse<BoardDto>? denied))
         {
-            return _readable.NotFound<BoardDto>(AccessTarget.Workspace, workspaceId, _actor.Id);
+            return denied;
         }
 
-        if (WorkspaceRules.Refusal(found.Standing, WorkspaceAction.CreateBoard) is { } refusal)
-        {
-            return _readable.Refused<BoardDto>(refusal, AccessTarget.Workspace, workspaceId, _actor.Id);
-        }
-
-        var workspace = WorkspaceRef.Of(found.Place);
+        var workspace = WorkspaceRef.Of(access.Target);
         var boardEntity = MapToEntity(write, _actor.Id);
         _context.Boards.Add(boardEntity);
         _context.BoardMembers.Add(BoardMember.AdminOf(boardEntity));
@@ -143,14 +141,10 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardWrite write)
     {
-        if (await _readable.BoardAsync(id, _actor.Id) is not { } found)
+        var access = await _readable.BoardAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Administer, AccessTarget.Board, id, _actor.Id, out ApiResponse<BoardDto>? denied))
         {
-            return _readable.NotFound<BoardDto>(AccessTarget.Board, id, _actor.Id);
-        }
-
-        if (BoardRules.Refusal(found.Standing, BoardAction.Administer) is { } refusal)
-        {
-            return _readable.Refused<BoardDto>(refusal, AccessTarget.Board, id, _actor.Id);
+            return denied;
         }
 
         if (await _archive.OnBoardAsync(id) is { } archived)
@@ -158,7 +152,7 @@ public class BoardService : IBoardService
             return ArchiveErrors.ReadOnly<BoardDto>(archived, TreeItem.Board);
         }
 
-        var existingBoard = found.Place;
+        var existingBoard = access.Target;
         existingBoard.Name = write.Name;
         existingBoard.Description = write.Description;
         existingBoard.Visibility = write.Visibility;
@@ -184,10 +178,17 @@ public class BoardService : IBoardService
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        var board = await _context.Boards.FirstOrDefaultAsync(b => b.Id == id);
-        if (board == null)
+        var access = await _readable.BoardAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Administer, AccessTarget.Board, id, _actor.Id, out ApiResponse<BoardDto>? denied))
         {
-            return ApiResponse<BoardDto>.ErrorResponse("Board not found", 404);
+            return denied;
+        }
+
+        var workspaceId = write.WorkspaceId;
+        var target = await _readable.WorkspaceAsync(workspaceId, _actor.Id);
+        if (_readable.TargetDenies(target, WorkspaceAction.CreateBoard, "workspaceId", workspaceId, _actor.Id, out denied))
+        {
+            return denied;
         }
 
         if (await _archive.OnBoardAsync(id) is { } archived)
@@ -195,11 +196,8 @@ public class BoardService : IBoardService
             return ArchiveErrors.ReadOnly<BoardDto>(archived, TreeItem.Board);
         }
 
-        var workspaceId = write.WorkspaceId;
-        if (await _tree.FindWorkspaceAsync(workspaceId) is not { } workspace)
-        {
-            return ReferenceErrors.NotFound<BoardDto>("workspaceId", "Workspace", workspaceId);
-        }
+        var board = access.Target;
+        var workspace = await _tree.WorkspaceAsync(workspaceId);
 
         var leaving = board.WorkspaceId;
         board.WorkspaceId = workspaceId;
@@ -222,17 +220,13 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived)
     {
-        if (await _readable.BoardAsync(id, _actor.Id) is not { } found)
+        var access = await _readable.BoardAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Administer, AccessTarget.Board, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return _readable.NotFound<bool>(AccessTarget.Board, id, _actor.Id);
+            return denied;
         }
 
-        if (BoardRules.Refusal(found.Standing, BoardAction.Administer) is { } refusal)
-        {
-            return _readable.Refused<bool>(refusal, AccessTarget.Board, id, _actor.Id);
-        }
-
-        var board = found.Place;
+        var board = access.Target;
         return await _context.SetArchivedAsync(board, _actor, archived, "Board", async archiving =>
         {
             var workspace = await _tree.WorkspaceAsync(board.WorkspaceId);
@@ -245,23 +239,20 @@ public class BoardService : IBoardService
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        if (await _readable.BoardAsync(id, _actor.Id) is not { } found)
+        var access = await _readable.BoardAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Administer, AccessTarget.Board, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return _readable.NotFound<bool>(AccessTarget.Board, id, _actor.Id);
+            return denied;
         }
 
-        if (BoardRules.Refusal(found.Standing, BoardAction.Administer) is { } refusal)
-        {
-            return _readable.Refused<bool>(refusal, AccessTarget.Board, id, _actor.Id);
-        }
-
-        var existingBoard = found.Place;
+        var existingBoard = access.Target;
         if (!existingBoard.IsArchived)
         {
             return ArchiveErrors.NotArchived<bool>(TreeItem.Board);
         }
 
         var workspace = await _tree.WorkspaceAsync(existingBoard.WorkspaceId);
+        await _context.KeepBoardReadersAsync(existingBoard);
         _context.Boards.Remove(existingBoard);
         await _activity.AddAsync(
             ActivityType.DeleteBoard,

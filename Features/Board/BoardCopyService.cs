@@ -12,12 +12,14 @@ public sealed class BoardCopyService : IBoardCopyService
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
     private readonly CopyJobSignal _signal;
+    private readonly Readable _readable;
 
-    public BoardCopyService(ApplicationDbContext context, Actor actor, CopyJobSignal signal)
+    public BoardCopyService(ApplicationDbContext context, Actor actor, CopyJobSignal signal, Readable readable)
     {
         _context = context;
         _actor = actor;
         _signal = signal;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<CopyJobDto>> CopyAsync(Guid id, CopyBoardWrite write)
@@ -26,14 +28,16 @@ public sealed class BoardCopyService : IBoardCopyService
 
         var workspaceId = write.WorkspaceId;
 
-        if (!await _context.Boards.AnyAsync(board => board.Id == id))
+        var access = await _readable.BoardAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Board, id, _actor.Id, out ApiResponse<CopyJobDto>? denied))
         {
-            return ApiResponse<CopyJobDto>.ErrorResponse("Board not found", 404);
+            return denied;
         }
 
-        if (!await _context.WorkSpaces.AnyAsync(workspace => workspace.Id == workspaceId))
+        var target = await _readable.WorkspaceAsync(workspaceId, _actor.Id);
+        if (_readable.TargetDenies(target, WorkspaceAction.CreateBoard, "workspaceId", workspaceId, _actor.Id, out denied))
         {
-            return ReferenceErrors.NotFound<CopyJobDto>("workspaceId", "Workspace", workspaceId);
+            return denied;
         }
 
         var keep = BoardCopyKeep.Of(write.Keep);

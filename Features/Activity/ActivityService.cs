@@ -10,18 +10,20 @@ public interface IActivityService
 
 public class ActivityService : IActivityService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly Actor _actor;
+    private readonly Readable _readable;
 
-    public ActivityService(ApplicationDbContext context)
+    public ActivityService(Actor actor, Readable readable)
     {
-        _context = context;
+        _actor = actor;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<List<ActivityEntryDto>>> GetAllAsync(ActivitySearchDto searchDto)
     {
         ArgumentNullException.ThrowIfNull(searchDto);
 
-        var query = _context.ActivityEntries.AsQueryable();
+        var query = _readable.ActivityEntries(_actor.Id);
 
         if (searchDto.WorkspaceId is { } workspaceId)
         {
@@ -86,28 +88,31 @@ public class ActivityService : IActivityService
     private async Task<List<ApiError>> UnknownIdsAsync(ActivitySearchDto searchDto)
     {
         var errors = new List<ApiError>();
-        await AddUnknownAsync<WorkSpace>(errors, "workspaceId", "Workspace", searchDto.WorkspaceId, AtWorkspace);
-        await AddUnknownAsync<Board>(errors, "boardId", "Board", searchDto.BoardId, AtBoard);
-        await AddUnknownAsync<List>(errors, "listId", "List", searchDto.ListId, AtList);
-        await AddUnknownAsync<Card>(errors, "cardId", "Card", searchDto.CardId, AtCard);
+        var userId = _actor.Id;
+        await AddUnknownAsync(errors, "workspaceId", AccessTarget.Workspace, searchDto.WorkspaceId, _readable.Workspaces(userId), AtWorkspace);
+        await AddUnknownAsync(errors, "boardId", AccessTarget.Board, searchDto.BoardId, _readable.Boards(userId), AtBoard);
+        await AddUnknownAsync(errors, "listId", AccessTarget.List, searchDto.ListId, _readable.Lists(userId), AtList);
+        await AddUnknownAsync(errors, "cardId", AccessTarget.Card, searchDto.CardId, _readable.Cards(userId), AtCard);
         return errors;
     }
 
     private async Task AddUnknownAsync<TItem>(
         List<ApiError> errors,
         string key,
-        string resource,
+        AccessTarget target,
         Guid? id,
+        IQueryable<TItem> readable,
         Func<Guid, Expression<Func<ActivityEntry, bool>>> named)
         where TItem : BaseEntity
     {
         if (id is not { } value
-            || await _context.Set<TItem>().AnyAsync(item => item.Id == value)
-            || await _context.ActivityEntries.AnyAsync(named(value)))
+            || await readable.AnyAsync(item => item.Id == value)
+            || await _readable.ActivityEntries(_actor.Id).AnyAsync(named(value)))
         {
             return;
         }
 
-        errors.Add(new ApiError(key, ErrorCodes.NotFound, $"{resource} {value} does not exist."));
+        _readable.HiddenField(target, value, _actor.Id);
+        errors.Add(new ApiError(key, ErrorCodes.NotFound, $"{AccessTargets.Name(target)} {value} does not exist."));
     }
 }

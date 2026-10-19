@@ -53,4 +53,4 @@ public sealed record WorkspaceStanding(Role Role)
     });
 }
 
-public sealed record Found<TPlace, TStanding>(TPlace Place, TStanding Standing);
+public sealed record Found<TTarget, TStanding>(TTarget Target, TStanding Standing);

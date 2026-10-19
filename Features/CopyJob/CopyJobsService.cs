@@ -10,18 +10,23 @@ public interface ICopyJobService
 public sealed class CopyJobService : ICopyJobService
 {
     private readonly ApplicationDbContext _context;
+    private readonly Actor _actor;
+    private readonly Readable _readable;
 
-    public CopyJobService(ApplicationDbContext context)
+    public CopyJobService(ApplicationDbContext context, Actor actor, Readable readable)
     {
         _context = context;
+        _actor = actor;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<CopyJobDto>> GetByIdAsync(Guid id)
     {
-        var job = await _context.CopyJobs.AsNoTracking().FirstOrDefaultAsync(found => found.Id == id);
+        var job = await _context.CopyJobs.AsNoTracking()
+            .FirstOrDefaultAsync(found => found.Id == id && found.CreatedBy == _actor.Id);
 
         return job is null
-            ? ApiResponse<CopyJobDto>.ErrorResponse("Copy job not found", 404)
+            ? _readable.NotFound<CopyJobDto>(AccessTarget.CopyJob, id, _actor.Id)
             : ApiResponse<CopyJobDto>.SuccessResponse(
                 CopyJobView.Of(job), "Copy job retrieved successfully", 200);
     }

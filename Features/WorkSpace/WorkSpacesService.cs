@@ -68,12 +68,13 @@ public class WorkSpaceService : IWorkSpaceService
 
     public async Task<ApiResponse<WorkspaceSummaryDto>> GetByIdAsync(Guid id)
     {
-        if (await _readable.WorkspaceAsync(id, _actor.Id) is not { } found)
+        var access = await _readable.WorkspaceAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Workspace, id, _actor.Id, out ApiResponse<WorkspaceSummaryDto>? denied))
         {
-            return _readable.NotFound<WorkspaceSummaryDto>(AccessTarget.Workspace, id, _actor.Id);
+            return denied;
         }
 
-        var workSpaceDto = MapToDto(found.Place, found.Standing.IsMember);
+        var workSpaceDto = MapToDto(access.Target, access.Standing.IsMember);
         return ApiResponse<WorkspaceSummaryDto>.SuccessResponse(workSpaceDto, "Workspace retrieved successfully", 200);
     }
 
@@ -100,17 +101,13 @@ public class WorkSpaceService : IWorkSpaceService
 
     public async Task<ApiResponse<WorkSpaceDto>> UpdateAsync(Guid id, UpdateWorkSpaceWrite write)
     {
-        if (await _readable.WorkspaceAsync(id, _actor.Id) is not { } found)
+        var access = await _readable.WorkspaceAsync(id, _actor.Id);
+        if (_readable.Denies(access, WorkspaceAction.Administer, id, _actor.Id, out ApiResponse<WorkSpaceDto>? denied))
         {
-            return _readable.NotFound<WorkSpaceDto>(AccessTarget.Workspace, id, _actor.Id);
+            return denied;
         }
 
-        if (WorkspaceRules.Refusal(found.Standing, WorkspaceAction.Administer) is { } refusal)
-        {
-            return _readable.Refused<WorkSpaceDto>(refusal, AccessTarget.Workspace, id, _actor.Id);
-        }
-
-        var existingWorkSpace = found.Place;
+        var existingWorkSpace = access.Target;
 
         existingWorkSpace.Name = write.Name;
         existingWorkSpace.Description = write.Description;
@@ -134,17 +131,13 @@ public class WorkSpaceService : IWorkSpaceService
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        if (await _readable.WorkspaceAsync(id, _actor.Id) is not { } found)
+        var access = await _readable.WorkspaceAsync(id, _actor.Id);
+        if (_readable.Denies(access, WorkspaceAction.Administer, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return _readable.NotFound<bool>(AccessTarget.Workspace, id, _actor.Id);
+            return denied;
         }
 
-        if (WorkspaceRules.Refusal(found.Standing, WorkspaceAction.Administer) is { } refusal)
-        {
-            return _readable.Refused<bool>(refusal, AccessTarget.Workspace, id, _actor.Id);
-        }
-
-        var workSpace = found.Place;
+        var workSpace = access.Target;
 
         var boardCount = await _context.Boards.CountAsync(b => b.WorkspaceId == id);
         if (boardCount > 0)
@@ -154,6 +147,7 @@ public class WorkSpaceService : IWorkSpaceService
                     $"Move or delete this workspace's {boardCount} {(boardCount == 1 ? "board" : "boards")} first.")]);
         }
 
+        await _context.KeepWorkspaceReadersAsync(workSpace.Id);
         _context.WorkSpaces.Remove(workSpace);
         await _activity.AddAsync(
             ActivityType.DeleteWorkspace,

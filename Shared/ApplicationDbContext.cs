@@ -13,6 +13,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Board> Boards { get; set; }
     public DbSet<WorkspaceMember> WorkspaceMembers { get; set; }
     public DbSet<BoardMember> BoardMembers { get; set; }
+    public DbSet<FormerReader> FormerReaders { get; set; }
     public DbSet<List> Lists { get; set; }
     public DbSet<Card> Cards { get; set; }
     public DbSet<Label> Labels { get; set; }
@@ -183,6 +184,16 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(m => new { m.BoardId, m.UserId }).IsUnique();
             entity.HasIndex(m => m.UserId);
             ActorKeys(entity);
+        });
+
+        modelBuilder.Entity<FormerReader>(entity =>
+        {
+            entity.HasKey(reader => new { reader.PlaceId, reader.UserId });
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(reader => reader.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(reader => reader.UserId);
         });
 
         modelBuilder.Entity<List>(entity =>

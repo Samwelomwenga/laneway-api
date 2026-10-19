@@ -832,6 +832,13 @@ public abstract class ApiTests : IAsyncLifetime
         return (await response.ReadEnvelope<List<AttachmentDto>>()).Data!;
     }
 
+    protected async Task<HttpResponseMessage> GetWithoutRedirectAsync(string path, TestUser user)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Authorization = Bearer(user);
+        return await NoRedirects.SendAsync(request);
+    }
+
     protected async Task<byte[]> DownloadAttachmentAsync(Guid id)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/attachments/{id}/content");

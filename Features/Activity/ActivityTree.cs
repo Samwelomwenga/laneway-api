@@ -42,7 +42,7 @@ public sealed class ActivityTree
         await FindWorkspaceAsync(workspaceId)
         ?? throw new InvalidOperationException($"Workspace {workspaceId} does not exist.");
 
-    public async Task<WorkspaceRef?> FindWorkspaceAsync(Guid workspaceId) =>
+    private async Task<WorkspaceRef?> FindWorkspaceAsync(Guid workspaceId) =>
         await _context.WorkSpaces
             .Where(workspace => workspace.Id == workspaceId)
             .Select(workspace => new WorkspaceRef(workspace.Id, workspace.Name))

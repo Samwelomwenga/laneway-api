@@ -19,6 +19,7 @@ public class LabelService : ILabelService
     private readonly BoardCaps _caps;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly Readable _readable;
 
     public LabelService(
         ApplicationDbContext context,
@@ -26,7 +27,8 @@ public class LabelService : ILabelService
         ArchiveGuard archive,
         BoardCaps caps,
         ActivityWriter activity,
-        ActivityTree tree)
+        ActivityTree tree,
+        Readable readable)
     {
         _context = context;
         _actor = actor;
@@ -34,16 +36,18 @@ public class LabelService : ILabelService
         _caps = caps;
         _activity = activity;
         _tree = tree;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<List<LabelDto>>> GetAllAsync(Guid boardId, LabelSearchDto searchDto)
     {
-        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
+        var access = await _readable.BoardAsync(boardId, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Board, boardId, _actor.Id, out ApiResponse<List<LabelDto>>? denied))
         {
-            return ReferenceErrors.ParentNotFound<List<LabelDto>>("Board");
+            return denied;
         }
 
-        var query = _context.Labels.Where(l => l.BoardId == boardId);
+        var query = _readable.Labels(_actor.Id).Where(l => l.BoardId == boardId);
         if (searchDto.SearchTerm is { } term)
         {
             query = query.Where(l => l.Name.ToLower().Contains(term.ToLower()));
@@ -67,12 +71,13 @@ public class LabelService : ILabelService
 
     public async Task<ApiResponse<LabelDto>> GetByIdAsync(Guid id)
     {
-        var label = await _context.Labels.FindAsync(id);
-        if (label == null)
+        var access = await _readable.LabelAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Label, id, _actor.Id, out ApiResponse<LabelDto>? denied))
         {
-            return ApiResponse<LabelDto>.ErrorResponse("Label not found", 404);
+            return denied;
         }
-        var labelDto = LabelView.Of(label);
+
+        var labelDto = LabelView.Of(access.Target);
         return ApiResponse<LabelDto>.SuccessResponse(labelDto, "Label retrieved successfully", 200);
     }
 
@@ -81,10 +86,13 @@ public class LabelService : ILabelService
         var boardId = write.BoardId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        if (!await _context.TryLockBoardAsync(boardId))
+        var access = await _readable.BoardAsync(boardId, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Board, boardId, _actor.Id, out ApiResponse<LabelDto>? denied))
         {
-            return ReferenceErrors.ParentNotFound<LabelDto>("Board");
+            return denied;
         }
+
+        await _context.TryLockBoardAsync(boardId);
 
         if (await _archive.OnBoardAsync(boardId) is { } archived)
         {
@@ -117,11 +125,13 @@ public class LabelService : ILabelService
 
     public async Task<ApiResponse<LabelDto>> UpdateAsync(Guid id, UpdateLabelWrite write)
     {
-        var existingLabel = await _context.Labels.FindAsync(id);
-        if (existingLabel == null)
+        var access = await _readable.LabelAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Label, id, _actor.Id, out ApiResponse<LabelDto>? denied))
         {
-            return ApiResponse<LabelDto>.ErrorResponse("Label not found", 404);
+            return denied;
         }
+
+        var existingLabel = access.Target;
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -162,11 +172,13 @@ public class LabelService : ILabelService
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        var existingLabel = await _context.Labels.FindAsync(id);
-        if (existingLabel == null)
+        var access = await _readable.LabelAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Label, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return ApiResponse<bool>.ErrorResponse("Label not found", 404);
+            return denied;
         }
+
+        var existingLabel = access.Target;
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 

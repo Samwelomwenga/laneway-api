@@ -7,112 +7,114 @@ public sealed class Placements
     public const double Gap = 65536;
 
     private readonly ApplicationDbContext _context;
+    private readonly Readable _readable;
 
-    public Placements(ApplicationDbContext context)
+    public Placements(ApplicationDbContext context, Readable readable)
     {
         _context = context;
+        _readable = readable;
     }
 
-    public async Task<PlacementResult> ResolveInListAsync(Guid boardId, Guid listId, Placement placement)
+    public async Task<PlacementResult> ResolveInListAsync(Guid boardId, Guid listId, Placement placement, Guid userId)
     {
         await _context.LockBoardsAsync(boardId);
         await _context.LockListsAsync(listId);
-        return await InListAsync(listId, placement, moving: null);
+        return await InListAsync(listId, placement, moving: null, userId);
     }
 
-    public Task<PlacementResult> CheckInListAsync(Guid listId, Placement placement) =>
-        InListAsync(listId, placement, moving: null);
+    public Task<PlacementResult> CheckInListAsync(Guid listId, Placement placement, Guid userId) =>
+        InListAsync(listId, placement, moving: null, userId);
 
-    public async Task<PlacementResult> ResolveMoveInListAsync(Card card, Guid listId, Placement placement)
+    public async Task<PlacementResult> ResolveMoveInListAsync(Card card, Guid listId, Placement placement, Guid userId)
     {
         ArgumentNullException.ThrowIfNull(card);
 
         await _context.LockListsAsync(card.ListId, listId);
-        return await InListAsync(listId, placement, card);
+        return await InListAsync(listId, placement, card, userId);
     }
 
-    public Task<PlacementResult> CheckOnBoardAsync(Guid boardId, Placement placement) =>
-        OnBoardAsync(boardId, placement, moving: null);
+    public Task<PlacementResult> CheckOnBoardAsync(Guid boardId, Placement placement, Guid userId) =>
+        OnBoardAsync(boardId, placement, moving: null, userId);
 
-    public async Task<PlacementResult> ResolveOnBoardAsync(Guid boardId, Placement placement)
+    public async Task<PlacementResult> ResolveOnBoardAsync(Guid boardId, Placement placement, Guid userId)
     {
         await _context.LockBoardsAsync(boardId);
-        return await OnBoardAsync(boardId, placement, moving: null);
+        return await OnBoardAsync(boardId, placement, moving: null, userId);
     }
 
-    public async Task<PlacementResult> ResolveMoveOnBoardAsync(List list, Guid boardId, Placement placement)
+    public async Task<PlacementResult> ResolveMoveOnBoardAsync(List list, Guid boardId, Placement placement, Guid userId)
     {
         ArgumentNullException.ThrowIfNull(list);
 
         await _context.LockBoardsAsync(list.BoardId, boardId);
-        return await OnBoardAsync(boardId, placement, list);
+        return await OnBoardAsync(boardId, placement, list, userId);
     }
 
-    public async Task<PlacementResult> ResolveOnCardAsync(Guid cardId, Placement placement)
+    public async Task<PlacementResult> ResolveOnCardAsync(Guid cardId, Placement placement, Guid userId)
     {
         await _context.LockCardsAsync(cardId);
-        return await OnCardAsync(cardId, placement, moving: null);
+        return await OnCardAsync(cardId, placement, moving: null, userId);
     }
 
-    public async Task<PlacementResult> ResolveReorderOnCardAsync(Checklist checklist, Placement placement)
+    public async Task<PlacementResult> ResolveReorderOnCardAsync(Checklist checklist, Placement placement, Guid userId)
     {
         ArgumentNullException.ThrowIfNull(checklist);
 
         await _context.LockCardsAsync(checklist.CardId);
-        return await OnCardAsync(checklist.CardId, placement, checklist);
+        return await OnCardAsync(checklist.CardId, placement, checklist, userId);
     }
 
-    public async Task<PlacementResult> ResolveInChecklistAsync(Guid checklistId, Placement placement)
+    public async Task<PlacementResult> ResolveInChecklistAsync(Guid checklistId, Placement placement, Guid userId)
     {
         await _context.LockChecklistsAsync(checklistId);
-        return await InChecklistAsync(checklistId, placement, moving: null);
+        return await InChecklistAsync(checklistId, placement, moving: null, userId);
     }
 
     public async Task<PlacementResult> ResolveMoveInChecklistAsync(
-        CheckItem checkItem, Guid checklistId, Placement placement)
+        CheckItem checkItem, Guid checklistId, Placement placement, Guid userId)
     {
         ArgumentNullException.ThrowIfNull(checkItem);
 
         await _context.LockChecklistsAsync(checkItem.ChecklistId, checklistId);
-        return await InChecklistAsync(checklistId, placement, checkItem);
+        return await InChecklistAsync(checklistId, placement, checkItem, userId);
     }
 
-    private async Task<PlacementResult> OnBoardAsync(Guid boardId, Placement placement, List? moving)
+    private async Task<PlacementResult> OnBoardAsync(Guid boardId, Placement placement, List? moving, Guid userId)
     {
         var lists = await _context.Lists.Where(list => list.BoardId == boardId).InSortOrder().ToListAsync();
         var siblings = lists.ConvertAll(list => new Sibling(list, list.IsArchived));
 
         return await ResolveAsync(siblings, placement, moving, "List", "board",
-            id => _context.Lists.AnyAsync(list => list.Id == id));
+            id => _readable.SeesAsync(_readable.Lists(userId), AccessTarget.List, id, userId));
     }
 
-    private async Task<PlacementResult> InListAsync(Guid listId, Placement placement, Card? moving)
+    private async Task<PlacementResult> InListAsync(Guid listId, Placement placement, Card? moving, Guid userId)
     {
         var cards = await _context.Cards.Where(card => card.ListId == listId).InSortOrder().ToListAsync();
         var siblings = cards.ConvertAll(card => new Sibling(card, card.IsArchived));
 
         return await ResolveAsync(siblings, placement, moving, "Card", "list",
-            id => _context.Cards.AnyAsync(card => card.Id == id));
+            id => _readable.SeesAsync(_readable.Cards(userId), AccessTarget.Card, id, userId));
     }
 
-    private async Task<PlacementResult> OnCardAsync(Guid cardId, Placement placement, Checklist? moving)
+    private async Task<PlacementResult> OnCardAsync(Guid cardId, Placement placement, Checklist? moving, Guid userId)
     {
         var checklists = await _context.Checklists
             .Where(checklist => checklist.CardId == cardId).InSortOrder().ToListAsync();
         var siblings = checklists.ConvertAll(checklist => new Sibling(checklist, checklist.IsArchived));
 
         return await ResolveAsync(siblings, placement, moving, "Checklist", "card",
-            id => _context.Checklists.AnyAsync(checklist => checklist.Id == id));
+            id => _readable.SeesAsync(_readable.Checklists(userId), AccessTarget.Checklist, id, userId));
     }
 
-    private async Task<PlacementResult> InChecklistAsync(Guid checklistId, Placement placement, CheckItem? moving)
+    private async Task<PlacementResult> InChecklistAsync(Guid checklistId, Placement placement, CheckItem? moving, Guid userId)
     {
         var checkItems = await _context.CheckItems
             .Where(checkItem => checkItem.ChecklistId == checklistId).InSortOrder().ToListAsync();
         var siblings = checkItems.ConvertAll(checkItem => new Sibling(checkItem, IsArchived: false));
 
         return await ResolveAsync(siblings, placement, moving, "Check item", "checklist",
-            id => _context.CheckItems.AnyAsync(checkItem => checkItem.Id == id));
+            id => _readable.SeesAsync(_readable.CheckItems(userId), AccessTarget.CheckItem, id, userId));
     }
 
     private static async Task<PlacementResult> ResolveAsync(

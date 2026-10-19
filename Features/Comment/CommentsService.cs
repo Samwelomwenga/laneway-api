@@ -16,19 +16,22 @@ public class CommentService : ICommentService
     private readonly ArchiveGuard _archive;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly Readable _readable;
 
     public CommentService(
         ApplicationDbContext context,
         Actor actor,
         ArchiveGuard archive,
         ActivityWriter activity,
-        ActivityTree tree)
+        ActivityTree tree,
+        Readable readable)
     {
         _context = context;
         _actor = actor;
         _archive = archive;
         _activity = activity;
         _tree = tree;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<ActivityEntryDto>> CreateAsync(Guid cardId, CommentTextWrite write)
@@ -36,6 +39,12 @@ public class CommentService : ICommentService
         ArgumentNullException.ThrowIfNull(write);
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var access = await _readable.CardAsync(cardId, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Comment, AccessTarget.Card, cardId, _actor.Id, out ApiResponse<ActivityEntryDto>? denied))
+        {
+            return denied;
+        }
 
         if (!await _context.TryLockCardAsync(cardId))
         {
@@ -65,7 +74,7 @@ public class CommentService : ICommentService
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        var found = await FindAsync<ActivityEntryDto>(id);
+        var found = await FindAsync<ActivityEntryDto>(id, adminMayDelete: false);
         if (found.Refused is { } refused)
         {
             return refused;
@@ -85,7 +94,7 @@ public class CommentService : ICommentService
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        var found = await FindAsync<bool>(id);
+        var found = await FindAsync<bool>(id, adminMayDelete: true);
         if (found.Refused is { } refused)
         {
             return refused;
@@ -97,20 +106,27 @@ public class CommentService : ICommentService
         return ApiResponse<bool>.SuccessResponse(true, "Comment deleted successfully", 204);
     }
 
-    private async Task<(ActivityEntry? Comment, ApiResponse<T>? Refused)> FindAsync<T>(Guid id)
+    private async Task<(ActivityEntry? Comment, ApiResponse<T>? Refused)> FindAsync<T>(Guid id, bool adminMayDelete)
     {
-        var comment = await _context.ActivityEntries.FirstOrDefaultAsync(entry =>
-            entry.Id == id
-            && entry.Type == ActivityType.Comment
-            && _context.Cards.Any(card => card.Id == entry.CardId));
-        if (comment is null)
+        var userId = _actor.Id;
+        var access = await _readable.CommentAsync(id, userId);
+        if (_readable.ReadDenies(access, AccessTarget.Comment, id, userId, out ApiResponse<T>? denied))
         {
-            return (null, NotFound<T>());
+            return (null, denied);
         }
 
-        if (comment.CreatedBy != _actor.Id)
+        var comment = access.Target;
+        if (!(adminMayDelete && access.Standing.Role == Role.Admin))
         {
-            return (null, NotAuthor<T>());
+            if (BoardRules.Refusal(access.Standing, BoardAction.Comment) is { } refusal)
+            {
+                return (null, _readable.Refused<T>(refusal, AccessTarget.Comment, id, userId));
+            }
+
+            if (comment.CreatedBy != userId)
+            {
+                return (null, _readable.Refused<T>(Refusals.NotAuthor, AccessTarget.Comment, id, userId));
+            }
         }
 
         return await _archive.OnCardAsync(comment.CardId!.Value) is { } archived
@@ -119,10 +135,4 @@ public class CommentService : ICommentService
     }
 
     private static ApiResponse<T> CardNotFound<T>() => ApiResponse<T>.ErrorResponse("Card not found", 404);
-
-    private static ApiResponse<T> NotFound<T>() => ApiResponse<T>.ErrorResponse("Comment not found", 404);
-
-    private static ApiResponse<T> NotAuthor<T>() =>
-        ApiResponse<T>.ErrorResponse("You didn't write this comment", 403,
-            [new ApiError(null, ErrorCodes.NotAuthor, "Only the author can edit or delete a comment.")]);
 }
