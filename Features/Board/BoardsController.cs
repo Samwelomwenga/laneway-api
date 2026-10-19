@@ -64,6 +64,22 @@ public class BoardsController : ApiControllerBase
         return ToActionResult(response);
     }
 
+    [HttpGet("{id}/settings")]
+    [NoQuery]
+    public async Task<ActionResult<ApiResponse<BoardSettingsDto>>> GetBoardSettings(Guid id)
+    {
+        var response = await _boardService.GetSettingsAsync(id);
+        return ToActionResult(response);
+    }
+
+    [HttpPut("{id}/settings")]
+    public async Task<ActionResult<ApiResponse<BoardSettingsDto>>> UpdateBoardSettings(
+        Guid id, [FromBody] UpdateBoardSettingsDto updateBoardSettingsDto)
+    {
+        var response = await _boardService.UpdateSettingsAsync(id, BoardSettingsWrite.Of(updateBoardSettingsDto));
+        return ToActionResult(response);
+    }
+
     [HttpPut("{id}/workspace")]
     public async Task<ActionResult<ApiResponse<BoardDto>>> MoveBoard(Guid id, [FromBody] MoveBoardDto moveBoardDto)
     {

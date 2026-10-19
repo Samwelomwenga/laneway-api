@@ -115,7 +115,7 @@ public class BoardRouteTests : ApiTests
         Assert.Equal(HttpStatusCode.BadRequest, read.StatusCode);
         Assert.Equal(["color", "visibility"], (await read.ReadErrors()).Select(e => e.Field).Order(StringComparer.Ordinal));
         Assert.Equal(HttpStatusCode.BadRequest, create.StatusCode);
-        Assert.Equal(["name", "visibility"], (await create.ReadErrors()).Select(e => e.Field).Order(StringComparer.Ordinal));
+        Assert.Equal("name", Assert.Single(await create.ReadErrors()).Field);
     }
 
     [Fact]

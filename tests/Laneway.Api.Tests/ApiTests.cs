@@ -367,6 +367,45 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected static string BoardsPath(Guid workspaceId) => $"/api/v1/workspaces/{workspaceId}/boards";
 
+    protected static string WorkspaceMembersPath(Guid workspaceId) => $"/api/v1/workspaces/{workspaceId}/members";
+
+    protected static string BoardMembersPath(Guid boardId) => $"/api/v1/boards/{boardId}/members";
+
+    protected async Task<TestUser> AddBoardMemberAsync(Guid boardId, BoardRole role)
+    {
+        var user = await CreateUserAsync();
+        using var response = await PostAsync(BoardMembersPath(boardId), new { userId = user.Id, role = role.ToString() });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return user;
+    }
+
+    protected async Task<TestUser> AddWorkspaceMemberAsync(Guid workspaceId, WorkspaceRole role)
+    {
+        var user = await CreateUserAsync();
+        using var response = await PostAsync(
+            WorkspaceMembersPath(workspaceId), new { userId = user.Id, role = role.ToString() });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return user;
+    }
+
+    protected async Task PutBoardSettingsAsync(
+        Guid boardId,
+        BoardCommenting commenting = BoardCommenting.Members,
+        BoardAddingMembers addingMembers = BoardAddingMembers.Admins,
+        bool selfJoin = true,
+        BoardVisibility? visibility = null)
+    {
+        var current = visibility ?? (await ReadBoardAsync(boardId)).Visibility;
+        using var response = await PutAsync($"/api/v1/boards/{boardId}/settings", new
+        {
+            commenting = commenting.ToString(),
+            addingMembers = addingMembers.ToString(),
+            selfJoin,
+            visibility = current.ToString()
+        });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     protected async Task<BoardDto> CreateBoardAsync(
         Guid workspaceId, string name, BoardVisibility visibility = BoardVisibility.Workspace)
     {
@@ -380,17 +419,8 @@ public abstract class ApiTests : IAsyncLifetime
         return (await response.ReadEnvelope<BoardDto>()).Data!;
     }
 
-    protected Task<HttpResponseMessage> UpdateBoardAsync(
-        Guid id,
-        string name,
-        string? description = null,
-        BoardVisibility visibility = BoardVisibility.Workspace) =>
-        PutAsync($"/api/v1/boards/{id}", new
-        {
-            name,
-            description,
-            visibility = visibility.ToString()
-        });
+    protected Task<HttpResponseMessage> UpdateBoardAsync(Guid id, string name, string? description = null) =>
+        PutAsync($"/api/v1/boards/{id}", new { name, description });
 
     protected Task<HttpResponseMessage> MoveBoardAsync(Guid id, Guid workspaceId) =>
         PutAsync($"/api/v1/boards/{id}/workspace", new { workspaceId });

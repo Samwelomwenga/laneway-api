@@ -165,8 +165,7 @@ Content-Type: application/json
 
 {
   "name": "Sprint 1",
-  "description": null,
-  "visibility": "Public"
+  "description": null
 }
 
 ### Search boards by visibility name.
@@ -427,7 +426,7 @@ Content-Type: application/json
 
 > {% client.global.set("validationBoardId", response.body.data.id); %}
 
-### Create a board from an empty object. 400 required on name and visibility.
+### Create a board from an empty object. 400 required on name. Visibility defaults to Private.
 POST {{Laneway_Api_HostAddress}}/api/v1/workspaces/{{workspaceId}}/boards
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -476,7 +475,7 @@ Content-Type: application/json
   "visibility": "Private"
 }
 
-### Replace the board with an empty object. 400 required on name and visibility.
+### Replace the board with an empty object. 400 required on name.
 PUT {{Laneway_Api_HostAddress}}/api/v1/boards/{{validationBoardId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -490,8 +489,7 @@ Content-Type: application/json
 
 {
   "name": "Validation board",
-  "workspaceId": "{{workspaceId}}",
-  "visibility": "Private"
+  "workspaceId": "{{workspaceId}}"
 }
 
 ### Create a list with a padded name and a color. The name comes back trimmed.
@@ -2135,7 +2133,6 @@ Content-Type: application/json
 
 {
   "name": "Archive board",
-  "visibility": "Private",
   "isArchived": true
 }
 
@@ -2791,8 +2788,7 @@ Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Renamed while archived",
-  "visibility": "Private"
+  "name": "Renamed while archived"
 }
 
 ### Create a card on the archived board. 409 archived with a null field, naming the board.

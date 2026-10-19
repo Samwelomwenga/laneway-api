@@ -46,4 +46,6 @@ public static class ErrorCodes
     public const string RequiresWorkspaceMember = "requiresWorkspaceMember";
     public const string RequiresWorkspaceAdmin = "requiresWorkspaceAdmin";
     public const string CommentingDisabled = "commentingDisabled";
+    public const string LastAdmin = "lastAdmin";
+    public const string LastMember = "lastMember";
 }

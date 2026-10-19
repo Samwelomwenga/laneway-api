@@ -13,6 +13,7 @@ public enum BoardAction
 public enum WorkspaceAction
 {
     CreateBoard,
+    ListMembers,
     Administer
 }
 
@@ -110,7 +111,8 @@ public static class WorkspaceRules
 
         return action switch
         {
-            WorkspaceAction.CreateBoard => standing.IsMember ? null : Refusals.RequiresWorkspaceMember,
+            WorkspaceAction.CreateBoard or WorkspaceAction.ListMembers =>
+                standing.IsMember ? null : Refusals.RequiresWorkspaceMember,
             WorkspaceAction.Administer => standing.Role == Role.Admin
                 ? null
                 : Refusals.RequiresWorkspaceAdmin,

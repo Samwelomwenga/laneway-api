@@ -241,6 +241,14 @@ public sealed class AuthService(
 
         return WithPasswordAsync(userId, sessionId, write.Password, PasswordCheckedEndpoint.DeleteUser, async now =>
         {
+            var soleAdmin = await database.SoleAdminPlacesAsync(userId);
+            if (soleAdmin.Count > 0)
+            {
+                return AuthReply.Of(MemberLimits.Conflict<bool>(soleAdmin));
+            }
+
+            await database.WorkspaceMembers.Where(m => m.UserId == userId).ExecuteDeleteAsync();
+            await database.BoardMembers.Where(m => m.UserId == userId).ExecuteDeleteAsync();
             await database.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u
                 .SetProperty(e => e.DeletedAt, now)
                 .SetProperty(e => e.UpdatedAt, now)

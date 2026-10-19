@@ -75,11 +75,26 @@ public sealed record CopyBoardData(
     BoardOrigin? From,
     IReadOnlyList<BoardCopyPart> Keep);
 
-public sealed record BoardFields(Was<string>? Name, Was<string>? Description, Was<BoardVisibility>? Visibility)
+public sealed record BoardFields(Was<string>? Name, Was<string>? Description)
 {
     public static BoardFields Changed(EntityEntry<Board> tracked) => new(
         tracked.Old(board => board.Name),
-        tracked.Old(board => board.Description),
+        tracked.Old(board => board.Description));
+}
+
+public sealed record UpdateBoardSettingsData(
+    ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, BoardSettingsFields Old);
+
+public sealed record BoardSettingsFields(
+    Was<BoardCommenting>? Commenting,
+    Was<BoardAddingMembers>? AddingMembers,
+    Was<bool>? SelfJoin,
+    Was<BoardVisibility>? Visibility)
+{
+    public static BoardSettingsFields Changed(EntityEntry<Board> tracked) => new(
+        tracked.Old(board => board.Commenting),
+        tracked.Old(board => board.AddingMembers),
+        tracked.Old(board => board.SelfJoin),
         tracked.Old(board => board.Visibility));
 }
 
@@ -423,3 +438,23 @@ public sealed record UpdateCardCoverData(
 
 public sealed record CommentData(
     ActorRef Actor, WorkspaceRef Workspace, BoardRef Board, ListRef List, CardRef Card);
+
+public sealed record MemberRef(Guid Id, string Username, string FirstName, string LastName)
+{
+    public static MemberRef Of(User user)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        return new MemberRef(user.Id, user.Username, user.FirstName, user.LastName);
+    }
+}
+
+public sealed record AddMemberData<TRole>(
+    ActorRef Actor, WorkspaceRef Workspace, BoardRef? Board, MemberRef Member, TRole Role);
+
+public sealed record ChangeMemberRoleData<TRole>(
+    ActorRef Actor, WorkspaceRef Workspace, BoardRef? Board, MemberRef Member, RoleChange<TRole> Role);
+
+public sealed record RemoveMemberData<TRole>(
+    ActorRef Actor, WorkspaceRef Workspace, BoardRef? Board, MemberRef Member, TRole Role);
+
+public sealed record RoleChange<TRole>(TRole Old, TRole New);

@@ -8,6 +8,8 @@ public interface IBoardService
     Task<ApiResponse<BoardViewDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<BoardDto>> CreateAsync(CreateBoardWrite write);
     Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardWrite write);
+    Task<ApiResponse<BoardSettingsDto>> GetSettingsAsync(Guid id);
+    Task<ApiResponse<BoardSettingsDto>> UpdateSettingsAsync(Guid id, BoardSettingsWrite write);
     Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardWrite write);
     Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
@@ -142,7 +144,7 @@ public class BoardService : IBoardService
     public async Task<ApiResponse<BoardDto>> UpdateAsync(Guid id, UpdateBoardWrite write)
     {
         var access = await _readable.BoardAsync(id, _actor.Id);
-        if (_readable.Denies(access, BoardAction.Administer, AccessTarget.Board, id, _actor.Id, out ApiResponse<BoardDto>? denied))
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Board, id, _actor.Id, out ApiResponse<BoardDto>? denied))
         {
             return denied;
         }
@@ -155,7 +157,6 @@ public class BoardService : IBoardService
         var existingBoard = access.Target;
         existingBoard.Name = write.Name;
         existingBoard.Description = write.Description;
-        existingBoard.Visibility = write.Visibility;
         _context.StampChange(existingBoard, _actor);
 
         var tracked = _context.Entry(existingBoard);
@@ -172,6 +173,54 @@ public class BoardService : IBoardService
         await _context.SaveChangesAsync();
         var updatedBoardDto = MapToDto(existingBoard);
         return ApiResponse<BoardDto>.SuccessResponse(updatedBoardDto, "Board updated successfully", 200);
+    }
+
+    public async Task<ApiResponse<BoardSettingsDto>> GetSettingsAsync(Guid id)
+    {
+        var access = await _readable.BoardAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Board, id, _actor.Id, out ApiResponse<BoardSettingsDto>? denied))
+        {
+            return denied;
+        }
+
+        return ApiResponse<BoardSettingsDto>.SuccessResponse(SettingsOf(access.Target), "Board settings retrieved successfully");
+    }
+
+    public async Task<ApiResponse<BoardSettingsDto>> UpdateSettingsAsync(Guid id, BoardSettingsWrite write)
+    {
+        ArgumentNullException.ThrowIfNull(write);
+
+        var access = await _readable.BoardAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Administer, AccessTarget.Board, id, _actor.Id, out ApiResponse<BoardSettingsDto>? denied))
+        {
+            return denied;
+        }
+
+        if (await _archive.OnBoardAsync(id) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<BoardSettingsDto>(archived, TreeItem.Board);
+        }
+
+        var board = access.Target;
+        board.Commenting = write.Commenting;
+        board.AddingMembers = write.AddingMembers;
+        board.SelfJoin = write.SelfJoin;
+        board.Visibility = write.Visibility;
+        _context.StampChange(board, _actor);
+
+        var tracked = _context.Entry(board);
+        if (tracked.Changed())
+        {
+            var old = BoardSettingsFields.Changed(tracked);
+            var workspace = await _tree.WorkspaceAsync(board.WorkspaceId);
+            await _activity.AddAsync(
+                ActivityType.UpdateBoardSettings,
+                new ActivityPlace(WorkspaceId: board.WorkspaceId, BoardId: board.Id),
+                actor => new UpdateBoardSettingsData(actor, workspace, BoardRef.Of(board), old));
+        }
+
+        await _context.SaveChangesAsync();
+        return ApiResponse<BoardSettingsDto>.SuccessResponse(SettingsOf(board), "Board settings updated successfully");
     }
 
     public async Task<ApiResponse<BoardDto>> MoveAsync(Guid id, MoveBoardWrite write)
@@ -279,6 +328,9 @@ public class BoardService : IBoardService
         );
     }
 
+    private static BoardSettingsDto SettingsOf(Board board) =>
+        new(board.Commenting, board.AddingMembers, board.SelfJoin, board.Visibility);
+
     private static Board MapToEntity(CreateBoardWrite write, Guid actorId)
     {
         return new Board
@@ -287,7 +339,10 @@ public class BoardService : IBoardService
             Name = write.Name,
             Description = write.Description,
             WorkspaceId = write.WorkspaceId,
-            Visibility = write.Visibility,
+            Visibility = write.Settings.Visibility,
+            Commenting = write.Settings.Commenting,
+            AddingMembers = write.Settings.AddingMembers,
+            SelfJoin = write.Settings.SelfJoin,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId
         };

@@ -18,8 +18,8 @@ public class BoardAccessTests : AccessMatrix
 
     [Fact]
     public Task PUT_a_board() =>
-        RunBoardRowAsync(Act.AdministerBoard, 200, (place, caller) =>
-            PutAsync($"/api/v1/boards/{place.BoardId}", new { name = "Renamed", visibility = "Public" }, caller));
+        RunBoardRowAsync(Act.EditBoard, 200, (place, caller) =>
+            PutAsync($"/api/v1/boards/{place.BoardId}", new { name = "Renamed" }, caller));
 
     [Fact]
     public Task PUT_a_boards_archived_state() =>
