@@ -5,8 +5,8 @@ namespace Laneway.Api;
 
 public interface IWorkSpaceService
 {
-    Task<ApiResponse<List<WorkSpaceDto>>> GetAllAsync(WorkSpaceSearchDto searchDto);
-    Task<ApiResponse<WorkSpaceDto>> GetByIdAsync(Guid id);
+    Task<ApiResponse<List<WorkspaceSummaryDto>>> GetAllAsync(WorkSpaceSearchDto searchDto);
+    Task<ApiResponse<WorkspaceSummaryDto>> GetByIdAsync(Guid id);
     Task<ApiResponse<WorkSpaceDto>> CreateAsync(CreateWorkSpaceWrite write);
     Task<ApiResponse<WorkSpaceDto>> UpdateAsync(Guid id, UpdateWorkSpaceWrite write);
     Task<ApiResponse<bool>> DeleteAsync(Guid id);
@@ -17,36 +17,47 @@ public class WorkSpaceService : IWorkSpaceService
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
     private readonly ActivityWriter _activity;
+    private readonly Readable _readable;
 
-    public WorkSpaceService(ApplicationDbContext context, Actor actor, ActivityWriter activity)
+    public WorkSpaceService(ApplicationDbContext context, Actor actor, ActivityWriter activity, Readable readable)
     {
         _context = context;
         _actor = actor;
         _activity = activity;
+        _readable = readable;
     }
 
-    public async Task<ApiResponse<List<WorkSpaceDto>>> GetAllAsync(WorkSpaceSearchDto searchDto)
+    public async Task<ApiResponse<List<WorkspaceSummaryDto>>> GetAllAsync(WorkSpaceSearchDto searchDto)
     {
-        var query = _context.WorkSpaces.AsQueryable();
+        var userId = _actor.Id;
+        var query = _readable.Workspaces(userId)
+            .Select(ws => new WorkspaceRow
+            {
+                Workspace = ws,
+                IsMember = _context.WorkspaceMembers.Any(member => member.WorkspaceId == ws.Id && member.UserId == userId)
+            })
+            .Where(row => row.IsMember
+                || _context.BoardMembers.Any(member => member.UserId == userId
+                    && _context.Boards.Any(board => board.Id == member.BoardId && board.WorkspaceId == row.Workspace.Id)));
 
         if (searchDto.SearchTerm is { } term)
         {
-            query = query.Where(ws => ws.Name.ToLower().Contains(term.ToLower()) ||
-                                      ws.Description.ToLower().Contains(term.ToLower()));
+            query = query.Where(row => row.Workspace.Name.ToLower().Contains(term.ToLower()) ||
+                                       (row.IsMember && row.Workspace.Description.ToLower().Contains(term.ToLower())));
         }
         if (searchDto.Visibility is { } visibility)
         {
-            query = query.Where(ws => ws.Visibility == visibility);
+            query = query.Where(row => row.IsMember && row.Workspace.Visibility == visibility);
         }
 
-        var (workSpaces, totalCount) = await PagedQuery.ReadAsync(
-            query.OrderBy(ws => ws.CreatedAt),
+        var (rows, totalCount) = await PagedQuery.ReadAsync(
+            query.OrderBy(row => row.Workspace.CreatedAt),
             pageNumber: searchDto.PageNumber,
             pageSize: searchDto.PageSize);
 
-        var workSpaceDtos = workSpaces.Select(MapToDto).ToList();
+        var workSpaceDtos = rows.ConvertAll(row => MapToDto(row.Workspace, row.IsMember));
 
-        return PagedResponse<WorkSpaceDto>.SuccessResponse(
+        return PagedResponse<WorkspaceSummaryDto>.SuccessResponse(
             workSpaceDtos,
             totalCount,
             pageSize: searchDto.PageSize,
@@ -55,22 +66,30 @@ public class WorkSpaceService : IWorkSpaceService
         );
     }
 
-    public async Task<ApiResponse<WorkSpaceDto>> GetByIdAsync(Guid id)
+    public async Task<ApiResponse<WorkspaceSummaryDto>> GetByIdAsync(Guid id)
     {
-        var existingWorkSpace = await _context.WorkSpaces
-            .FirstOrDefaultAsync(ws => ws.Id == id);
-        if (existingWorkSpace == null)
+        if (await _readable.WorkspaceAsync(id, _actor.Id) is not { } found)
         {
-            return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
+            return _readable.NotFound<WorkspaceSummaryDto>(AccessTarget.Workspace, id, _actor.Id);
         }
-        var workSpaceDto = MapToDto(existingWorkSpace);
-        return ApiResponse<WorkSpaceDto>.SuccessResponse(workSpaceDto, "Workspace retrieved successfully", 200);
+
+        var workSpaceDto = MapToDto(found.Place, found.Standing.IsMember);
+        return ApiResponse<WorkspaceSummaryDto>.SuccessResponse(workSpaceDto, "Workspace retrieved successfully", 200);
     }
 
     public async Task<ApiResponse<WorkSpaceDto>> CreateAsync(CreateWorkSpaceWrite write)
     {
         var newWorkSpace = MapToEntity(write, _actor.Id);
         _context.WorkSpaces.Add(newWorkSpace);
+        _context.WorkspaceMembers.Add(new WorkspaceMember
+        {
+            Id = Guid.NewGuid(),
+            WorkspaceId = newWorkSpace.Id,
+            UserId = _actor.Id,
+            Role = WorkspaceRole.Admin,
+            CreatedAt = newWorkSpace.CreatedAt,
+            CreatedBy = _actor.Id
+        });
         await _activity.AddAsync(
             ActivityType.CreateWorkspace,
             ActivityPlace.OnWorkspace(newWorkSpace.Id),
@@ -81,11 +100,17 @@ public class WorkSpaceService : IWorkSpaceService
 
     public async Task<ApiResponse<WorkSpaceDto>> UpdateAsync(Guid id, UpdateWorkSpaceWrite write)
     {
-        var existingWorkSpace = await _context.WorkSpaces.FirstOrDefaultAsync(ws => ws.Id == id);
-        if (existingWorkSpace == null)
+        if (await _readable.WorkspaceAsync(id, _actor.Id) is not { } found)
         {
-            return ApiResponse<WorkSpaceDto>.ErrorResponse("Workspace not found", 404);
+            return _readable.NotFound<WorkSpaceDto>(AccessTarget.Workspace, id, _actor.Id);
         }
+
+        if (WorkspaceRules.Refusal(found.Standing, WorkspaceAction.Administer) is { } refusal)
+        {
+            return _readable.Refused<WorkSpaceDto>(refusal, AccessTarget.Workspace, id, _actor.Id);
+        }
+
+        var existingWorkSpace = found.Place;
 
         existingWorkSpace.Name = write.Name;
         existingWorkSpace.Description = write.Description;
@@ -109,11 +134,17 @@ public class WorkSpaceService : IWorkSpaceService
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        var workSpace = await _context.WorkSpaces.FindAsync(id);
-        if (workSpace == null)
+        if (await _readable.WorkspaceAsync(id, _actor.Id) is not { } found)
         {
-            return ApiResponse<bool>.ErrorResponse("Workspace not found", 404);
+            return _readable.NotFound<bool>(AccessTarget.Workspace, id, _actor.Id);
         }
+
+        if (WorkspaceRules.Refusal(found.Standing, WorkspaceAction.Administer) is { } refusal)
+        {
+            return _readable.Refused<bool>(refusal, AccessTarget.Workspace, id, _actor.Id);
+        }
+
+        var workSpace = found.Place;
 
         var boardCount = await _context.Boards.CountAsync(b => b.WorkspaceId == id);
         if (boardCount > 0)
@@ -131,6 +162,15 @@ public class WorkSpaceService : IWorkSpaceService
         await _context.SaveChangesAsync();
         return ApiResponse<bool>.SuccessResponse(true, "Workspace deleted successfully", 204);
     }
+
+    private sealed class WorkspaceRow
+    {
+        public required WorkSpace Workspace { get; init; }
+        public required bool IsMember { get; init; }
+    }
+
+    private static WorkspaceSummaryDto MapToDto(WorkSpace workSpace, bool isMember) =>
+        isMember ? MapToDto(workSpace) : new WorkspaceSummaryDto(workSpace.Id, workSpace.Name);
 
     private static WorkSpaceDto MapToDto(WorkSpace workSpace)
     {

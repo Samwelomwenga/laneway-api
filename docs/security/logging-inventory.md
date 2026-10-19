@@ -50,6 +50,24 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 
 `BreachedCheckUnavailable` means the Pwned Passwords check failed or took over 2 seconds, so the password was accepted without it. Each entry is one password that skipped ASVS 6.2.12.
 
+## Authorization denials
+
+Denials log under the `Laneway.Authorization` category, which meets ASVS 16.3.2. ADR 0007 records the scheme.
+
+| Id | Event | Level | Fields |
+|---|---|---|---|
+| 1 | `AccessDenied` | Warning | `sub`, `targetType`, `targetId`, `status`, `code` |
+
+`targetType` is `Workspace` or `Board`. `status` is 404 when the caller couldn't read the object, and `code` is then `notFound`. `status` is 403 when they could read it but their role forbids the action, and `code` is the 403 code, such as `readOnlyRole` or `requiresWorkspaceAdmin`.
+
+The service puts each denial on a bounded channel and answers at once, so a hiding 404 is as fast as a missing one. `DenialDrainer` reads the channel in the background. For a 404 it checks whether the object exists, and drops the entry when it doesn't. A random id is a miss, not a denial. So every logged `targetId` names a real object.
+
+The channel holds 1024 entries. When it's full, `DenialLog` drops the denial and counts it on the `Laneway.Authorization` meter.
+
+| Counter | Tags |
+|---|---|
+| `laneway.authorization.denials.dropped` | none |
+
 ## Unexpected errors
 
 `ApiExceptionHandler` logs each exception it turns into a 500 once, at Error, under the `Laneway.Api.ApiExceptionHandler` category as event 1, `UnexpectedError`. Event ids are unique within a category, so this id doesn't clash with `AccessTokenRejected`. The entry carries the exception and `traceId`, the request's `TraceIdentifier`. The 500 body returns the same `traceId` with a generic message, so a client can quote it and nothing else leaks. This meets ASVS 16.3.4 and 16.5.1.

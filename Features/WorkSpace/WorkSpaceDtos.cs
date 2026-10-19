@@ -1,6 +1,14 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Laneway.Api;
+
+[JsonDerivedType(typeof(WorkSpaceDto))]
+public record WorkspaceSummaryDto
+(
+    Guid Id,
+    string Name
+);
 
 public record WorkSpaceDto
 (
@@ -12,7 +20,7 @@ public record WorkSpaceDto
     DateTime? UpdatedAt,
     Guid CreatedBy,
     Guid? UpdatedBy
-);
+) : WorkspaceSummaryDto(Id, Name);
 public record CreateWorkSpaceDto
 (
     string? Name,
