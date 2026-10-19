@@ -79,7 +79,7 @@ public sealed class ListCopyService : IListCopyService
         }
         else
         {
-            errors.AddRange((await _placements.CheckOnBoardAsync(boardId, placement)).Errors);
+            errors.AddRange((await _placements.CheckOnBoardAsync(boardId, placement, _actor.Id)).Errors);
         }
 
         if (errors.Count > 0)

@@ -7,7 +7,22 @@ namespace Laneway.Api;
 public enum AccessTarget
 {
     Workspace,
-    Board
+    Board,
+    List,
+    Card,
+    Label,
+    Checklist,
+    CheckItem,
+    Attachment
+}
+
+public static class AccessTargets
+{
+    public static string Name(AccessTarget target) => target switch
+    {
+        AccessTarget.CheckItem => "Check item",
+        _ => target.ToString()
+    };
 }
 
 public sealed record Denial(Guid ActorId, AccessTarget Target, Guid TargetId, string? Code)
@@ -125,6 +140,12 @@ public sealed class DenialDrainer : BackgroundService
         {
             AccessTarget.Workspace => await context.WorkSpaces.AnyAsync(found => found.Id == denial.TargetId, token),
             AccessTarget.Board => await context.Boards.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.List => await context.Lists.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.Card => await context.Cards.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.Label => await context.Labels.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.Checklist => await context.Checklists.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.CheckItem => await context.CheckItems.AnyAsync(found => found.Id == denial.TargetId, token),
+            AccessTarget.Attachment => await context.Attachments.AnyAsync(found => found.Id == denial.TargetId, token),
             _ => throw new ArgumentOutOfRangeException(nameof(denial), denial.Target, null)
         };
     }

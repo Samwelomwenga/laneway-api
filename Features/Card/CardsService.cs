@@ -29,6 +29,7 @@ public class CardService : ICardService
     private readonly CardReads _reads;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly Readable _readable;
 
     public CardService(
         ApplicationDbContext context,
@@ -40,7 +41,8 @@ public class CardService : ICardService
         CardCompletion completion,
         CardReads reads,
         ActivityWriter activity,
-        ActivityTree tree)
+        ActivityTree tree,
+        Readable readable)
     {
         _context = context;
         _actor = actor;
@@ -52,6 +54,7 @@ public class CardService : ICardService
         _reads = reads;
         _activity = activity;
         _tree = tree;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<CardDto>> CreateAsync(CreateCardWrite write)
@@ -59,13 +62,16 @@ public class CardService : ICardService
         var listId = write.ListId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        if (await _context.BoardOfListAsync(listId) is not { } boardId)
+        var access = await _readable.ListAsync(listId, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.List, listId, _actor.Id, out ApiResponse<CardDto>? denied))
         {
-            return ReferenceErrors.ParentNotFound<CardDto>("List");
+            return denied;
         }
 
+        var boardId = access.Target.BoardId;
+
         var (labels, errors) = await ResolveLabelsAsync(boardId, write.LabelIds);
-        var placed = await _placements.ResolveInListAsync(boardId, listId, Placement.Of(write));
+        var placed = await _placements.ResolveInListAsync(boardId, listId, Placement.Of(write), _actor.Id);
         errors.AddRange(placed.Errors);
 
         if (errors.Count > 0)
@@ -109,26 +115,25 @@ public class CardService : ICardService
     public async Task<ApiResponse<CardDto>> UpdateAsync(Guid id, UpdateCardWrite write)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
-        await _context.TryLockCardAsync(id);
 
-        var card = await _context.Cards
-            .Include(c => c.Labels)
-            .FirstOrDefaultAsync(c => c.Id == id);
-        if (card == null)
+        var access = await _readable.CardAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Card, id, _actor.Id, out ApiResponse<CardDto>? denied))
         {
-            return ApiResponse<CardDto>.ErrorResponse("Card not found", 404);
+            return denied;
         }
 
-        if (await _archive.OnCardAsync(id) is { } archived)
-        {
-            return ArchiveErrors.ReadOnly<CardDto>(archived, TreeItem.Card);
-        }
+        var card = await LockedWithLabelsAsync(access.Target);
 
         var (labels, referenceErrors) = await ResolveLabelsAsync(
             await _context.BoardOfListAsync(card.ListId), write.LabelIds);
         if (referenceErrors.Count > 0)
         {
             return ReferenceErrors.Invalid<CardDto>(referenceErrors);
+        }
+
+        if (await _archive.OnCardAsync(id) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<CardDto>(archived, TreeItem.Card);
         }
 
         var watch = TouchesCompletion(card, write) ? await _completion.WatchAsync(id) : null;
@@ -218,7 +223,7 @@ public class CardService : ICardService
             await _context.TryLockBoardAsync(boardId);
         }
 
-        var placed = await _placements.ResolveMoveInListAsync(card, listId, placement);
+        var placed = await _placements.ResolveMoveInListAsync(card, listId, placement, _actor.Id);
 
         var listChangedBoard = await _context.BoardOfListAsync(listId) != boardId;
         if (listChangedBoard)
@@ -294,13 +299,14 @@ public class CardService : ICardService
 
     public async Task<ApiResponse<CardViewDto>> GetByIdAsync(Guid id)
     {
-        var card = await _context.Cards
-            .Include(c => c.Labels)
-            .FirstOrDefaultAsync(c => c.Id == id);
-        if (card == null)
+        var access = await _readable.CardAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Card, id, _actor.Id, out ApiResponse<CardViewDto>? denied))
         {
-            return ApiResponse<CardViewDto>.ErrorResponse("Card not found", 404);
+            return denied;
         }
+
+        var card = access.Target;
+        await _context.Entry(card).Collection(c => c.Labels).LoadAsync();
 
         var checklists = await ArchiveView.Checklists(
                 _context.Checklists.Where(c => c.CardId == id), ArchiveFilter.Exclude)
@@ -321,12 +327,13 @@ public class CardService : ICardService
     }
     public async Task<ApiResponse<List<CardDto>>> GetAllAsync(Guid listId, CardSearchDto searchDto)
     {
-        if (!await _context.Lists.AnyAsync(l => l.Id == listId))
+        var access = await _readable.ListAsync(listId, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.List, listId, _actor.Id, out ApiResponse<List<CardDto>>? denied))
         {
-            return ReferenceErrors.ParentNotFound<List<CardDto>>("List");
+            return denied;
         }
 
-        var query = _context.Cards.Where(c => c.ListId == listId);
+        var query = _readable.Cards(_actor.Id).Where(c => c.ListId == listId);
 
         if (searchDto.SearchTerm is { } term)
         {
@@ -382,31 +389,35 @@ public class CardService : ICardService
     private async Task<ApiResponse<bool>> ChangeLabelAsync(Guid cardId, Guid labelId, bool add)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
-        await _context.TryLockCardAsync(cardId);
 
-        var card = await _context.Cards
-            .Include(c => c.Labels)
-            .FirstOrDefaultAsync(c => c.Id == cardId);
-        if (card == null)
+        var access = await _readable.CardAsync(cardId, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Card, cardId, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return ApiResponse<bool>.ErrorResponse("Card not found", 404);
+            return denied;
         }
 
-        var label = await _context.Labels.FindAsync(labelId);
+        var label = await _readable.Labels(_actor.Id).FirstOrDefaultAsync(l => l.Id == labelId);
         if (label == null)
         {
-            return ApiResponse<bool>.ErrorResponse("Label not found", 404);
+            return _readable.NotFound<bool>(AccessTarget.Label, labelId, _actor.Id);
         }
 
-        if (await _archive.OnCardAsync(cardId) is { } archived)
+        if (BoardRules.Refusal(access.Standing, BoardAction.Edit) is { } refusal)
         {
-            return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.Card);
+            return _readable.Refused<bool>(refusal, AccessTarget.Card, cardId, _actor.Id);
         }
+
+        var card = await LockedWithLabelsAsync(access.Target);
 
         var boardId = await _context.BoardOfListAsync(card.ListId);
         if (boardId is { } board && label.BoardId != board)
         {
             return ReferenceErrors.Invalid<bool>([NotOnBoard("labelId", labelId, board)]);
+        }
+
+        if (await _archive.OnCardAsync(cardId) is { } archived)
+        {
+            return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.Card);
         }
 
         var message = add ? "Label added to the card" : "Label removed from the card";
@@ -457,20 +468,22 @@ public class CardService : ICardService
     {
         ArgumentNullException.ThrowIfNull(coverDto);
 
-        var card = await _context.Cards.FindAsync(id);
-        if (card == null)
+        var access = await _readable.CardAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Card, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return ApiResponse<bool>.ErrorResponse("Card not found", 404);
+            return denied;
+        }
+
+        var card = access.Target;
+
+        if (coverDto.AttachmentId is { } attachmentId && await CoverErrorAsync(id, attachmentId) is { } error)
+        {
+            return ReferenceErrors.Invalid<bool>([error]);
         }
 
         if (await _archive.OnCardAsync(id) is { } archived)
         {
             return ArchiveErrors.ReadOnly<bool>(archived, TreeItem.Card);
-        }
-
-        if (coverDto.AttachmentId is { } attachmentId && await CoverErrorAsync(id, attachmentId) is { } error)
-        {
-            return ReferenceErrors.Invalid<bool>([error]);
         }
 
         var wasAttachmentId = card.CoverAttachmentId;
@@ -508,7 +521,7 @@ public class CardService : ICardService
 
     private async Task<ApiError?> CoverErrorAsync(Guid cardId, Guid attachmentId)
     {
-        var attachment = await _context.Attachments
+        var attachment = await _readable.Attachments(_actor.Id)
             .Where(a => a.Id == attachmentId)
             .Select(a => new { a.CardId, a.MimeType })
             .FirstOrDefaultAsync();
@@ -532,11 +545,13 @@ public class CardService : ICardService
 
     public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived)
     {
-        var card = await _context.Cards.FindAsync(id);
-        if (card == null)
+        var access = await _readable.CardAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Card, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return ApiResponse<bool>.ErrorResponse("Card not found", 404);
+            return denied;
         }
+
+        var card = access.Target;
 
         if (await _archive.OnListAsync(card.ListId) is { } holder)
         {
@@ -568,11 +583,13 @@ public class CardService : ICardService
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        var card = await _context.Cards.FindAsync(id);
-        if (card == null)
+        var access = await _readable.CardAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Card, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return ApiResponse<bool>.ErrorResponse("Card not found", 404);
+            return denied;
         }
+
+        var card = access.Target;
 
         if (!card.IsArchived)
         {
@@ -590,6 +607,14 @@ public class CardService : ICardService
         return ApiResponse<bool>.SuccessResponse(true, "Card deleted successfully", 204);
     }
 
+    private async Task<Card> LockedWithLabelsAsync(Card card)
+    {
+        await _context.TryLockCardAsync(card.Id);
+        await _context.Entry(card).ReloadAsync();
+        await _context.Entry(card).Collection(c => c.Labels).LoadAsync();
+        return card;
+    }
+
     private static bool TouchesCompletion(Card card, UpdateCardWrite write) =>
         card.DueDate != write.DueDate || card.IsDueComplete != write.IsDueComplete;
 
@@ -601,7 +626,7 @@ public class CardService : ICardService
         var errors = new List<ApiError>();
 
         var ids = labelIds ?? [];
-        var labels = await _context.Labels.Where(l => ids.Contains(l.Id)).ToListAsync();
+        var labels = await _readable.Labels(_actor.Id).Where(l => ids.Contains(l.Id)).ToListAsync();
         var seen = new HashSet<Guid>();
         for (var index = 0; index < ids.Count; index++)
         {

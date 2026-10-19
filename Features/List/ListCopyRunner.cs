@@ -112,7 +112,7 @@ public sealed class ListCopyRunner : ICopyJobRunner
                 [new ApiError("boardId", ErrorCodes.NotFound, $"Board {boardId} does not exist.")]);
         }
 
-        var placed = await _placements.ResolveOnBoardAsync(boardId, Placement.Of(request));
+        var placed = await _placements.ResolveOnBoardAsync(boardId, Placement.Of(request), _actor.Id);
         if (placed.Errors.Count > 0)
         {
             return CopyRunResult.Refused(placed.Errors);

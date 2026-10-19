@@ -1,14 +1,34 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Laneway.Api.Tests;
 
-public sealed record Place(Guid WorkspaceId, Guid BoardId);
+public sealed record Place(Guid WorkspaceId, Guid BoardId, Content Content);
+
+public sealed record Content(
+    Guid ListId,
+    Guid CardId,
+    Guid LabelId,
+    Guid CardLabelId,
+    Guid ChecklistId,
+    Guid CheckItemId,
+    Guid AttachmentId,
+    Guid FileAttachmentId,
+    Guid ArchivedListId,
+    Guid ArchivedCardId,
+    Guid ArchivedChecklistId);
 
 public abstract class AccessMatrix : ApiTests
 {
+    private static readonly byte[] MatrixFile = "A line of notes.\n"u8.ToArray();
+
+    private static readonly string MatrixFileKey = $"matrix/{Guid.NewGuid()}";
+
     private Dictionary<Caller, TestUser>? _callers;
+
+    private bool _fileStored;
 
     protected AccessMatrix(TestStack stack) : base(stack)
     {
@@ -34,11 +54,13 @@ public abstract class AccessMatrix : ApiTests
         var callers = await CallersAsync();
         var workspace = NewWorkspace(workspaceVisibility);
         var board = NewBoard(workspace.Id, boardVisibility, archived);
+        var content = NewContent();
 
         await FromDatabaseAsync(async database =>
         {
             database.WorkSpaces.Add(workspace);
             database.Boards.Add(board);
+            AddContent(database, board.Id, content);
             AddWorkspaceMember(database, workspace.Id, ActorId, WorkspaceRole.Admin);
             AddBoardMember(database, board.Id, ActorId, BoardRole.Admin);
 
@@ -55,7 +77,120 @@ public abstract class AccessMatrix : ApiTests
             return await database.SaveChangesAsync();
         });
 
-        return new Place(workspace.Id, board.Id);
+        return new Place(workspace.Id, board.Id, content);
+    }
+
+    protected async Task<Content> SeedContentAsync(Guid boardId)
+    {
+        var content = NewContent();
+        await FromDatabaseAsync(async database =>
+        {
+            AddContent(database, boardId, content);
+            return await database.SaveChangesAsync();
+        });
+
+        return content;
+    }
+
+    private static Content NewContent() => new(
+        Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+        Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+    private void AddContent(ApplicationDbContext database, Guid boardId, Content content)
+    {
+        var cardLabel = new Label { Id = content.CardLabelId, Name = "On the card", BoardId = boardId, CreatedBy = ActorId };
+        database.Labels.Add(new Label { Id = content.LabelId, Name = "Free", BoardId = boardId, CreatedBy = ActorId });
+        database.Labels.Add(cardLabel);
+        database.Lists.Add(new List
+        {
+            Id = content.ListId, Name = "Matrix list", BoardId = boardId, Position = Placements.Gap, CreatedBy = ActorId
+        });
+        database.Lists.Add(new List
+        {
+            Id = content.ArchivedListId,
+            Name = "Archived list",
+            BoardId = boardId,
+            Position = 2 * Placements.Gap,
+            IsArchived = true,
+            CreatedBy = ActorId
+        });
+        var card = new Card
+        {
+            Id = content.CardId, Title = "Matrix card", ListId = content.ListId, Position = Placements.Gap, CreatedBy = ActorId
+        };
+        card.Labels.Add(cardLabel);
+        database.Cards.Add(card);
+        database.Cards.Add(new Card
+        {
+            Id = content.ArchivedCardId,
+            Title = "Archived card",
+            ListId = content.ListId,
+            Position = 2 * Placements.Gap,
+            IsArchived = true,
+            CreatedBy = ActorId
+        });
+        database.Checklists.Add(new Checklist
+        {
+            Id = content.ChecklistId,
+            Name = "Matrix checklist",
+            CardId = content.CardId,
+            Position = Placements.Gap,
+            CreatedBy = ActorId
+        });
+        database.Checklists.Add(new Checklist
+        {
+            Id = content.ArchivedChecklistId,
+            Name = "Archived checklist",
+            CardId = content.CardId,
+            Position = 2 * Placements.Gap,
+            IsArchived = true,
+            CreatedBy = ActorId
+        });
+        database.CheckItems.Add(new CheckItem
+        {
+            Id = content.CheckItemId,
+            Name = "Matrix item",
+            ChecklistId = content.ChecklistId,
+            Position = Placements.Gap,
+            CreatedBy = ActorId
+        });
+        database.Attachments.Add(new Attachment
+        {
+            Id = content.AttachmentId,
+            CardId = content.CardId,
+            Kind = AttachmentKind.Link,
+            Name = "Matrix link",
+            Url = "https://example.com/matrix",
+            CreatedBy = ActorId
+        });
+        database.Attachments.Add(new Attachment
+        {
+            Id = content.FileAttachmentId,
+            CardId = content.CardId,
+            Kind = AttachmentKind.File,
+            Name = "Matrix file",
+            FileName = "notes.txt",
+            MimeType = "text/plain",
+            Bytes = MatrixFile.Length,
+            ObjectKey = MatrixFileKey,
+            CreatedBy = ActorId
+        });
+    }
+
+    protected async Task StoreMatrixFileAsync()
+    {
+        if (_fileStored)
+        {
+            return;
+        }
+
+        await FromServicesAsync(async services =>
+        {
+            await services.GetRequiredService<AttachmentStorage>()
+                .UploadAsync(MatrixFileKey, MatrixFile, "text/plain", CancellationToken.None);
+            return true;
+        });
+        _fileStored = true;
     }
 
     protected async Task<Guid> SeedBoardAsync(Guid workspaceId, BoardVisibility visibility, params Caller[] members)
@@ -79,7 +214,11 @@ public abstract class AccessMatrix : ApiTests
     }
 
     protected async Task RunBoardRowAsync(
-        Act act, int success, Func<Place, TestUser, Task<HttpResponseMessage>> send, bool archived = false)
+        Act act,
+        int success,
+        Func<Place, TestUser, Task<HttpResponseMessage>> send,
+        bool archived = false,
+        string routeObject = "Board")
     {
         var callers = await CallersAsync();
         var failures = new List<string>();
@@ -90,8 +229,59 @@ public abstract class AccessMatrix : ApiTests
             {
                 var place = await SeedPlaceAsync(WorkspaceVisibility.Private, visibility, archived);
                 var expect = AccessExpectations.For(act, caller, visibility, success);
-                await CheckCellAsync(failures, $"{visibility} board, {caller}", expect, "Board",
+                await CheckCellAsync(failures, $"{visibility} board, {caller}", expect, routeObject,
                     place, () => send(place, callers[caller]));
+            }
+        }
+
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
+    protected async Task RunBoardListRowAsync(
+        string routeObject, Func<Place, string> path, Func<Content, Guid[]> expected)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(expected);
+
+        var callers = await CallersAsync();
+        var failures = new List<string>();
+        var elsewhere = await SeedPlaceAsync(WorkspaceVisibility.Public, BoardVisibility.Public);
+        var foreign = expected(elsewhere.Content).ToHashSet();
+
+        foreach (var visibility in Enum.GetValues<BoardVisibility>())
+        {
+            var place = await SeedPlaceAsync(WorkspaceVisibility.Private, visibility);
+            foreach (var caller in Enum.GetValues<Caller>())
+            {
+                var cell = $"{visibility} board, {caller}";
+                var expect = AccessExpectations.For(Act.ReadBoard, caller, visibility, 200);
+                using var response = await GetAsync(path(place), callers[caller]);
+                var body = await response.Content.ReadAsStringAsync();
+                if ((int)response.StatusCode != expect.Status)
+                {
+                    failures.Add($"{cell}: expected {expect}, got status {(int)response.StatusCode}. {body}");
+                    continue;
+                }
+
+                var root = JsonDocument.Parse(body).RootElement;
+                if (expect.Status == 404)
+                {
+                    var message = root.GetProperty("message").GetString();
+                    if (message != $"{routeObject} not found")
+                    {
+                        failures.Add($"{cell}: message \"{message}\"");
+                    }
+
+                    continue;
+                }
+
+                var seen = root.GetProperty("data").EnumerateArray()
+                    .Select(item => item.GetProperty("id").GetGuid())
+                    .ToHashSet();
+                if (!seen.SetEquals(expected(place.Content)) || seen.Overlaps(foreign))
+                {
+                    failures.Add($"{cell}: saw {string.Join(", ", seen)}");
+                }
             }
         }
 
@@ -184,6 +374,47 @@ public abstract class AccessMatrix : ApiTests
                 .Where(board => board.WorkspaceId == place.WorkspaceId)
                 .OrderBy(board => board.Id)
                 .Select(board => new { board.Id, board.Name, board.Description, board.Visibility, board.IsArchived, board.UpdatedAt })
+                .ToListAsync(),
+            Lists = await database.Lists.AsNoTracking()
+                .Where(list => database.Boards.Any(board => board.Id == list.BoardId && board.WorkspaceId == place.WorkspaceId))
+                .OrderBy(list => list.Id)
+                .Select(list => new { list.Id, list.Name, list.BoardId, list.Position, list.IsArchived, list.UpdatedAt })
+                .ToListAsync(),
+            Cards = await database.Cards.AsNoTracking()
+                .Where(card => database.Lists.Any(list => list.Id == card.ListId
+                    && database.Boards.Any(board => board.Id == list.BoardId && board.WorkspaceId == place.WorkspaceId)))
+                .OrderBy(card => card.Id)
+                .Select(card => new
+                {
+                    card.Id,
+                    card.Title,
+                    card.ListId,
+                    card.Position,
+                    card.IsArchived,
+                    card.CoverColor,
+                    card.UpdatedAt,
+                    Labels = card.Labels.OrderBy(label => label.Id).Select(label => label.Id).ToList()
+                })
+                .ToListAsync(),
+            Labels = await database.Labels.AsNoTracking()
+                .Where(label => database.Boards.Any(board => board.Id == label.BoardId && board.WorkspaceId == place.WorkspaceId))
+                .OrderBy(label => label.Id)
+                .Select(label => new { label.Id, label.Name, label.Color, label.UpdatedAt })
+                .ToListAsync(),
+            Checklists = await database.Checklists.AsNoTracking()
+                .Where(checklist => checklist.CardId == place.Content.CardId)
+                .OrderBy(checklist => checklist.Id)
+                .Select(checklist => new { checklist.Id, checklist.Name, checklist.Position, checklist.IsArchived, checklist.UpdatedAt })
+                .ToListAsync(),
+            CheckItems = await database.CheckItems.AsNoTracking()
+                .Where(checkItem => checkItem.ChecklistId == place.Content.ChecklistId)
+                .OrderBy(checkItem => checkItem.Id)
+                .Select(checkItem => new { checkItem.Id, checkItem.Name, checkItem.Position, checkItem.IsChecked, checkItem.UpdatedAt })
+                .ToListAsync(),
+            Attachments = await database.Attachments.AsNoTracking()
+                .Where(attachment => attachment.CardId == place.Content.CardId)
+                .OrderBy(attachment => attachment.Id)
+                .Select(attachment => new { attachment.Id, attachment.Name, attachment.UpdatedAt })
                 .ToListAsync()
         }));
 

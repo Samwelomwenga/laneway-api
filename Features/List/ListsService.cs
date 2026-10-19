@@ -23,6 +23,7 @@ public class ListService : IListService
     private readonly BoardCaps _caps;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly Readable _readable;
 
     public ListService(
         ApplicationDbContext context,
@@ -32,7 +33,8 @@ public class ListService : IListService
         LabelMatching labelMatching,
         BoardCaps caps,
         ActivityWriter activity,
-        ActivityTree tree)
+        ActivityTree tree,
+        Readable readable)
     {
         _context = context;
         _actor = actor;
@@ -42,6 +44,7 @@ public class ListService : IListService
         _caps = caps;
         _activity = activity;
         _tree = tree;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<ListDto>> CreateAsync(CreateListWrite write)
@@ -49,12 +52,13 @@ public class ListService : IListService
         var boardId = write.BoardId;
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
+        var access = await _readable.BoardAsync(boardId, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Board, boardId, _actor.Id, out ApiResponse<ListDto>? denied))
         {
-            return ReferenceErrors.ParentNotFound<ListDto>("Board");
+            return denied;
         }
 
-        var placed = await _placements.ResolveOnBoardAsync(boardId, Placement.Of(write));
+        var placed = await _placements.ResolveOnBoardAsync(boardId, Placement.Of(write), _actor.Id);
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<ListDto>(placed.Errors);
@@ -87,11 +91,13 @@ public class ListService : IListService
 
     public async Task<ApiResponse<ListDto>> UpdateAsync(Guid id, UpdateListWrite write)
     {
-        var list = await _context.Lists.FirstOrDefaultAsync(l => l.Id == id);
-        if (list == null)
+        var access = await _readable.ListAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.List, id, _actor.Id, out ApiResponse<ListDto>? denied))
         {
-            return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
+            return denied;
         }
+
+        var list = access.Target;
 
         if (await _archive.OnListAsync(id) is { } archived)
         {
@@ -143,7 +149,7 @@ public class ListService : IListService
         }
 
         var crossesBoards = boardId != list.BoardId;
-        var placed = await _placements.ResolveMoveOnBoardAsync(list, boardId, Placement.Of(write));
+        var placed = await _placements.ResolveMoveOnBoardAsync(list, boardId, Placement.Of(write), _actor.Id);
         if (placed.Errors.Count > 0)
         {
             return ReferenceErrors.Invalid<ListDto>(placed.Errors);
@@ -212,11 +218,13 @@ public class ListService : IListService
 
     public async Task<ApiResponse<bool>> SetArchivedAsync(Guid id, ArchivedWrite archived)
     {
-        var list = await _context.Lists.FindAsync(id);
-        if (list == null)
+        var access = await _readable.ListAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.List, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return ApiResponse<bool>.ErrorResponse("List not found", 404);
+            return denied;
         }
+
+        var list = access.Target;
 
         if (await _archive.OnBoardAsync(list.BoardId) is { } holder)
         {
@@ -251,11 +259,13 @@ public class ListService : IListService
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        var list = await _context.Lists.FindAsync(id);
-        if (list == null)
+        var access = await _readable.ListAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.List, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return ApiResponse<bool>.ErrorResponse("List not found", 404);
+            return denied;
         }
+
+        var list = access.Target;
 
         if (!list.IsArchived)
         {
@@ -275,24 +285,25 @@ public class ListService : IListService
 
     public async Task<ApiResponse<ListDto>> GetByIdAsync(Guid id)
     {
-        var list = await _context.Lists.FirstOrDefaultAsync(l => l.Id == id);
-        if (list == null)
+        var access = await _readable.ListAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.List, id, _actor.Id, out ApiResponse<ListDto>? denied))
         {
-            return ApiResponse<ListDto>.ErrorResponse("List not found", 404);
+            return denied;
         }
 
-        var listDto = ListView.Of(list);
+        var listDto = ListView.Of(access.Target);
         return ApiResponse<ListDto>.SuccessResponse(listDto, "List retrieved successfully", 200);
     }
 
     public async Task<ApiResponse<List<ListDto>>> GetAllAsync(Guid boardId, ListSearchDto searchDto)
     {
-        if (!await _context.Boards.AnyAsync(b => b.Id == boardId))
+        var access = await _readable.BoardAsync(boardId, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Board, boardId, _actor.Id, out ApiResponse<List<ListDto>>? denied))
         {
-            return ReferenceErrors.ParentNotFound<List<ListDto>>("Board");
+            return denied;
         }
 
-        var query = _context.Lists.Where(l => l.BoardId == boardId);
+        var query = _readable.Lists(_actor.Id).Where(l => l.BoardId == boardId);
 
         if (searchDto.SearchTerm is { } term)
         {

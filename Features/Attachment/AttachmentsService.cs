@@ -26,6 +26,7 @@ public class AttachmentService : IAttachmentService
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
     private readonly ILogger<AttachmentService> _logger;
+    private readonly Readable _readable;
 
     public AttachmentService(
         ApplicationDbContext context,
@@ -34,7 +35,8 @@ public class AttachmentService : IAttachmentService
         AttachmentStorage storage,
         ActivityWriter activity,
         ActivityTree tree,
-        ILogger<AttachmentService> logger)
+        ILogger<AttachmentService> logger,
+        Readable readable)
     {
         _context = context;
         _actor = actor;
@@ -43,6 +45,7 @@ public class AttachmentService : IAttachmentService
         _activity = activity;
         _tree = tree;
         _logger = logger;
+        _readable = readable;
     }
 
     public async Task<ApiResponse<AttachmentDto>> CreateFileAsync(
@@ -50,9 +53,10 @@ public class AttachmentService : IAttachmentService
     {
         ArgumentNullException.ThrowIfNull(upload);
 
-        if (!await _context.Cards.AnyAsync(card => card.Id == cardId, token))
+        var access = await _readable.CardAsync(cardId, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Card, cardId, _actor.Id, out ApiResponse<AttachmentDto>? denied))
         {
-            return CardNotFound<AttachmentDto>();
+            return denied;
         }
 
         if (await RefusesAsync(cardId) is { } refused)
@@ -123,6 +127,12 @@ public class AttachmentService : IAttachmentService
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
+        var access = await _readable.CardAsync(cardId, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Card, cardId, _actor.Id, out ApiResponse<AttachmentDto>? denied))
+        {
+            return denied;
+        }
+
         if (!await _context.TryLockCardAsync(cardId))
         {
             return CardNotFound<AttachmentDto>();
@@ -148,11 +158,13 @@ public class AttachmentService : IAttachmentService
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        var attachment = await FindAsync(id);
-        if (attachment == null)
+        var access = await _readable.AttachmentAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Attachment, id, _actor.Id, out ApiResponse<AttachmentDto>? denied))
         {
-            return NotFound<AttachmentDto>();
+            return denied;
         }
+
+        var attachment = access.Target;
 
         if (await _archive.OnCardAsync(attachment.CardId) is { } archived)
         {
@@ -188,11 +200,13 @@ public class AttachmentService : IAttachmentService
 
     public async Task<ApiResponse<bool>> DeleteAsync(Guid id)
     {
-        var attachment = await FindAsync(id);
-        if (attachment == null)
+        var access = await _readable.AttachmentAsync(id, _actor.Id);
+        if (_readable.Denies(access, BoardAction.Edit, AccessTarget.Attachment, id, _actor.Id, out ApiResponse<bool>? denied))
         {
-            return NotFound<bool>();
+            return denied;
         }
+
+        var attachment = access.Target;
 
         if (await _archive.OnCardAsync(attachment.CardId) is { } archived)
         {
@@ -225,24 +239,25 @@ public class AttachmentService : IAttachmentService
 
     public async Task<ApiResponse<AttachmentDto>> GetByIdAsync(Guid id)
     {
-        var attachment = await FindAsync(id);
-        if (attachment == null)
+        var access = await _readable.AttachmentAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Attachment, id, _actor.Id, out ApiResponse<AttachmentDto>? denied))
         {
-            return NotFound<AttachmentDto>();
+            return denied;
         }
 
         return ApiResponse<AttachmentDto>.SuccessResponse(
-            AttachmentView.Of(attachment), "Attachment retrieved successfully");
+            AttachmentView.Of(access.Target), "Attachment retrieved successfully");
     }
 
     public async Task<ApiResponse<List<AttachmentDto>>> GetAllAsync(Guid cardId)
     {
-        if (!await _context.Cards.AnyAsync(card => card.Id == cardId))
+        var access = await _readable.CardAsync(cardId, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Card, cardId, _actor.Id, out ApiResponse<List<AttachmentDto>>? denied))
         {
-            return CardNotFound<List<AttachmentDto>>();
+            return denied;
         }
 
-        var attachments = await _context.Attachments
+        var attachments = await _readable.Attachments(_actor.Id)
             .Where(attachment => attachment.CardId == cardId)
             .NewestFirst()
             .ToListAsync();
@@ -253,8 +268,13 @@ public class AttachmentService : IAttachmentService
 
     public async Task<ApiResponse<string>> GetContentUrlAsync(Guid id)
     {
-        if (await FindAsync(id)
-            is not { Kind: AttachmentKind.File, ObjectKey: { } objectKey, FileName: { } fileName })
+        var access = await _readable.AttachmentAsync(id, _actor.Id);
+        if (_readable.ReadDenies(access, AccessTarget.Attachment, id, _actor.Id, out ApiResponse<string>? denied))
+        {
+            return denied;
+        }
+
+        if (access.Target is not { Kind: AttachmentKind.File, ObjectKey: { } objectKey, FileName: { } fileName })
         {
             return NotFound<string>();
         }
@@ -314,9 +334,6 @@ public class AttachmentService : IAttachmentService
                 "Could not remove {ObjectKey} after a failed create. The outbox will retry it.", objectKey);
         }
     }
-
-    private Task<Attachment?> FindAsync(Guid id) =>
-        _context.Attachments.FirstOrDefaultAsync(attachment => attachment.Id == id);
 
     private async Task<bool> IsFullAsync(Guid cardId) =>
         await _context.Attachments.CountAsync(attachment => attachment.CardId == cardId)

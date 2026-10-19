@@ -14,6 +14,7 @@ public enum Caller
 public enum Act
 {
     ReadBoard,
+    EditBoard,
     AdministerBoard,
     ReadWorkspace,
     AdministerWorkspace,
@@ -34,6 +35,10 @@ public static class AccessExpectations
         [(Act.ReadBoard, BoardVisibility.Private)] = ["ok", "ok", "ok", "ok", "404", "404", "404"],
         [(Act.ReadBoard, BoardVisibility.Workspace)] = ["ok", "ok", "ok", "ok", "ok", "ok", "404"],
         [(Act.ReadBoard, BoardVisibility.Public)] = ["ok", "ok", "ok", "ok", "ok", "ok", "ok"],
+
+        [(Act.EditBoard, BoardVisibility.Private)] = ["ok", "ok", "readOnly", "ok", "404", "404", "404"],
+        [(Act.EditBoard, BoardVisibility.Workspace)] = ["ok", "ok", "readOnly", "ok", "ok", "member", "404"],
+        [(Act.EditBoard, BoardVisibility.Public)] = ["ok", "ok", "readOnly", "ok", "ok", "member", "member"],
 
         [(Act.AdministerBoard, BoardVisibility.Private)] = ["ok", "admin", "readOnly", "admin", "404", "404", "404"],
         [(Act.AdministerBoard, BoardVisibility.Workspace)] = ["ok", "admin", "readOnly", "admin", "ok", "member", "404"],

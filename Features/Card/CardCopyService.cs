@@ -103,7 +103,7 @@ public sealed class CardCopyService : ICardCopyService
         }
         else
         {
-            errors.AddRange((await _placements.CheckInListAsync(listId, placement)).Errors);
+            errors.AddRange((await _placements.CheckInListAsync(listId, placement, _actor.Id)).Errors);
         }
 
         if (errors.Count > 0)
@@ -149,7 +149,7 @@ public sealed class CardCopyService : ICardCopyService
             return ReferenceErrors.NotFound<CardDto>("listId", "List", listId);
         }
 
-        var placed = await _placements.ResolveInListAsync(boardId, listId, placement);
+        var placed = await _placements.ResolveInListAsync(boardId, listId, placement, _actor.Id);
 
         if (await _context.BoardOfListAsync(listId) != boardId)
         {
