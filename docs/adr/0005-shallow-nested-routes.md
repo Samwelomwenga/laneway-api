@@ -1,6 +1,6 @@
 # Shallow nested routes
 
-Collections and creates sit under their parent, as in `GET /workspaces/{workspaceId}/boards` and `POST /lists/{listId}/cards`. One item keeps its own short URL, as in `GET /cards/{id}` and `PUT /attachments/{id}`, so a card's URL doesn't change when it moves. Every collection read needs its parent, and no search crosses parents. This reverses the Trello gap spec, which kept routes flat so clients saw one routing style and nested only attachments and comment writes. With nesting as the rule, those two became the exceptions, so they moved to short URLs like everything else.
+Collections and creates sit under their parent, as in `GET /workspaces/{workspaceId}/boards` and `POST /lists/{listId}/cards`. One item keeps its own short URL, as in `GET /cards/{id}` and `PUT /attachments/{id}`, so a card's URL doesn't change when it moves. Every collection read needs its parent, and no search crosses parents. This reverses an earlier spec, which kept routes flat so clients saw one routing style and nested only attachments and comment writes. With nesting as the rule, those two became the exceptions, so they moved to short URLs like everything else.
 
 ## Considered options
 

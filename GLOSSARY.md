@@ -1,6 +1,6 @@
 # Laneway
 
-A Trello-style board API. Work is organized as a tree: workspace, board, list, card, label.
+A kanban board API. Work is organized as a tree: workspace, board, list, card, label.
 
 ## Language
 

@@ -7,7 +7,7 @@ We measured the board view's query and serialization on seeded boards in Postgre
 | Board | Cards | Description | Query | Serialize | JSON | Allocated |
 |---|---|---|---|---|---|---|
 | Typical | 200 | 200 chars | 8 ms | 3 ms | 0.16 MB | 1 MB |
-| Trello's limit | 4,750 | 300 chars | 95 ms | 62 ms | 4.4 MB | 21 MB |
+| Large | 4,750 | 300 chars | 95 ms | 62 ms | 4.4 MB | 21 MB |
 | Full descriptions | 5,000 | 10,000 chars | 293 ms | 51 ms | 53 MB | 171 MB |
 
 At the caps, without descriptions, the worst case is about 26 MB. Most of that is 100 label ids on each of 5,000 cards. A real board stays under 1 MB.
