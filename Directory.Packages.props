@@ -16,13 +16,13 @@
     </PackageVersion>
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.Testing" Version="9.7.0" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.7.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageVersion Include="Scalar.AspNetCore" Version="1.2.42" />
     <PackageVersion Include="Supabase.Storage" Version="8.1.1" />
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
   </ItemGroup>
 </Project>
