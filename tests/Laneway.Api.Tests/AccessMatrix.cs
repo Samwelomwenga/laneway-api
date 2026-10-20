@@ -473,7 +473,28 @@ public abstract class AccessMatrix : ApiTests
             Boards = await database.Boards.AsNoTracking()
                 .Where(board => board.WorkspaceId == place.WorkspaceId)
                 .OrderBy(board => board.Id)
-                .Select(board => new { board.Id, board.Name, board.Description, board.Visibility, board.IsArchived, board.UpdatedAt })
+                .Select(board => new
+                {
+                    board.Id,
+                    board.Name,
+                    board.Description,
+                    board.Visibility,
+                    board.IsArchived,
+                    board.Commenting,
+                    board.AddingMembers,
+                    board.SelfJoin,
+                    board.UpdatedAt
+                })
+                .ToListAsync(),
+            WorkspaceMembers = await database.WorkspaceMembers.AsNoTracking()
+                .Where(member => member.WorkspaceId == place.WorkspaceId)
+                .OrderBy(member => member.UserId)
+                .Select(member => new { member.UserId, member.Role })
+                .ToListAsync(),
+            BoardMembers = await database.BoardMembers.AsNoTracking()
+                .Where(member => database.Boards.Any(board => board.Id == member.BoardId && board.WorkspaceId == place.WorkspaceId))
+                .OrderBy(member => member.BoardId).ThenBy(member => member.UserId)
+                .Select(member => new { member.BoardId, member.UserId, member.Role })
                 .ToListAsync(),
             Lists = await database.Lists.AsNoTracking()
                 .Where(list => database.Boards.Any(board => board.Id == list.BoardId && board.WorkspaceId == place.WorkspaceId))
@@ -522,6 +543,31 @@ public abstract class AccessMatrix : ApiTests
                 .Select(entry => new { entry.Id, entry.Text, entry.UpdatedAt })
                 .ToListAsync()
         }));
+
+    protected async Task<Guid> SeedUserAsync()
+    {
+        var tag = Guid.NewGuid().ToString("n")[..12];
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = $"seeded-{tag}",
+            Email = $"{tag}@example.com",
+            PasswordHash = "unused",
+            FirstName = "Wanjiru",
+            LastName = "Otieno",
+            Language = "en-US",
+            TimeZone = "UTC",
+            Location = "Kisumu"
+        };
+        user.CreatedBy = user.Id;
+        await FromDatabaseAsync(async database =>
+        {
+            database.Users.Add(user);
+            return await database.SaveChangesAsync();
+        });
+
+        return user.Id;
+    }
 
     protected WorkSpace NewWorkspace(WorkspaceVisibility visibility) => new()
     {

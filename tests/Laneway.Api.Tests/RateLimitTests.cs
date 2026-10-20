@@ -63,6 +63,21 @@ public class RateLimitTests : ApiTests
     }
 
     [Fact]
+    public async Task The_21st_member_add_in_a_minute_by_one_user_gets_a_429_across_both_member_routes()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var board = await CreateBoardAsync(workspace.Id, "Roadmap");
+        object unknown = new { email = "nobody@example.com" };
+        await SendTimesAsync(10, () => PostAsync(WorkspaceMembersPath(workspace.Id), unknown));
+        await SendTimesAsync(10, () => PostAsync(BoardMembersPath(board.Id), unknown));
+
+        using var response = await PostAsync(WorkspaceMembersPath(workspace.Id), unknown);
+
+        await AssertTooManyRequestsAsync(response, "10");
+        Assert.Equal("add-member", Assert.Single(Logs(), log => log.Id.Name == "RateLimited").GetStructuredStateValue("policy"));
+    }
+
+    [Fact]
     public async Task The_301st_signed_in_request_in_a_minute_by_one_user_gets_a_429()
     {
         await SendTimesAsync(300 - ProfileReadsInCreateUser, () => GetAsync("/api/v1/profile"));

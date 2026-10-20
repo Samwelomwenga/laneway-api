@@ -36,7 +36,10 @@ public record CreateBoardDto
 (
     string? Name,
     string? Description,
-    BoardVisibility? Visibility
+    BoardVisibility? Visibility,
+    BoardCommenting? Commenting,
+    BoardAddingMembers? AddingMembers,
+    bool? SelfJoin
 )
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -45,12 +48,27 @@ public record CreateBoardDto
 public record UpdateBoardDto
 (
     string? Name,
-    string? Description,
-    BoardVisibility? Visibility
+    string? Description
 )
 {
     public string? Name { get; init; } = Name?.Trim();
 }
+
+public record BoardSettingsDto
+(
+    BoardCommenting Commenting,
+    BoardAddingMembers AddingMembers,
+    bool SelfJoin,
+    BoardVisibility Visibility
+);
+
+public record UpdateBoardSettingsDto
+(
+    BoardCommenting? Commenting,
+    BoardAddingMembers? AddingMembers,
+    bool? SelfJoin,
+    BoardVisibility? Visibility
+);
 
 public record MoveBoardDto
 (

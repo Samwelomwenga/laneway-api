@@ -16,6 +16,8 @@ public static class RateLimits
 
     public const string PasswordCheck = "password-check";
 
+    public const string AddMember = "add-member";
+
     public const string SignedIn = "signed-in";
 
     public const string Anonymous = "anonymous";
@@ -33,7 +35,8 @@ public static class RateLimits
         new(SignIn, 10, TimeSpan.FromMinutes(1), CountsBy.Ip),
         new(SignUp, 10, TimeSpan.FromHours(1), CountsBy.Ip),
         new(Refresh, 60, TimeSpan.FromMinutes(1), CountsBy.Ip),
-        new(PasswordCheck, 5, TimeSpan.FromMinutes(1), CountsBy.Sub)
+        new(PasswordCheck, 5, TimeSpan.FromMinutes(1), CountsBy.Sub),
+        new(AddMember, 20, TimeSpan.FromMinutes(1), CountsBy.Sub)
     }.ToDictionary(limit => limit.Policy, StringComparer.Ordinal);
 
     public static IServiceCollection AddRateLimits(this IServiceCollection services) =>

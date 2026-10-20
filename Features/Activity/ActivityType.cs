@@ -47,5 +47,9 @@ public enum ActivityType
     Comment,
     CopyCard,
     CopyList,
-    CopyBoard
+    CopyBoard,
+    UpdateBoardSettings,
+    AddMember,
+    ChangeMemberRole,
+    RemoveMember
 }

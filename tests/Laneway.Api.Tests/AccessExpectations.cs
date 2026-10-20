@@ -19,7 +19,8 @@ public enum Act
     CommentOnBoard,
     ReadWorkspace,
     AdministerWorkspace,
-    CreateBoard
+    CreateBoard,
+    ListWorkspaceMembers
 }
 
 public sealed record Expect(int Status, string? Code, bool Limited, string? Field = null)
@@ -69,6 +70,9 @@ public static class AccessExpectations
 
         [(Act.CreateBoard, WorkspaceVisibility.Private)] = ["ok", "ok", "ok", "wsMember", "ok", "ok", "404"],
         [(Act.CreateBoard, WorkspaceVisibility.Public)] = ["ok", "ok", "ok", "wsMember", "ok", "ok", "wsMember"],
+
+        [(Act.ListWorkspaceMembers, WorkspaceVisibility.Private)] = ["ok", "ok", "ok", "wsMember", "ok", "ok", "404"],
+        [(Act.ListWorkspaceMembers, WorkspaceVisibility.Public)] = ["ok", "ok", "ok", "wsMember", "ok", "ok", "wsMember"],
     };
 
     public static Expect For(Act act, Caller caller, BoardVisibility visibility, int success) =>

@@ -8,7 +8,6 @@ public sealed class CreateBoardDtoValidator : AbstractValidator<CreateBoardDto>
     {
         RuleFor(x => x.Name).Required().MaxLength(FieldLimits.BoardName);
         RuleFor(x => x.Description).MaxLength(FieldLimits.BoardDescription);
-        RuleFor(x => x.Visibility).Required();
     }
 }
 
@@ -18,6 +17,16 @@ public sealed class UpdateBoardDtoValidator : AbstractValidator<UpdateBoardDto>
     {
         RuleFor(x => x.Name).Required().MaxLength(FieldLimits.BoardName);
         RuleFor(x => x.Description).MaxLength(FieldLimits.BoardDescription);
+    }
+}
+
+public sealed class UpdateBoardSettingsDtoValidator : AbstractValidator<UpdateBoardSettingsDto>
+{
+    public UpdateBoardSettingsDtoValidator()
+    {
+        RuleFor(x => x.Commenting).Required();
+        RuleFor(x => x.AddingMembers).Required();
+        RuleFor(x => x.SelfJoin).Required();
         RuleFor(x => x.Visibility).Required();
     }
 }

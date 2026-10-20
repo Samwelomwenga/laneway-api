@@ -4,7 +4,7 @@ public sealed record CreateBoardWrite(
     string Name,
     string Description,
     Guid WorkspaceId,
-    BoardVisibility Visibility)
+    BoardSettingsWrite Settings)
 {
     public static CreateBoardWrite Of(Guid workspaceId, CreateBoardDto dto)
     {
@@ -14,19 +14,38 @@ public sealed record CreateBoardWrite(
             Writes.Required(dto.Name, "name"),
             dto.Description ?? string.Empty,
             workspaceId,
-            Writes.Required(dto.Visibility, "visibility"));
+            new BoardSettingsWrite(
+                dto.Commenting ?? BoardCommenting.Members,
+                dto.AddingMembers ?? BoardAddingMembers.Admins,
+                dto.SelfJoin ?? true,
+                dto.Visibility ?? BoardVisibility.Private));
     }
 }
 
-public sealed record UpdateBoardWrite(string Name, string Description, BoardVisibility Visibility)
+public sealed record UpdateBoardWrite(string Name, string Description)
 {
     public static UpdateBoardWrite Of(UpdateBoardDto dto)
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        return new UpdateBoardWrite(
-            Writes.Required(dto.Name, "name"),
-            dto.Description ?? string.Empty,
+        return new UpdateBoardWrite(Writes.Required(dto.Name, "name"), dto.Description ?? string.Empty);
+    }
+}
+
+public sealed record BoardSettingsWrite(
+    BoardCommenting Commenting,
+    BoardAddingMembers AddingMembers,
+    bool SelfJoin,
+    BoardVisibility Visibility)
+{
+    public static BoardSettingsWrite Of(UpdateBoardSettingsDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        return new BoardSettingsWrite(
+            Writes.Required(dto.Commenting, "commenting"),
+            Writes.Required(dto.AddingMembers, "addingMembers"),
+            Writes.Required(dto.SelfJoin, "selfJoin"),
             Writes.Required(dto.Visibility, "visibility"));
     }
 }

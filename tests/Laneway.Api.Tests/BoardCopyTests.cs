@@ -34,8 +34,7 @@ public class BoardCopyTests : ApiTests
     {
         var workspace = await CreateWorkspaceAsync("Design");
         var source = await CreateBoardAsync(workspace.Id, "Sprint 14", BoardVisibility.Private);
-        using (var described = await UpdateBoardAsync(
-                   source.Id, "Sprint 14", "What we ship in March", BoardVisibility.Private))
+        using (var described = await UpdateBoardAsync(source.Id, "Sprint 14", "What we ship in March"))
         {
             Assert.Equal(HttpStatusCode.OK, described.StatusCode);
         }
