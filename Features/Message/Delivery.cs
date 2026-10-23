@@ -19,6 +19,7 @@ public class Delivery
     public required JsonDocument Message { get; set; }
     public Guid? UserId { get; set; }
     public string? Address { get; set; }
+    public string? Secret { get; set; }
     public DeliveryStatus Status { get; set; }
     public int Attempts { get; set; }
     public Guid IdempotencyKey { get; set; }

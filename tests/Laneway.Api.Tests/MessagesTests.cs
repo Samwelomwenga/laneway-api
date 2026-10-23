@@ -18,7 +18,7 @@ public class MessagesTests : ApiTests
         {
             var database = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             await using var transaction = await database.Database.BeginTransactionAsync();
-            scope.ServiceProvider.GetRequiredService<Messages>().Add(Notice());
+            scope.ServiceProvider.GetRequiredService<Messages>().Add(PasswordNotice());
             await database.SaveChangesAsync();
             await transaction.RollbackAsync();
         }
@@ -31,7 +31,7 @@ public class MessagesTests : ApiTests
     {
         await using (var scope = Services.CreateAsyncScope())
         {
-            scope.ServiceProvider.GetRequiredService<Messages>().Add(Notice());
+            scope.ServiceProvider.GetRequiredService<Messages>().Add(PasswordNotice());
             await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().SaveChangesAsync();
         }
 
@@ -39,7 +39,4 @@ public class MessagesTests : ApiTests
         Assert.Equal("Your Laneway password was changed", send.Subject);
         Assert.Single(Brevo.Sends);
     }
-
-    private PasswordChanged Notice() =>
-        new(ActorId, PasswordChangeHow.Changed, Time.GetUtcNow().UtcDateTime, "Laneway.Api.Tests", "UTC");
 }

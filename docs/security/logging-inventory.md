@@ -68,6 +68,36 @@ The channel holds 1024 entries. When it's full, `DenialLog` drops the denial and
 |---|---|
 | `laneway.authorization.denials.dropped` | none |
 
+## Deliveries
+
+Deliveries log under the `Laneway.Message` category. Features never learn how a delivery ended, so these entries are the only record of a failed or dropped one. `DeliveryWorker` logs each delivery inside a scope that carries `deliveryId`, `messageType`, `channel`, `attempt`, and `sub` when the message names a user.
+
+| Id | Event | Level | Fields |
+|---|---|---|---|
+| 1 | `DeliverySent` | Information | `providerMessageId` |
+| 2 | `DeliveryRetrying` | Information | `reason`, `status` when Brevo answered, `nextAttemptAt` |
+| 3 | `DeliveryFailed` | Warning, or Error when `status` is 401, 402, or 403 | `reason`, `status` when Brevo answered, and `code` when Brevo sent a known one |
+| 4 | `DeliveryExpired` | Warning | `sendBy` |
+| 5 | `DeliveryDropped` | Information | `reason` |
+
+`DeliveryRetrying` has `reason` `rateLimited`, `serverError`, `timeout`, or `networkError`. A 429 is `rateLimited` and a 5xx is `serverError`. Each Brevo call times out after 10 seconds. Attempts run at 0, 30 seconds, 2 minutes, and 10 minutes after the one before, all with the same idempotency key.
+
+`DeliveryFailed` has `reason` `retriesExhausted` or `rejected`. `retriesExhausted` follows a fourth attempt that would have retried, or a claim past the fourth attempt after a send threw or the worker stopped mid-send. `rejected` is any other 4xx from Brevo, which fails at once. A 401, 402, or 403 means the API key, the credits, or the key's permissions broke, so every send fails until someone fixes it. Those log at Error.
+
+`DeliveryExpired` is a delivery past its `SendBy`, dropped without calling Brevo. The retry schedule ends long before any `SendBy`, so this means the worker stalled.
+
+`DeliveryDropped` has `reason` `userDeleted` or `noAddress`. `userDeleted` covers a user who was deleted, or whose id matches no user row. `noAddress` is a delivery with nowhere to go on its channel.
+
+Before it calls Brevo, the worker checks `SendBy`, then the user, then the address, and logs only the first that applies. A sent, failed, or dropped delivery clears its secret column. A send that throws anything other than a Brevo answer, a timeout, or a network error logs at Error with the exception and no event id. The claim's 2-minute lease runs out and a later poll tries again. A failed poll logs a plain Warning.
+
+`DeliverySweep` deletes delivery rows 30 days after they were created, hourly, in batches of 1,000.
+
+A `Laneway.Message` meter counts each delivery once, when it ends. Locally, `dotnet-counters monitor --counters Laneway.Message` reads it.
+
+| Counter | Tags |
+|---|---|
+| `laneway.message.deliveries` | `result`: `sent`, `failed`, `expired`, or `dropped`. `channel`: `email` |
+
 ## Unexpected errors
 
 `ApiExceptionHandler` logs each exception it turns into a 500 once, at Error, under the `Laneway.Api.ApiExceptionHandler` category as event 1, `UnexpectedError`. Event ids are unique within a category, so this id doesn't clash with `AccessTokenRejected`. The entry carries the exception and `traceId`, the request's `TraceIdentifier`. The 500 body returns the same `traceId` with a generic message, so a client can quote it and nothing else leaks. This meets ASVS 16.3.4 and 16.5.1.
@@ -100,7 +130,12 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 - Any part of an access token. A `kid` is a key name, not part of the secret, and follows the rule below.
 - A client IP address or user agent.
 - The Pwned Passwords request URI. It ends in the first 5 hex characters of the password's SHA-1, so the `BreachedPasswords` client has its HttpClient request logs turned off.
+- An email address in any form, raw, hashed, or masked, including a delivery's recipient.
+- A message token, a link built from one, or any rendered subject or body.
+- The Brevo API key.
+- Brevo's error `message`. It's free text and may quote the address.
+- The Brevo request body. The `BrevoEmail` client has its HttpClient request logs turned off.
 
 ## Request values
 
-No field carries a value from the request unless the value is checked against a known set first. `kid` on `AccessTokenRejected` is logged only when it matches a key in `Auth:SigningKeys`. Every other field comes from the server: ids from the database, and reasons from fixed lists.
+No field carries a value from the request unless the value is checked against a known set first. `kid` on `AccessTokenRejected` is logged only when it matches a key in `Auth:SigningKeys`. `code` on `DeliveryFailed` is logged only when it matches one of Brevo's documented error codes. Every other field comes from the server: ids from the database, and reasons from fixed lists.

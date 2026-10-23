@@ -553,6 +553,9 @@ namespace Laneway.Api.Migrations
                     b.Property<string>("ProviderMessageId")
                         .HasColumnType("text");
 
+                    b.Property<string>("Secret")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("SendBy")
                         .HasColumnType("timestamp with time zone");
 
@@ -568,6 +571,8 @@ namespace Laneway.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
 
                     b.HasIndex("Status", "NextAttemptAt");
 

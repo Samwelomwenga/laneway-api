@@ -286,6 +286,55 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected IReadOnlyList<FakeLogRecord> Logs() => Factory.Services.GetFakeLogCollector().GetSnapshot();
 
+    protected async Task<List<FakeLogRecord>> AwaitLogsAsync(string name, int count)
+    {
+        for (var attempt = 0; attempt < 250; attempt++)
+        {
+            var found = Logs().Where(log => log.Id.Name == name).ToList();
+            if (found.Count >= count)
+            {
+                return found;
+            }
+
+            await Task.Delay(20);
+        }
+
+        throw new TimeoutException($"{name} didn't log {count} times within 5 seconds.");
+    }
+
+    protected void AdvanceDeliveries(TimeSpan by)
+    {
+        Time.Advance(by);
+        Services.GetRequiredService<DeliverySignal>().Poke();
+    }
+
+    protected async Task<Delivery> AwaitDeliveryAsync(DeliveryStatus status)
+    {
+        for (var attempt = 0; attempt < 250; attempt++)
+        {
+            var found = await FromDatabaseAsync(database =>
+                database.Deliveries.AsNoTracking().FirstOrDefaultAsync(d => d.Status == status));
+            if (found is not null)
+            {
+                return found;
+            }
+
+            await Task.Delay(20);
+        }
+
+        throw new TimeoutException($"No delivery reached {status} within 5 seconds.");
+    }
+
+    protected async Task AddMessageAsync(IMessage message)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<Messages>().Add(message);
+        await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().SaveChangesAsync();
+    }
+
+    protected PasswordChanged PasswordNotice(Guid? userId = null) =>
+        new(userId ?? ActorId, PasswordChangeHow.Changed, Time.GetUtcNow().UtcDateTime, "Laneway.Api.Tests", "UTC");
+
     protected (HttpClient Client, FakeLogCollector Collector) HostWith(Action<IServiceCollection> services)
     {
         var host = Factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services));

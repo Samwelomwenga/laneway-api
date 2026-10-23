@@ -48,7 +48,7 @@ public class PasswordChangedNoticeTests : ApiTests
         using var response = await ChangePasswordAsync();
 
         var send = await AwaitEmailAsync(ActorUser.User.Email);
-        var delivery = await WaitForSentAsync();
+        var delivery = await AwaitDeliveryAsync(DeliveryStatus.Sent);
         Assert.Equal(send.MessageId, delivery.ProviderMessageId);
         Assert.Equal(MessageType.PasswordChanged, delivery.Type);
         Assert.Equal(MessageChannel.Email, delivery.Channel);
@@ -60,7 +60,7 @@ public class PasswordChangedNoticeTests : ApiTests
     {
         using var response = await ChangePasswordAsync();
 
-        var delivery = await WaitForSentAsync();
+        var delivery = await AwaitDeliveryAsync(DeliveryStatus.Sent);
         var sent = Assert.Single(Logs(), log => log.Id.Name == "DeliverySent");
         Assert.Equal(MessageLog.Category, sent.Category);
         Assert.Equal(LogLevel.Information, sent.Level);
@@ -91,21 +91,4 @@ public class PasswordChangedNoticeTests : ApiTests
         PostAsync(
             "/api/v1/auth/change-password",
             new { currentPassword = TestUser.Password, newPassword = "quiet harbor lantern" });
-
-    private async Task<Delivery> WaitForSentAsync()
-    {
-        for (var attempt = 0; attempt < 250; attempt++)
-        {
-            var found = await FromDatabaseAsync(database =>
-                database.Deliveries.AsNoTracking().SingleOrDefaultAsync(d => d.Status == DeliveryStatus.Sent));
-            if (found is not null)
-            {
-                return found;
-            }
-
-            await Task.Delay(20);
-        }
-
-        throw new TimeoutException("No delivery reached Sent within 5 seconds.");
-    }
 }

@@ -304,6 +304,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(d => d.NextAttemptAt).HasColumnType("timestamp with time zone");
             entity.Property(d => d.SendBy).HasColumnType("timestamp with time zone");
             entity.HasIndex(d => new { d.Status, d.NextAttemptAt });
+            entity.HasIndex(d => d.CreatedAt);
         });
 
         modelBuilder.Entity<Label>(entity =>

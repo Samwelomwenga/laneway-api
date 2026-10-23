@@ -13,8 +13,10 @@ public static class MessageSetup
 
         services.AddSingleton<AppLinks>();
         services.AddSingleton<DeliverySignal>();
+        services.AddSingleton<MessageMeter>();
         services.AddSingleton<DeliveryCommitPoke>();
         services.AddScoped<Messages>();
+        services.AddScoped<DeliverySweep>();
         services.AddHttpClient<IEmailProvider, BrevoEmail>(BrevoEmail.Configure).RemoveAllLoggers();
         services.AddHostedService<DeliveryWorker>();
 
