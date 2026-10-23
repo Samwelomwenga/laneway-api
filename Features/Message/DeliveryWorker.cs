@@ -146,16 +146,13 @@ public sealed class DeliveryWorker : BackgroundService
                 return;
             }
 
-            if (await DropReasonAsync(database, delivery, token) is { } drop)
+            var triage = await TriageAsync(database, delivery, token);
+            if (triage.Address is not { } address)
             {
-                await DropAsync(database, delivery, drop, token);
+                await DropAsync(database, delivery, triage, token);
                 return;
             }
 
-            var address = delivery.Address ?? await database.Users
-                .Where(u => u.Id == delivery.UserId)
-                .Select(u => u.Email)
-                .SingleAsync(token);
             await TrySendAsync(database, scope.ServiceProvider.GetRequiredService<IEmailProvider>(), delivery, address, token);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -167,34 +164,59 @@ public sealed class DeliveryWorker : BackgroundService
         }
     }
 
-    private async Task<DeliveryDrop?> DropReasonAsync(
-        ApplicationDbContext database, Delivery delivery, CancellationToken token)
+    private async Task<Triage> TriageAsync(ApplicationDbContext database, Delivery delivery, CancellationToken token)
     {
         if (_time.GetUtcNow().UtcDateTime > delivery.SendBy)
         {
-            return DeliveryDrop.Expired;
+            return new Triage(DeliveryDrop.Expired);
         }
 
+        var address = delivery.Address;
         if (delivery.UserId is { } userId)
         {
-            var live = await database.Users.AnyAsync(u => u.Id == userId, token);
-            return live ? null : DeliveryDrop.UserDeleted;
+            address = await database.Users.Where(u => u.Id == userId).Select(u => u.Email).SingleOrDefaultAsync(token);
+            if (address is null)
+            {
+                return new Triage(DeliveryDrop.UserDeleted);
+            }
         }
 
-        return string.IsNullOrEmpty(delivery.Address) ? DeliveryDrop.NoAddress : null;
+        if (string.IsNullOrEmpty(address))
+        {
+            return new Triage(DeliveryDrop.NoAddress);
+        }
+
+        return await Suppressions.StoppingAsync(database, address, MessageRoutes.For(delivery.Type), token) switch
+        {
+            null => new Triage(null, Address: address),
+            SuppressionKind.Unsubscribed => new Triage(DeliveryDrop.Unsubscribed),
+            var kind => new Triage(DeliveryDrop.Suppressed, kind)
+        };
     }
 
-    private async Task DropAsync(ApplicationDbContext database, Delivery delivery, DeliveryDrop drop, CancellationToken token)
+    private async Task DropAsync(ApplicationDbContext database, Delivery delivery, Triage triage, CancellationToken token)
     {
         await EndAsync(database, delivery, DeliveryStatus.Dropped, token);
-        if (drop == DeliveryDrop.Expired)
+        switch (triage.Drop)
         {
-            _log.DeliveryExpired(delivery.SendBy);
-            _meter.Delivered(DeliveryResult.Expired, delivery.Channel);
-            return;
+            case DeliveryDrop.Expired:
+                _log.DeliveryExpired(delivery.SendBy);
+                _meter.Delivered(DeliveryResult.Expired, delivery.Channel);
+                return;
+            case DeliveryDrop.Suppressed:
+                _log.DeliverySuppressed(triage.SuppressedBy!.Value);
+                break;
+            default:
+                _log.DeliveryDropped(triage.Drop switch
+                {
+                    DeliveryDrop.UserDeleted => "userDeleted",
+                    DeliveryDrop.NoAddress => "noAddress",
+                    DeliveryDrop.Unsubscribed => "unsubscribed",
+                    _ => throw new InvalidOperationException($"A delivery dropped with no reason: {triage.Drop}.")
+                });
+                break;
         }
 
-        _log.DeliveryDropped(drop == DeliveryDrop.UserDeleted ? "userDeleted" : "noAddress");
         _meter.Delivered(DeliveryResult.Dropped, delivery.Channel);
     }
 
@@ -202,8 +224,12 @@ public sealed class DeliveryWorker : BackgroundService
     {
         Expired,
         UserDeleted,
-        NoAddress
+        NoAddress,
+        Unsubscribed,
+        Suppressed
     }
+
+    private sealed record Triage(DeliveryDrop? Drop, SuppressionKind? SuppressedBy = null, string? Address = null);
 
     private async Task TrySendAsync(
         ApplicationDbContext database, IEmailProvider provider, Delivery delivery, string address, CancellationToken token)

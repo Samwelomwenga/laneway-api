@@ -16,7 +16,11 @@ public sealed class MessageMeter
 
     public const string DeliveriesName = "laneway.message.deliveries";
 
+    public const string SuppressionsName = "laneway.message.suppressions";
+
     private readonly Counter<long> _deliveries;
+
+    private readonly Counter<long> _suppressions;
 
     public MessageMeter(IMeterFactory factory)
     {
@@ -24,6 +28,7 @@ public sealed class MessageMeter
 
         Meter = factory.Create(Name);
         _deliveries = Meter.CreateCounter<long>(DeliveriesName);
+        _suppressions = Meter.CreateCounter<long>(SuppressionsName);
     }
 
     public Meter Meter { get; }
@@ -44,4 +49,7 @@ public sealed class MessageMeter
                 MessageChannel.Email => "email",
                 _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, null)
             }));
+
+    public void Suppressed(SuppressionKind kind) =>
+        _suppressions.Add(1, new KeyValuePair<string, object?>("event", Suppressions.Name(kind)));
 }

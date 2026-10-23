@@ -24,6 +24,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ActivityEntry> ActivityEntries { get; set; }
     public DbSet<CopyJob> CopyJobs { get; set; }
     public DbSet<Delivery> Deliveries { get; set; }
+    public DbSet<Suppression> Suppressions { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Account> Accounts { get; set; }
     public DbSet<Session> Sessions { get; set; }
@@ -305,6 +306,13 @@ public class ApplicationDbContext : DbContext
             entity.Property(d => d.SendBy).HasColumnType("timestamp with time zone");
             entity.HasIndex(d => new { d.Status, d.NextAttemptAt });
             entity.HasIndex(d => d.CreatedAt);
+            entity.HasIndex(d => d.ProviderMessageId);
+        });
+
+        modelBuilder.Entity<Suppression>(entity =>
+        {
+            entity.HasKey(s => new { s.AddressHash, s.Kind });
+            entity.Property(s => s.SuppressedAt).HasColumnType("timestamp with time zone");
         });
 
         modelBuilder.Entity<Label>(entity =>

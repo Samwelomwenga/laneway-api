@@ -7,6 +7,12 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (args is [BrevoWebhookTokens.MintCommand])
+{
+    Console.WriteLine(BrevoWebhookTokens.Mint(builder.Configuration));
+    return;
+}
+
 builder.Logging.AddJsonConsole(options =>
 {
     options.IncludeScopes = true;

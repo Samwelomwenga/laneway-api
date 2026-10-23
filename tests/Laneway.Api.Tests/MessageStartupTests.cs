@@ -18,6 +18,14 @@ public class MessageStartupTests
         Assert.Contains(variable, thrown.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void A_webhook_signing_key_under_32_bytes_stops_the_app_at_startup()
+    {
+        var thrown = StartWith("Brevo:WebhookSigningKey", new string('k', 31));
+
+        Assert.Contains("BREVO__WEBHOOKSIGNINGKEY is 31 bytes", thrown.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("https://elsewhere.laneway.example")]
     [InlineData("https://app.laneway.example/")]

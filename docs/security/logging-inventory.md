@@ -78,7 +78,11 @@ Deliveries log under the `Laneway.Message` category. Features never learn how a 
 | 2 | `DeliveryRetrying` | Information | `reason`, `status` when Brevo answered, `nextAttemptAt` |
 | 3 | `DeliveryFailed` | Warning, or Error when `status` is 401, 402, or 403 | `reason`, `status` when Brevo answered, and `code` when Brevo sent a known one |
 | 4 | `DeliveryExpired` | Warning | `sendBy` |
-| 5 | `DeliveryDropped` | Information | `reason` |
+| 5 | `DeliveryDropped` | Information | `reason`, and `suppressedBy` when `reason` is `suppressed` |
+| 6 | `WebhookRejected` | Warning | `reason` |
+| 7 | `AddressSuppressed` | Information | `event`, `deliveryId`, `messageType`, `alreadySuppressed` |
+| 8 | `WebhookEventUnmatched` | Warning | `event`, `reason` |
+| 9 | `WebhookEventIgnored` | Information | `event` |
 
 `DeliveryRetrying` has `reason` `rateLimited`, `serverError`, `timeout`, or `networkError`. A 429 is `rateLimited` and a 5xx is `serverError`. Each Brevo call times out after 10 seconds. Attempts run at 0, 30 seconds, 2 minutes, and 10 minutes after the one before, all with the same idempotency key.
 
@@ -86,17 +90,22 @@ Deliveries log under the `Laneway.Message` category. Features never learn how a 
 
 `DeliveryExpired` is a delivery past its `SendBy`, dropped without calling Brevo. The retry schedule ends long before any `SendBy`, so this means the worker stalled.
 
-`DeliveryDropped` has `reason` `userDeleted` or `noAddress`. `userDeleted` covers a user who was deleted, or whose id matches no user row. `noAddress` is a delivery with nowhere to go on its channel.
+`DeliveryDropped` has `reason` `userDeleted`, `noAddress`, `unsubscribed`, or `suppressed`. `userDeleted` covers a user who was deleted, or whose id matches no user row. `noAddress` is a delivery with nowhere to go on its channel. `unsubscribed` is an opt-out message to an address that unsubscribed. `suppressed` is any message to an address that hard bounced, complained of spam, or was blocked, and `suppressedBy` says which: `hardBounce`, `spam`, or `blocked`.
 
-Before it calls Brevo, the worker checks `SendBy`, then the user, then the address, and logs only the first that applies. A sent, failed, or dropped delivery clears its secret column. A send that throws anything other than a Brevo answer, a timeout, or a network error logs at Error with the exception and no event id. The claim's 2-minute lease runs out and a later poll tries again. A failed poll logs a plain Warning.
+Before it calls Brevo, the worker checks `SendBy`, then the user, then the address, then an unsubscribe, then the other suppressions, and logs only the first that applies. A sent, failed, or dropped delivery clears its secret column. A send that throws anything other than a Brevo answer, a timeout, or a network error logs at Error with the exception and no event id. The claim's 2-minute lease runs out and a later poll tries again. A failed poll logs a plain Warning.
 
 `DeliverySweep` deletes delivery rows 30 days after they were created, hourly, in batches of 1,000.
+
+`WebhookRejected` is a call to `POST /api/v1/webhooks/brevo` with a missing or bad webhook token. It got a 401. `reason` is `missing`, `malformed`, `expired`, `notYetValid`, `invalidSignature`, `invalidAlgorithm`, or `invalidAudience`. A token with no `nbf` is `malformed`. A run of them means a broken token rotation, or someone probing.
+
+`event` on the webhook events is the payload's event in camelCase: `hardBounce`, `spam`, `blocked`, `unsubscribed`, `softBounce`, `delivered`, `deferred`, `request`, `invalidEmail`, `opened`, `uniqueOpened`, `click`, `proxyOpen`, or `uniqueProxyOpen`. Anything else is `other`. `AddressSuppressed` logs a handled event whose `message-id` matched a delivery to the same address. `alreadySuppressed: true` means a Brevo retry or a repeat that wrote nothing new. `WebhookEventUnmatched` has `reason` `unknownMessageId`, `addressMismatch`, or `missingMessageId`, and still gets a 204. A real event always matches unless its row is gone, so an unmatched one is a forger holding a valid token, an event that outlived its 30-day delivery row, or a bug. `WebhookEventIgnored` is an event the webhook doesn't handle, or a body that isn't JSON.
 
 A `Laneway.Message` meter counts each delivery once, when it ends. Locally, `dotnet-counters monitor --counters Laneway.Message` reads it.
 
 | Counter | Tags |
 |---|---|
 | `laneway.message.deliveries` | `result`: `sent`, `failed`, `expired`, or `dropped`. `channel`: `email` |
+| `laneway.message.suppressions` | `event`: `hardBounce`, `spam`, `blocked`, or `unsubscribed`. It counts new suppressions only, not repeats. |
 
 ## Unexpected errors
 
@@ -118,7 +127,7 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 | `laneway.auth.breached_check.unavailable` | none |
 | `laneway.auth.refresh` | `result`: `rotated`, `superseded`, `reused`, or `rejected` |
 | `laneway.auth.csrf.rejections` | `check`: `header`, `origin`, or `fetch_site` |
-| `laneway.auth.rate_limit.rejections` | `policy`: one of the six rate limit policies |
+| `laneway.auth.rate_limit.rejections` | `policy`: one of the [rate limit](rate-limits.md) policies |
 
 `laneway.auth.sign_in.attempts` includes successes, so the failure-to-success ratio is visible. A climbing ratio is the usual sign of credential stuffing. `blocked` counts attempts made during a block, and `sign_in.blocks` counts the blocks themselves.
 
@@ -132,10 +141,11 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 - The Pwned Passwords request URI. It ends in the first 5 hex characters of the password's SHA-1, so the `BreachedPasswords` client has its HttpClient request logs turned off.
 - An email address in any form, raw, hashed, or masked, including a delivery's recipient.
 - A message token, a link built from one, or any rendered subject or body.
-- The Brevo API key.
+- The Brevo API key, or the Brevo webhook token.
 - Brevo's error `message`. It's free text and may quote the address.
+- A webhook payload's `email`, `message-id`, `reason`, `subject`, `tags`, `X-Mailin-custom`, `sending_ip`, `user_agent`, or `link`. They're from outside, and a bounce reason often quotes the address. A matched event logs our own `deliveryId` instead of the `message-id`.
 - The Brevo request body. The `BrevoEmail` client has its HttpClient request logs turned off.
 
 ## Request values
 
-No field carries a value from the request unless the value is checked against a known set first. `kid` on `AccessTokenRejected` is logged only when it matches a key in `Auth:SigningKeys`. `code` on `DeliveryFailed` is logged only when it matches one of Brevo's documented error codes. Every other field comes from the server: ids from the database, and reasons from fixed lists.
+No field carries a value from the request unless the value is checked against a known set first. `kid` on `AccessTokenRejected` is logged only when it matches a key in `Auth:SigningKeys`. `code` on `DeliveryFailed` is logged only when it matches one of Brevo's documented error codes. `event` on the webhook events is logged only after it matches Brevo's event list, and as `other` otherwise. A webhook's `message-id` is never logged. A matched event logs our own `deliveryId` instead. Every other field comes from the server: ids from the database, and reasons from fixed lists.

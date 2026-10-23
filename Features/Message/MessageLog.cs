@@ -14,6 +14,14 @@ public static class MessageLog
 
     private static readonly EventId DeliveryDroppedId = new(5, "DeliveryDropped");
 
+    private static readonly EventId WebhookRejectedId = new(6, "WebhookRejected");
+
+    private static readonly EventId AddressSuppressedId = new(7, "AddressSuppressed");
+
+    private static readonly EventId WebhookEventUnmatchedId = new(8, "WebhookEventUnmatched");
+
+    private static readonly EventId WebhookEventIgnoredId = new(9, "WebhookEventIgnored");
+
     private const string DeliveryFailedMessage = "Delivery failed: reason {reason}, status {status}, code {code}";
 
     private static readonly Action<ILogger, string, Exception?> DeliverySentEvent =
@@ -38,6 +46,26 @@ public static class MessageLog
     private static readonly Action<ILogger, string, Exception?> DeliveryDroppedEvent =
         LoggerMessage.Define<string>(LogLevel.Information, DeliveryDroppedId, "Delivery dropped: reason {reason}");
 
+    private static readonly Action<ILogger, string, string, Exception?> DeliverySuppressedEvent =
+        LoggerMessage.Define<string, string>(
+            LogLevel.Information, DeliveryDroppedId, "Delivery dropped: reason {reason}, suppressedBy {suppressedBy}");
+
+    private static readonly Action<ILogger, string, Exception?> WebhookRejectedEvent =
+        LoggerMessage.Define<string>(LogLevel.Warning, WebhookRejectedId, "Webhook rejected: reason {reason}");
+
+    private static readonly Action<ILogger, string, Guid, string, bool, Exception?> AddressSuppressedEvent =
+        LoggerMessage.Define<string, Guid, string, bool>(
+            LogLevel.Information,
+            AddressSuppressedId,
+            "Address suppressed: event {event}, deliveryId {deliveryId}, messageType {messageType}, alreadySuppressed {alreadySuppressed}");
+
+    private static readonly Action<ILogger, string, string, Exception?> WebhookEventUnmatchedEvent =
+        LoggerMessage.Define<string, string>(
+            LogLevel.Warning, WebhookEventUnmatchedId, "Webhook event unmatched: event {event}, reason {reason}");
+
+    private static readonly Action<ILogger, string, Exception?> WebhookEventIgnoredEvent =
+        LoggerMessage.Define<string>(LogLevel.Information, WebhookEventIgnoredId, "Webhook event ignored: event {event}");
+
     public static void DeliverySent(this ILogger logger, string providerMessageId) =>
         DeliverySentEvent(logger, providerMessageId, null);
 
@@ -53,6 +81,21 @@ public static class MessageLog
     public static void DeliveryExpired(this ILogger logger, DateTime sendBy) => DeliveryExpiredEvent(logger, sendBy, null);
 
     public static void DeliveryDropped(this ILogger logger, string reason) => DeliveryDroppedEvent(logger, reason, null);
+
+    public static void DeliverySuppressed(this ILogger logger, SuppressionKind by) =>
+        DeliverySuppressedEvent(logger, "suppressed", Suppressions.Name(by), null);
+
+    public static void WebhookRejected(this ILogger logger, string reason) => WebhookRejectedEvent(logger, reason, null);
+
+    public static void AddressSuppressed(
+        this ILogger logger, string brevoEvent, Guid deliveryId, MessageType type, bool alreadySuppressed) =>
+        AddressSuppressedEvent(logger, brevoEvent, deliveryId, type.ToString(), alreadySuppressed, null);
+
+    public static void WebhookEventUnmatched(this ILogger logger, string brevoEvent, string reason) =>
+        WebhookEventUnmatchedEvent(logger, brevoEvent, reason, null);
+
+    public static void WebhookEventIgnored(this ILogger logger, string brevoEvent) =>
+        WebhookEventIgnoredEvent(logger, brevoEvent, null);
 
     public static IDisposable? BeginDeliveryScope(this ILogger logger, Delivery delivery)
     {
@@ -72,4 +115,15 @@ public static class MessageLog
 
         return logger.BeginScope(scope);
     }
+}
+
+public static class WebhookRejection
+{
+    public const string Missing = "missing";
+    public const string Malformed = "malformed";
+    public const string Expired = "expired";
+    public const string NotYetValid = "notYetValid";
+    public const string InvalidSignature = "invalidSignature";
+    public const string InvalidAlgorithm = "invalidAlgorithm";
+    public const string InvalidAudience = "invalidAudience";
 }

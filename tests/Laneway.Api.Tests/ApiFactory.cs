@@ -28,6 +28,8 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
 
     public const string SenderEmail = "no-reply@laneway.test";
 
+    public const string WebhookSigningKey = "brevo-webhook-test-key-that-is-long-enough";
+
     private readonly string _connectionString;
 
     public ApiFactory(string connectionString) => _connectionString = connectionString;
@@ -68,7 +70,7 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
                 ["WebApp:BaseUrl"] = AllowedOrigin,
                 ["Brevo:ApiKey"] = BrevoApiKey,
                 ["Brevo:SenderEmail"] = SenderEmail,
-                ["Brevo:WebhookSigningKey"] = "brevo-webhook-test-key-that-is-long-enough"
+                ["Brevo:WebhookSigningKey"] = WebhookSigningKey
             }));
         builder.ConfigureLogging(logging => logging.AddFakeLogging());
         builder.ConfigureTestServices(services =>

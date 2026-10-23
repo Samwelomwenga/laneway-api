@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 
@@ -29,6 +30,12 @@ public sealed class BrevoOptionsValidator : IValidateOptions<BrevoOptions>
             .Select(setting =>
                 $"{setting.Item1} is missing. Run the app through `doppler run --` or set the {setting.Item1} environment variable.")
             .ToList();
+        var keyBytes = Encoding.UTF8.GetByteCount(options.WebhookSigningKey);
+        if (!string.IsNullOrWhiteSpace(options.WebhookSigningKey) && keyBytes < BrevoWebhookTokens.MinimumKeyBytes)
+        {
+            problems.Add(
+                $"BREVO__WEBHOOKSIGNINGKEY is {keyBytes} bytes. It needs at least {BrevoWebhookTokens.MinimumKeyBytes}. Make one with `openssl rand -base64 32`.");
+        }
 
         return problems.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(problems);
     }

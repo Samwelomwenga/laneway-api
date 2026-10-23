@@ -17,6 +17,8 @@ public static class MessageSetup
         services.AddSingleton<DeliveryCommitPoke>();
         services.AddScoped<Messages>();
         services.AddScoped<DeliverySweep>();
+        services.AddScoped<BrevoWebhook>();
+        services.AddSingleton<BrevoWebhookTokens>();
         services.AddHttpClient<IEmailProvider, BrevoEmail>(BrevoEmail.Configure).RemoveAllLoggers();
         services.AddHostedService<DeliveryWorker>();
 

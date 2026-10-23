@@ -574,6 +574,8 @@ namespace Laneway.Api.Migrations
 
                     b.HasIndex("CreatedAt");
 
+                    b.HasIndex("ProviderMessageId");
+
                     b.HasIndex("Status", "NextAttemptAt");
 
                     b.ToTable("Deliveries");
@@ -759,6 +761,26 @@ namespace Laneway.Api.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Sessions");
+                });
+
+            modelBuilder.Entity("Laneway.Api.Suppression", b =>
+                {
+                    b.Property<byte[]>("AddressHash")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Kind")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MessageId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("SuppressedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("AddressHash", "Kind");
+
+                    b.ToTable("Suppressions");
                 });
 
             modelBuilder.Entity("Laneway.Api.User", b =>

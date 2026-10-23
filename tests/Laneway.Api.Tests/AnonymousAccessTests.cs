@@ -24,7 +24,7 @@ public partial class AnonymousAccessTests : ApiTests
     }
 
     [Fact]
-    public async Task Only_sign_up_sign_in_and_refresh_take_an_anonymous_request()
+    public async Task Only_sign_up_sign_in_refresh_and_the_brevo_webhook_take_an_anonymous_request()
     {
         var (client, services) = ProductionHost(OverHttps);
         var routes = Routes(services);
@@ -34,7 +34,7 @@ public partial class AnonymousAccessTests : ApiTests
             using var request = new HttpRequestMessage(new HttpMethod(route.Method), Filled(route.Template));
             request.Headers.Add(ApiFactory.ClientIpHeader, IpUnderTheAnonymousLimitFor(index));
             using var response = await client.SendAsync(request);
-            if (response.Headers.WwwAuthenticate.Count == 0)
+            if (response.Headers.WwwAuthenticate.Count == 0 || route.Template == $"/{BrevoWebhookController.Path}")
             {
                 accepted.Add(route.ToString());
             }
@@ -46,7 +46,12 @@ public partial class AnonymousAccessTests : ApiTests
 
         Assert.True(routes.Count > 50, $"Only {routes.Count} routes were found.");
         Assert.Equal(
-            ["POST /api/v1/auth/refresh", "POST /api/v1/auth/sign-in", "POST /api/v1/auth/sign-up"],
+            [
+                "POST /api/v1/auth/refresh",
+                "POST /api/v1/auth/sign-in",
+                "POST /api/v1/auth/sign-up",
+                "POST /api/v1/webhooks/brevo"
+            ],
             accepted.Order(StringComparer.Ordinal));
     }
 
