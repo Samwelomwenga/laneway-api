@@ -40,6 +40,10 @@ public abstract class ApiTests : IAsyncLifetime
 
     internal PwnedPasswordsStub PwnedPasswords => Factory.PwnedPasswords;
 
+    internal BrevoStub Brevo => Factory.Brevo;
+
+    internal Task<BrevoSend> AwaitEmailAsync(string to) => Brevo.AwaitEmailAsync(to);
+
     private ApiFactory Factory =>
         _factory ?? throw new InvalidOperationException("The test host isn't up yet.");
 

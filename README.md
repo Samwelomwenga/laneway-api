@@ -6,6 +6,10 @@ CI runs no tests, so run `dotnet test` before you push. The suite needs Docker f
 
 [docs/ci.md](docs/ci.md) lists each check and how to fix it.
 
+## Email
+
+The app won't start without `BREVO__APIKEY`, `BREVO__SENDEREMAIL`, and `BREVO__WEBHOOKSIGNINGKEY` in Doppler. Local runs send real mail through the shared dev Brevo account. Tests swap Brevo for a stub and never reach it.
+
 ## Signing keys
 
 The app won't start without at least one access token signing key. Doppler holds them as an ordered list, `AUTH__SIGNINGKEYS__{n}__ID` and `AUTH__SIGNINGKEYS__{n}__KEY`. Key 0 signs, and every listed key validates. The id is a year and month like `2026-10`. The key is 32 random bytes in base64:

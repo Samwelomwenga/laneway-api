@@ -24,6 +24,10 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
 
     public const string ClientIpHeader = "X-Test-Client-Ip";
 
+    public const string BrevoApiKey = "xkeysib-test";
+
+    public const string SenderEmail = "no-reply@laneway.test";
+
     private readonly string _connectionString;
 
     public ApiFactory(string connectionString) => _connectionString = connectionString;
@@ -31,6 +35,8 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
     public FakeTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
 
     public PwnedPasswordsStub PwnedPasswords { get; } = new();
+
+    public BrevoStub Brevo { get; } = new();
 
     public HttpClient CreateApiClient()
     {
@@ -58,7 +64,11 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
                 ["Supabase:BucketName"] = TestStack.BucketName,
                 ["Auth:SigningKeys:0:Id"] = SigningKeyId,
                 ["Auth:SigningKeys:0:Key"] = SigningKey,
-                ["Cors:AllowedOrigins:0"] = AllowedOrigin
+                ["Cors:AllowedOrigins:0"] = AllowedOrigin,
+                ["WebApp:BaseUrl"] = AllowedOrigin,
+                ["Brevo:ApiKey"] = BrevoApiKey,
+                ["Brevo:SenderEmail"] = SenderEmail,
+                ["Brevo:WebhookSigningKey"] = "brevo-webhook-test-key-that-is-long-enough"
             }));
         builder.ConfigureLogging(logging => logging.AddFakeLogging());
         builder.ConfigureTestServices(services =>
@@ -67,6 +77,9 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<TimeProvider>(Time);
             services.AddHttpClient<BreachedPasswords>()
                 .ConfigurePrimaryHttpMessageHandler(() => PwnedPasswords)
+                .SetHandlerLifetime(Timeout.InfiniteTimeSpan);
+            services.AddHttpClient<IEmailProvider, BrevoEmail>()
+                .ConfigurePrimaryHttpMessageHandler(() => Brevo)
                 .SetHandlerLifetime(Timeout.InfiniteTimeSpan);
         });
     }

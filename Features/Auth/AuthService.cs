@@ -22,6 +22,7 @@ public sealed class AuthService(
     PasswordPolicy passwordPolicy,
     AccessTokens tokens,
     AuthMeter meter,
+    Messages messages,
     TimeProvider time,
     ILoggerFactory loggers) : IAuthService
 {
@@ -186,7 +187,7 @@ public sealed class AuthService(
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        return WithPasswordAsync(userId, sessionId, write.CurrentPassword, PasswordCheckedEndpoint.ChangePassword, async now =>
+        return WithPasswordAsync(userId, sessionId, write.CurrentPassword, PasswordCheckedEndpoint.ChangePassword, async (user, now) =>
         {
             var newHash = passwords.Hash(write.NewPassword);
             await database.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u
@@ -194,6 +195,9 @@ public sealed class AuthService(
                 .SetProperty(e => e.UpdatedAt, now)
                 .SetProperty(e => e.UpdatedBy, userId));
             var ended = await EndAllAsync(userId, keep: sessionId, SessionEndReason.PasswordChanged, now);
+            var userAgent = await database.Sessions.Where(s => s.Id == sessionId).Select(s => s.UserAgent).SingleAsync();
+            messages.Add(new PasswordChanged(userId, PasswordChangeHow.Changed, now, userAgent, user.TimeZone));
+            await database.SaveChangesAsync();
 
             _log.PasswordChanged(userId, sessionId);
             LogEnded(userId, ended, SessionEndReason.PasswordChanged);
@@ -217,7 +221,7 @@ public sealed class AuthService(
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        return WithPasswordAsync(userId, sessionId, write.Password, PasswordCheckedEndpoint.ChangeEmail, async now =>
+        return WithPasswordAsync(userId, sessionId, write.Password, PasswordCheckedEndpoint.ChangeEmail, async (_, now) =>
         {
             if (await database.Users.AnyAsync(u => u.Id != userId && u.Email == write.NewEmail))
             {
@@ -239,7 +243,7 @@ public sealed class AuthService(
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        return WithPasswordAsync(userId, sessionId, write.Password, PasswordCheckedEndpoint.DeleteUser, async now =>
+        return WithPasswordAsync(userId, sessionId, write.Password, PasswordCheckedEndpoint.DeleteUser, async (_, now) =>
         {
             var soleAdmin = await database.SoleAdminPlacesAsync(userId);
             if (soleAdmin.Count > 0)
@@ -328,7 +332,7 @@ public sealed class AuthService(
         Guid sessionId,
         string password,
         PasswordCheckedEndpoint endpoint,
-        Func<DateTime, Task<AuthReply<bool>>> action,
+        Func<User, DateTime, Task<AuthReply<bool>>> action,
         Func<User, Task<AuthReply<bool>?>>? refuseFirst = null)
     {
         var user = await database.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId);
@@ -364,7 +368,7 @@ public sealed class AuthService(
             return await ClearLostAsync(userId, sessionId, endpoint, now);
         }
 
-        var reply = await action(now);
+        var reply = await action(user, now);
         await transaction.CommitAsync();
         return reply;
     }
