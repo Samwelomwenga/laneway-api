@@ -9,10 +9,13 @@ Every request except a CORS preflight falls under at least one written limit. Th
 | `refresh` | `POST /api/v1/auth/refresh` | IP | 60 per minute |
 | `password-check` | `change-password`, `change-email`, `delete-user` | `sub` | 5 per minute |
 | `add-member` | `POST /api/v1/workspaces/{id}/members`, `POST /api/v1/boards/{id}/members` | `sub` | 20 per minute |
+| `webhook` | `POST /api/v1/webhooks/brevo` | IP | 600 per minute |
 | `signed-in` | every request with a valid token | `sub` | 300 per minute |
 | `anonymous` | every other request with no valid token | IP | 60 per minute |
 
-Each policy is a sliding window with 6 segments. The limiter runs after authentication, so a valid token decides between `signed-in` and `anonymous`. A request with a missing or bad token counts as `anonymous`, unless it goes to sign-in, sign-up, or refresh. Those three count only under their own policy. `password-check` and `add-member` count on top of `signed-in`. The two member routes share one `add-member` bucket.
+Each policy is a sliding window with 6 segments. The limiter runs after authentication, so a valid token decides between `signed-in` and `anonymous`. A request with a missing or bad token counts as `anonymous`, unless it goes to sign-in, sign-up, refresh, or the Brevo webhook. Those four count only under their own policy. `password-check` and `add-member` count on top of `signed-in`. The two member routes share one `add-member` bucket.
+
+The webhook's bearer is a webhook token, not an access token, so the webhook never counts under `signed-in`. Brevo retries a 429 at 10 minutes, 1 hour, 2 hours, and 8 hours. A 429 delays an event without losing it.
 
 The limiter checks every policy a request falls under before it takes a permit from any of them. A refused request spends nothing, so a 429 from `password-check` leaves the caller's `signed-in` count alone.
 

@@ -78,6 +78,17 @@ public class RateLimitTests : ApiTests
     }
 
     [Fact]
+    public async Task The_601st_webhook_call_in_a_minute_from_one_ip_gets_a_429()
+    {
+        await SendTimesAsync(600, WebhookAsync);
+
+        using var response = await WebhookAsync();
+
+        await AssertTooManyRequestsAsync(response, "10");
+        Assert.Equal("webhook", Assert.Single(Logs(), log => log.Id.Name == "RateLimited").GetStructuredStateValue("policy"));
+    }
+
+    [Fact]
     public async Task The_301st_signed_in_request_in_a_minute_by_one_user_gets_a_429()
     {
         await SendTimesAsync(300 - ProfileReadsInCreateUser, () => GetAsync("/api/v1/profile"));
@@ -292,6 +303,9 @@ public class RateLimitTests : ApiTests
         return SendFromBrowserAsync(
             "/api/v1/auth/sign-in", new { email = "nobody@example.com", password = "not the password" }, headers);
     }
+
+    private Task<HttpResponseMessage> WebhookAsync() =>
+        SendAnonymousAsync(HttpMethod.Post, "/api/v1/webhooks/brevo", new { @event = "delivered" });
 
     private Task<HttpResponseMessage> ChangeEmailAsync(TestUser user) =>
         PostAsync("/api/v1/auth/change-email", new { password = TestUser.Password, newEmail = NewEmail() }, user);

@@ -30,7 +30,9 @@ public static class BearerTokens
     public static IApplicationBuilder RefuseFailedBearerTokens(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>
         {
-            if (context.Request.Headers.Authorization.Count > 0 && context.User.Identity?.IsAuthenticated != true)
+            if (context.Request.Headers.Authorization.Count > 0
+                && context.User.Identity?.IsAuthenticated != true
+                && !OwnBearerTokenAttribute.On(context))
             {
                 await context.ChallengeAsync();
                 return;
@@ -48,6 +50,18 @@ public sealed class BearerEvents(
     ILoggerFactory loggers) : JwtBearerEvents
 {
     private readonly ILogger _log = loggers.CreateLogger(AuthLog.Category);
+
+    public override Task MessageReceived(MessageReceivedContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (OwnBearerTokenAttribute.On(context.HttpContext))
+        {
+            context.NoResult();
+        }
+
+        return Task.CompletedTask;
+    }
 
     public override async Task TokenValidated(TokenValidatedContext context)
     {
@@ -144,4 +158,14 @@ public sealed class BearerEvents(
         SecurityTokenMalformedException or ArgumentException => AccessTokenRejection.Malformed,
         _ => AccessTokenRejection.Invalid
     };
+}
+
+/// <summary>
+/// The endpoint checks its own bearer token, so the access-token scheme leaves the Authorization header alone.
+/// </summary>
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class OwnBearerTokenAttribute : Attribute
+{
+    public static bool On(HttpContext context) =>
+        context.GetEndpoint()?.Metadata.GetMetadata<OwnBearerTokenAttribute>() is not null;
 }

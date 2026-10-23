@@ -1,0 +1,95 @@
+@Laneway_Api_HostAddress = https://localhost:7287
+
+@webhookToken = paste-a-minted-token
+@messageId = <paste-a-provider-message-id@smtp-relay.mailin.fr>
+@email = paste-the-delivery-address@example.com
+
+### A hard bounce. 204, and every later message to the address drops with suppressedBy hardBounce.
+POST {{Laneway_Api_HostAddress}}/api/v1/webhooks/brevo
+Authorization: Bearer {{webhookToken}}
+Content-Type: application/json
+
+{
+  "event": "hard_bounce",
+  "email": "{{email}}",
+  "id": 1234567,
+  "date": "2026-10-23 18:05:01",
+  "ts": 1792775101,
+  "message-id": "{{messageId}}",
+  "ts_event": 1792775101,
+  "subject": "Your Laneway password was changed",
+  "tags": ["PasswordChanged"],
+  "sending_ip": "185.41.28.109",
+  "ts_epoch": 1792775101000,
+  "reason": "550 5.1.1 Recipient address rejected"
+}
+
+### A spam complaint. 204, and every later message to the address drops with suppressedBy spam.
+POST {{Laneway_Api_HostAddress}}/api/v1/webhooks/brevo
+Authorization: Bearer {{webhookToken}}
+Content-Type: application/json
+
+{
+  "event": "spam",
+  "email": "{{email}}",
+  "id": 1234567,
+  "date": "2026-10-23 18:06:01",
+  "ts": 1792775161,
+  "message-id": "{{messageId}}",
+  "ts_event": 1792775161,
+  "subject": "Your Laneway password was changed",
+  "tags": ["PasswordChanged"],
+  "X-Mailin-custom": "",
+  "sending_ip": "185.41.28.109",
+  "ts_epoch": 1792775161000
+}
+
+### A block. 204, and every later message to the address drops with suppressedBy blocked.
+POST {{Laneway_Api_HostAddress}}/api/v1/webhooks/brevo
+Authorization: Bearer {{webhookToken}}
+Content-Type: application/json
+
+{
+  "event": "blocked",
+  "email": "{{email}}",
+  "id": 1234567,
+  "date": "2026-10-23 18:07:01",
+  "ts": 1792775221,
+  "message-id": "{{messageId}}",
+  "ts_event": 1792775221,
+  "subject": "Your Laneway password was changed",
+  "tags": ["PasswordChanged"],
+  "sending_ip": "185.41.28.109",
+  "ts_epoch": 1792775221000,
+  "reason": "blocked : due to blacklist user"
+}
+
+### An unsubscribe. 204. It stops only opt-out messages, so a password notice still goes out.
+POST {{Laneway_Api_HostAddress}}/api/v1/webhooks/brevo
+Authorization: Bearer {{webhookToken}}
+Content-Type: application/json
+
+{
+  "event": "unsubscribed",
+  "email": "{{email}}",
+  "id": 1234567,
+  "date": "2026-10-23 18:08:01",
+  "ts": 1792775281,
+  "message-id": "{{messageId}}",
+  "ts_event": 1792775281,
+  "subject": "Your Laneway password was changed",
+  "tags": ["PasswordChanged"],
+  "sending_ip": "185.41.28.109",
+  "user_agent": "Mozilla/5.0",
+  "ts_epoch": 1792775281000
+}
+
+### No bearer. 401, and the API logs WebhookRejected with reason missing.
+POST {{Laneway_Api_HostAddress}}/api/v1/webhooks/brevo
+Content-Type: application/json
+
+{
+  "event": "hard_bounce",
+  "email": "{{email}}",
+  "message-id": "{{messageId}}"
+}

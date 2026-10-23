@@ -7,6 +7,12 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (args is [BrevoWebhookTokens.MintCommand])
+{
+    Console.WriteLine(BrevoWebhookTokens.Mint(builder.Configuration));
+    return;
+}
+
 builder.Logging.AddJsonConsole(options =>
 {
     options.IncludeScopes = true;
@@ -58,6 +64,7 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<Sessio
 builder.Services.AddSingleton<Passwords>();
 builder.Services.AddHttpClient<BreachedPasswords>(BreachedPasswords.Configure).RemoveAllLoggers();
 builder.Services.AddScoped<PasswordPolicy>();
+builder.Services.AddMessages();
 
 builder.Services.AddScoped<Actor>();
 builder.Services.AddScoped<Readable>();
@@ -120,8 +127,9 @@ if (string.IsNullOrWhiteSpace(connectionString))
         $"ConnectionStrings:DefaultConnection is missing. Run the app through `doppler run --` or set the CONNECTIONSTRINGS__DEFAULTCONNECTION environment variable.");
 }
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+builder.Services.AddDbContext<ApplicationDbContext>((services, options) => options
+    .UseNpgsql(connectionString)
+    .AddInterceptors(services.GetRequiredService<DeliveryCommitPoke>()));
 
 
 var app = builder.Build();

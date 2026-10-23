@@ -103,7 +103,7 @@ public class CorsTests : ApiTests
         using var broken = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration(
             (_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
             {
-                ["Cors:AllowedOrigins:0"] = origin
+                ["Cors:AllowedOrigins:1"] = origin
             })));
 
         var thrown = Assert.Throws<OptionsValidationException>(() => broken.CreateClient());
