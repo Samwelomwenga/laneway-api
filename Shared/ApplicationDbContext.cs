@@ -67,19 +67,19 @@ public class ApplicationDbContext : DbContext
             entity.Property(u => u.Id)
                 .IsRequired();
             entity.Property(u => u.FirstName)
-                .HasColumnType("varchar(50)")
+                .HasColumnType($"varchar({FieldLimits.UserFirstName})")
                  .IsRequired();
             entity.Property(u => u.LastName)
-                .HasColumnType("varchar(50)")
+                .HasColumnType($"varchar({FieldLimits.UserLastName})")
                 .IsRequired();
             entity.Property(u => u.Username)
-                .HasColumnType("varchar(50)")
+                .HasColumnType($"varchar({FieldLimits.Username})")
                 .IsRequired();
             entity.HasIndex(u => u.Username)
                 .IsUnique()
                 .HasFilter("\"DeletedAt\" IS NULL");
             entity.Property(u => u.Email)
-                .HasColumnType("varchar(255)")
+                .HasColumnType($"varchar({FieldLimits.UserEmail})")
                 .IsRequired();
             entity.HasIndex(u => u.Email)
                 .IsUnique()
@@ -88,20 +88,20 @@ public class ApplicationDbContext : DbContext
                 .HasColumnType("varchar(500)")
                 .IsRequired();
             entity.Property(u => u.PhoneNumber)
-                .HasColumnType("varchar(20)")
+                .HasColumnType($"varchar({FieldLimits.UserPhoneNumber})")
                 .HasDefaultValue(string.Empty);
             entity.Property(u => u.ProfilePictureUrl);
             entity.Property(u => u.Bio)
-                .HasColumnType("varchar(500)")
+                .HasColumnType($"varchar({FieldLimits.UserBio})")
                 .HasDefaultValue(string.Empty);
             entity.Property(u => u.Language)
-                .HasColumnType("varchar(10)")
+                .HasColumnType($"varchar({FieldLimits.UserLanguage})")
                .HasDefaultValue("en-US");
             entity.Property(u => u.TimeZone)
-                .HasColumnType("varchar(50)")
+                .HasColumnType($"varchar({FieldLimits.UserTimeZone})")
                 .HasDefaultValue("UTC");
             entity.Property(u => u.Location)
-                .HasColumnType("varchar(300)")
+                .HasColumnType($"varchar({FieldLimits.UserLocation})")
                 .HasDefaultValue(string.Empty);
             entity.Property(u => u.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP AT TIME ZONE 'UTC'")

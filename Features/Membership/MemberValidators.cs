@@ -41,7 +41,10 @@ internal static class MemberRules
             .Must(request => Named(request) < 2)
             .WithErrorCode(ErrorCodes.MutuallyExclusive)
             .WithMessage("Send only one of 'userId', 'username', or 'email'.");
-        validator.RuleFor(request => request.Username).Required().When(request => request.Username is not null);
+        validator.RuleFor(request => request.Username)
+            .Required()
+            .MaxLength(FieldLimits.Username)
+            .When(request => request.Username is not null);
         validator.RuleFor(request => request.Email).Required().When(request => request.Email is not null);
     }
 

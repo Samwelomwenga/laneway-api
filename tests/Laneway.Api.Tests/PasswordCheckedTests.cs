@@ -152,6 +152,18 @@ public class PasswordCheckedTests : ApiTests
     }
 
     [Fact]
+    public async Task A_new_email_over_the_limit_is_tooLong()
+    {
+        using var response = await PostAsync(
+            "/api/v1/auth/change-email", new { password = TestUser.Password, newEmail = EmailOfLength(FieldLimits.UserEmail + 1) });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = Assert.Single(await response.ReadErrors());
+        Assert.Equal("newEmail", error.Field);
+        Assert.Equal(ErrorCodes.TooLong, error.Code);
+    }
+
+    [Fact]
     public async Task Delete_user_deletes_the_caller_and_ends_every_session()
     {
         var other = await SignInForTokenAsync();
