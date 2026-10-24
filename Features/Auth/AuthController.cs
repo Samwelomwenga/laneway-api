@@ -142,6 +142,16 @@ public class AuthController : ApiControllerBase
         return Reply(await _authService.ChangeEmailAsync(_actor.Id, _actor.SessionId, ChangeEmailWrite.Of(changeEmailDto)));
     }
 
+    [HttpPost("confirm-email-change")]
+    [AllowAnonymous]
+    public async Task<ActionResult> ConfirmEmailChange([FromBody] ConfirmEmailChangeDto confirmDto)
+    {
+        ArgumentNullException.ThrowIfNull(confirmDto);
+
+        return Reply(await _authService.ConfirmEmailChangeAsync(
+            Writes.Required(confirmDto.Token, "token"), Request.Headers.UserAgent.ToString()));
+    }
+
     [HttpPost("delete-user")]
     [RateLimited(RateLimits.PasswordCheck)]
     [Authorize]

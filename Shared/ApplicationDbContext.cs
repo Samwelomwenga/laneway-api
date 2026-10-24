@@ -145,6 +145,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<AuthToken>(entity =>
         {
             entity.Property(t => t.Kind).HasColumnType("varchar(32)");
+            entity.Property(t => t.Email).HasColumnType($"varchar({FieldLimits.UserEmail})");
             entity.HasOne<User>()
                 .WithMany()
                 .HasForeignKey(t => t.UserId)

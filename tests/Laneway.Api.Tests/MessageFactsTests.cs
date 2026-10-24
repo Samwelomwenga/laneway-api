@@ -25,4 +25,11 @@ public class MessageFactsTests
     [InlineData("Laneway.Api.Tests")]
     public void An_unparsed_user_agent_reads_as_unknown(string userAgent) =>
         Assert.Equal(("an unknown browser", "an unknown system"), MessageFacts.Browser(userAgent));
+
+    [Theory]
+    [InlineData("jane@gmail.com", "j•••@g•••.com")]
+    [InlineData("ana.waweru@mail.example.co.ke", "a•••@m•••.example.co.ke")]
+    [InlineData("j@gmail.com", "•••@g•••.com")]
+    public void An_address_keeps_its_first_letters_and_the_rest_of_its_domain(string address, string masked) =>
+        Assert.Equal(masked, MessageFacts.Mask(address));
 }

@@ -277,7 +277,7 @@ public class RateLimitTests : ApiTests
         using var otherUser = await ChangeEmailAsync(other);
         using var sameUser = await ChangeEmailAsync(ActorUser);
 
-        Assert.Equal(HttpStatusCode.NoContent, otherUser.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, otherUser.StatusCode);
         Assert.Equal(HttpStatusCode.TooManyRequests, sameUser.StatusCode);
     }
 

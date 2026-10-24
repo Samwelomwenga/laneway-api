@@ -48,6 +48,7 @@ public partial class AnonymousAccessTests : ApiTests
         Assert.Equal(
             [
                 "GET /api/v1/auth/username-available",
+                "POST /api/v1/auth/confirm-email-change",
                 "POST /api/v1/auth/forgot-password",
                 "POST /api/v1/auth/refresh",
                 "POST /api/v1/auth/resend-verification",

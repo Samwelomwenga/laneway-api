@@ -222,6 +222,9 @@ namespace Laneway.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Email")
+                        .HasColumnType("varchar(255)");
+
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 

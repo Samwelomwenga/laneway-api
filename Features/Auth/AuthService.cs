@@ -19,6 +19,7 @@ public interface IAuthService
     Task<AuthReply<bool>> EndSessionAsync(Guid userId, Guid currentSessionId, Guid sessionId);
     Task<AuthReply<bool>> ChangePasswordAsync(Guid userId, Guid sessionId, ChangePasswordWrite write);
     Task<AuthReply<bool>> ChangeEmailAsync(Guid userId, Guid sessionId, ChangeEmailWrite write);
+    Task<AuthReply<bool>> ConfirmEmailChangeAsync(string token, string? userAgent);
     Task<AuthReply<bool>> DeleteUserAsync(Guid userId, Guid sessionId, DeleteUserWrite write);
 }
 
@@ -232,7 +233,7 @@ public sealed class AuthService(
             .SingleOrDefaultAsync();
         if (user is null)
         {
-            return InvalidResetToken();
+            return InvalidLink();
         }
 
         if (Passwords.Length(newPassword) < Passwords.MinimumLength)
@@ -254,7 +255,7 @@ public sealed class AuthService(
             && await database.AuthTokens.Where(t => t.TokenHash == hash && t.ExpiresAt > now).ExecuteDeleteAsync() == 1;
         if (!used)
         {
-            return InvalidResetToken();
+            return InvalidLink();
         }
 
         await ReplacePasswordAsync(user.Id, newHash, now);
@@ -262,6 +263,7 @@ public sealed class AuthService(
             .SetProperty(e => e.FailedSignInCount, 0)
             .SetProperty(e => e.LastFailedSignInAt, (DateTime?)null)
             .SetProperty(e => e.SignInBlockedUntil, (DateTime?)null));
+        await DeleteTokensAsync(user.Id, AuthTokenKind.ChangeEmail);
         var ended = await EndAllAsync(user.Id, keep: null, SessionEndReason.PasswordReset, now);
         messages.Add(new PasswordChanged(user.Id, PasswordChangeHow.Reset, now, UserAgent: null, user.TimeZone));
         await database.SaveChangesAsync();
@@ -282,7 +284,7 @@ public sealed class AuthService(
             .SetProperty(e => e.UpdatedBy, userId));
     }
 
-    private static AuthReply<bool> InvalidResetToken() =>
+    private static AuthReply<bool> InvalidLink() =>
         Invalid(new ApiError("token", ErrorCodes.InvalidToken, "This link is invalid or has expired."));
 
     private async Task<Verification> IssueVerificationAsync(Guid userId, string email, DateTime now)
@@ -557,23 +559,114 @@ public sealed class AuthService(
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        return WithPasswordAsync(userId, sessionId, write.Password, PasswordCheckedEndpoint.ChangeEmail, async (_, now) =>
+        return WithPasswordAsync(userId, sessionId, write.Password, PasswordCheckedEndpoint.ChangeEmail, async (user, now) =>
         {
-            if (await database.Users.AnyAsync(u => u.Id != userId && u.Email == write.NewEmail))
+            var newEmail = write.NewEmail;
+            if (await VerifiedOwnerExistsAsync(userId, newEmail))
             {
-                return AuthReply.Of(UserRules.AlreadyExists<bool>(
-                    [new ApiError("newEmail", ErrorCodes.Duplicate, "A user with this email already exists.")]));
+                return EmailTaken("newEmail");
             }
 
-            await database.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u
-                .SetProperty(e => e.Email, write.NewEmail)
-                .SetProperty(e => e.UpdatedAt, now)
-                .SetProperty(e => e.UpdatedBy, userId));
+            await database.TryLockUserAsync(userId);
+            if (newEmail == user.Email)
+            {
+                await DeleteTokensAsync(userId, AuthTokenKind.ChangeEmail);
+                return AuthReply.Of(ApiResponse<bool>.SuccessResponse(
+                    true, "This is already your email. Any pending change is cancelled.", StatusCodes.Status202Accepted));
+            }
 
-            _log.EmailChanged(userId, sessionId);
-            return NoContent("Email changed", RefreshCookieChange.None);
+            if (await ConfirmEmailSkipAsync(newEmail, now) is { } skipped)
+            {
+                _log.MessageSkipped(MessageType.ConfirmEmailChange, skipped, userId);
+                return CheckNewEmail();
+            }
+
+            await DeleteTokensAsync(userId, AuthTokenKind.ChangeEmail);
+            var (row, value) = AuthToken.Issue(
+                userId, AuthTokenKind.ChangeEmail, AuthToken.ChangeEmailLifetime, now, newEmail);
+            database.AuthTokens.Add(row);
+            messages.Add(new ConfirmEmailChange(user.Username, newEmail) { Token = value });
+            await database.SaveChangesAsync();
+            return CheckNewEmail();
         });
     }
+
+    private async Task<string?> ConfirmEmailSkipAsync(string newEmail, DateTime now)
+    {
+        if (await AddressCap.NewAddressReachedAsync(database, newEmail, now))
+        {
+            return MessageSkip.AddressCapped;
+        }
+
+        return await SuppressedAsync(newEmail, MessageType.ConfirmEmailChange) ? MessageSkip.Suppressed : null;
+    }
+
+    public async Task<AuthReply<bool>> ConfirmEmailChangeAsync(string token, string? userAgent)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+
+        var hash = AuthToken.Hash(token);
+        var now = time.GetUtcNow().UtcDateTime;
+        var change = await database.AuthTokens
+            .Where(t => t.TokenHash == hash && t.Kind == AuthTokenKind.ChangeEmail && t.ExpiresAt > now)
+            .Select(t => new { t.UserId, NewEmail = t.Email! })
+            .SingleOrDefaultAsync();
+        if (change is null)
+        {
+            return InvalidLink();
+        }
+
+        var (userId, newEmail) = (change.UserId, change.NewEmail);
+        await using var transaction = await database.Database.BeginTransactionAsync();
+        if (!await database.TryLockUserAsync(userId))
+        {
+            return InvalidLink();
+        }
+
+        if (await VerifiedOwnerExistsAsync(userId, newEmail))
+        {
+            return EmailTaken(field: null);
+        }
+
+        if (await database.AuthTokens.Where(t => t.TokenHash == hash && t.ExpiresAt > now).ExecuteDeleteAsync() != 1)
+        {
+            return InvalidLink();
+        }
+
+        var user = await database.Users.AsNoTracking().SingleAsync(u => u.Id == userId);
+        await database.Users.Where(u => u.Id != userId && u.Email == newEmail && !u.Verified).ExecuteDeleteAsync();
+        try
+        {
+            await database.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u
+                .SetProperty(e => e.Email, newEmail)
+                .SetProperty(e => e.UpdatedAt, now)
+                .SetProperty(e => e.UpdatedBy, userId));
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            return EmailTaken(field: null);
+        }
+        await DeleteTokensAsync(userId, AuthTokenKind.Reset);
+        var (undo, value) = AuthToken.Issue(userId, AuthTokenKind.Undo, AuthToken.UndoLifetime, now, user.Email);
+        database.AuthTokens.Add(undo);
+        messages.Add(new EmailChanged(user.Email, newEmail, now, userAgent, user.TimeZone) { Token = value });
+        await database.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        _log.EmailChanged(userId);
+        return NoContent("Email changed", RefreshCookieChange.None);
+    }
+
+    private Task<bool> VerifiedOwnerExistsAsync(Guid userId, string email) =>
+        database.Users.AnyAsync(u => u.Id != userId && u.Email == email && u.Verified);
+
+    private static AuthReply<bool> EmailTaken(string? field) =>
+        AuthReply.Of(UserRules.AlreadyExists<bool>(
+            [new ApiError(field, ErrorCodes.Duplicate, "A user with this email already exists.")]));
+
+    private static AuthReply<bool> CheckNewEmail() =>
+        AuthReply.Of(ApiResponse<bool>.SuccessResponse(
+            true, "Check your new email for a link to confirm it.", StatusCodes.Status202Accepted));
 
     public Task<AuthReply<bool>> DeleteUserAsync(Guid userId, Guid sessionId, DeleteUserWrite write)
     {

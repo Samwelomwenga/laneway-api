@@ -37,6 +37,14 @@ public class EmailSampleTests
 
     private static Dictionary<string, (MessageType Type, EmailBody Body)> Rendered() => new(StringComparer.Ordinal)
     {
+        ["ConfirmEmailChange"] = Render(new ConfirmEmailChange("ana-waweru", "jane.doe@gmail.com") { Token = SampleToken }),
+        ["EmailChanged"] = Render(new EmailChanged(
+            "ana@example.com",
+            "jane.doe@gmail.com",
+            At,
+            "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
+            "Africa/Nairobi")
+        { Token = SampleToken }),
         ["PasswordChanged-Changed"] = Render(new PasswordChanged(
             Guid.Empty,
             PasswordChangeHow.Changed,

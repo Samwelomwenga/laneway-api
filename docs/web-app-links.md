@@ -9,6 +9,7 @@ Every link Laneway puts in an email points at a page in the web app. This file l
 | `/verify-email` | `token` | `POST /api/v1/auth/verify-email {token}` | `VerifyEmail` |
 | `/forgot-password` | none | `POST /api/v1/auth/forgot-password {email}` | `PasswordChanged` |
 | `/reset-password` | `token` | `POST /api/v1/auth/reset-password {token, newPassword}` | `ResetPassword` |
+| `/confirm-email-change` | `token` | `POST /api/v1/auth/confirm-email-change {token}` | `ConfirmEmailChange` |
 
 ## Rules for pages with a token
 
@@ -18,6 +19,7 @@ Every link Laneway puts in an email points at a page in the web app. This file l
 - The page sets `Referrer-Policy: no-referrer`.
 - The verify call answers like sign-in, with an access token and the refresh cookie, so the page signs the user in. A 400 `invalidToken` means the link was used, replaced by a newer one, or more than 24 hours old.
 - The reset call answers 204 and signs nobody in, so the page sends the user to sign in with the new password. A 400 `invalidToken` means the link was used, replaced by a newer one, or more than 1 hour old. Any other 400 is the password policy refusing `newPassword`. The link still works, so the page lets the user pick another.
+- The confirm call answers 204 and signs nobody in. Sessions that were signed in stay signed in, so the page tells the user to use the new address next time. A 400 `invalidToken` means the link was used, replaced by a newer request, cancelled by a password reset, or more than 24 hours old. A 409 `duplicate` means another account proved that address after the request, and nothing changed.
 
 ## The forgot password page
 

@@ -1,0 +1,11 @@
+Laneway
+
+Your Laneway email was changed to j•••@g•••.com on 20 October 2026 at 14:05 East Africa Time from Firefox on Linux. We'll no longer send mail here.
+
+If this wasn't you, undo the change within 7 days:
+
+https://app.laneway.example/undo-email-change#token=Zm9yLXRoZS1zYW1wbGUtb25seS1ub3QtYS1yZWFsLXRva2Vu
+
+You'll need a password you used on Laneway in the last week, and you'll choose a new one. Undoing it signs everyone out.
+
+You got this email because it belongs to a Laneway account.

@@ -52,6 +52,14 @@ public sealed class ResetPasswordDtoValidator : AbstractValidator<ResetPasswordD
     }
 }
 
+public sealed class ConfirmEmailChangeDtoValidator : AbstractValidator<ConfirmEmailChangeDto>
+{
+    public ConfirmEmailChangeDtoValidator()
+    {
+        RuleFor(x => x.Token).Required();
+    }
+}
+
 public sealed class SignInDtoValidator : AbstractValidator<SignInDto>
 {
     public SignInDtoValidator()

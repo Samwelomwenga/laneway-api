@@ -130,6 +130,10 @@ _Avoid_: Login, token family
 Setting a new password through a link Laneway emails to a verified user who forgot theirs. The link works for 1 hour, and only the newest one works. A reset ends every session and any sign-in block, and signs nobody in.
 _Avoid_: Password recovery
 
+**Email change**:
+Moving a user's sign-in address to a new one. The user asks with their password, and Laneway emails the new address a link that works for 24 hours. The address moves only when someone uses that link. Laneway then emails the old address with a link to undo the change for 7 days. A password reset cancels a pending email change, and a confirmed change voids any live reset link.
+_Avoid_: Email update, email swap
+
 **Password history**:
 The hashes a user's password had before each change or reset, with when each was replaced. Laneway never shows it. It exists so undoing an email change can ask for a password the account used recently.
 _Avoid_: Old passwords, previous passwords

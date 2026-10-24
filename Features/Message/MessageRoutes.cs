@@ -8,7 +8,9 @@ public static class MessageRoutes
     {
         [MessageType.PasswordChanged] = new([MessageChannel.Email], EmailByNature: false, OptOut: false, TimeSpan.FromHours(24)),
         [MessageType.VerifyEmail] = new([MessageChannel.Email], EmailByNature: true, OptOut: false, AuthToken.VerificationLifetime),
-        [MessageType.ResetPassword] = new([MessageChannel.Email], EmailByNature: true, OptOut: false, AuthToken.ResetLifetime)
+        [MessageType.ResetPassword] = new([MessageChannel.Email], EmailByNature: true, OptOut: false, AuthToken.ResetLifetime),
+        [MessageType.ConfirmEmailChange] = new([MessageChannel.Email], EmailByNature: true, OptOut: false, AuthToken.ChangeEmailLifetime),
+        [MessageType.EmailChanged] = new([MessageChannel.Email], EmailByNature: true, OptOut: false, TimeSpan.FromHours(24))
     };
 
     public static MessageRoute For(MessageType type) => All[type];

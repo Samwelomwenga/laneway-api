@@ -9,6 +9,10 @@ public static class AppRoutes
     public const string VerifyEmail = "/verify-email";
 
     public const string ResetPassword = "/reset-password";
+
+    public const string ConfirmEmailChange = "/confirm-email-change";
+
+    public const string UndoEmailChange = "/undo-email-change";
 }
 
 public sealed class AppLinks(IOptions<WebAppOptions> options)

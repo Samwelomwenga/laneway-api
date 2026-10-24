@@ -18,4 +18,13 @@ public static class AddressCap
         return await database.Deliveries
             .CountAsync(d => d.UserId == userId && Capped.Contains(d.Type) && d.CreatedAt > since) >= Limit;
     }
+
+    public static async Task<bool> NewAddressReachedAsync(ApplicationDbContext database, string address, DateTime now)
+    {
+        ArgumentNullException.ThrowIfNull(database);
+
+        var since = now - Window;
+        return await database.Deliveries
+            .CountAsync(d => d.Address == address && d.Type == MessageType.ConfirmEmailChange && d.CreatedAt > since) >= Limit;
+    }
 }

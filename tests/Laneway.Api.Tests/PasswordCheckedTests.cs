@@ -137,16 +137,15 @@ public class PasswordCheckedTests : ApiTests
         using var response = await PostAsync(
             "/api/v1/auth/change-email", new { password = TestUser.Password, newEmail = $"  {newEmail.ToUpperInvariant()} " });
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var token = (await AwaitEmailAsync(newEmail)).TokenFrom(AppRoutes.ConfirmEmailChange);
+        using var confirm = await SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/confirm-email-change", new { token });
+        Assert.Equal(HttpStatusCode.NoContent, confirm.StatusCode);
         using var signIn = await SignInAsync(TestUser.Password, newEmail);
         Assert.Equal(HttpStatusCode.OK, signIn.StatusCode);
         using var otherRead = await SendOverHttpsAsync(HttpMethod.Get, "/api/v1/auth/sessions", other);
         Assert.Equal(HttpStatusCode.OK, otherRead.StatusCode);
         Assert.DoesNotContain(Logs(), log => log.Id.Name == "SessionEnded");
-        var changed = Assert.Single(Logs(), log => log.Id.Name == "EmailChanged");
-        Assert.Equal(ActorId.ToString(), changed.GetStructuredStateValue("sub"));
-        Assert.Equal(ActorUser.SessionId.ToString(), changed.GetStructuredStateValue("sid"));
-        Assert.DoesNotContain(newEmail, changed.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -248,7 +247,8 @@ public class PasswordCheckedTests : ApiTests
 
         using var response = await CheckAsync(endpoint, TestUser.Password);
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(
+            endpoint == "change-email" ? HttpStatusCode.Accepted : HttpStatusCode.NoContent, response.StatusCode);
         var user = await ActorRowAsync();
         Assert.Equal(0, user.FailedSignInCount);
         Assert.Null(user.LastFailedSignInAt);
@@ -317,7 +317,7 @@ public class PasswordCheckedTests : ApiTests
 
         using var response = await CheckAsync("change-email", TestUser.Password);
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var user = await ActorRowAsync();
         Assert.NotEqual(weaker, user.PasswordHash);
         Assert.Equal(

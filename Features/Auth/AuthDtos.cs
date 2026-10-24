@@ -82,6 +82,8 @@ public record ResetPasswordDto(string? Token, string? NewPassword)
     public string? NewPassword { get; init; } = Passwords.Normalize(NewPassword);
 }
 
+public record ConfirmEmailChangeDto(string? Token);
+
 public record UsernameCheckDto(string? Username);
 
 public record UsernameAvailabilityDto(bool Available);

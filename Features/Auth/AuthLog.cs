@@ -102,8 +102,8 @@ public static class AuthLog
 
     private static readonly EventId EmailChangedId = new(15, "EmailChanged");
 
-    private static readonly Action<ILogger, Guid, Guid, Exception?> EmailChangedEvent =
-        LoggerMessage.Define<Guid, Guid>(LogLevel.Information, EmailChangedId, "Email changed: sub {sub}, sid {sid}");
+    private static readonly Action<ILogger, Guid, Exception?> EmailChangedEvent =
+        LoggerMessage.Define<Guid>(LogLevel.Information, EmailChangedId, "Email changed: sub {sub}");
 
     private static readonly EventId UserDeletedId = new(16, "UserDeleted");
 
@@ -162,8 +162,8 @@ public static class AuthLog
     public static void PasswordReset(this ILogger logger, Guid userId) =>
         PasswordResetEvent(logger, userId, null);
 
-    public static void EmailChanged(this ILogger logger, Guid userId, Guid sessionId) =>
-        EmailChangedEvent(logger, userId, sessionId, null);
+    public static void EmailChanged(this ILogger logger, Guid userId) =>
+        EmailChangedEvent(logger, userId, null);
 
     public static void UserDeleted(this ILogger logger, Guid userId, Guid sessionId) =>
         UserDeletedEvent(logger, userId, sessionId, null);
