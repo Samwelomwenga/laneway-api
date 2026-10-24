@@ -24,6 +24,7 @@ public sealed class Messages(ApplicationDbContext database, TimeProvider time)
                 Message = MessageBodies.Of(message),
                 UserId = message.UserId,
                 Address = message.Address,
+                Secret = message.Secret,
                 Status = DeliveryStatus.Pending,
                 IdempotencyKey = Guid.NewGuid(),
                 CreatedAt = now,

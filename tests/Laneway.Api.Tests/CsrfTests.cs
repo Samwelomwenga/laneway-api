@@ -12,9 +12,10 @@ namespace Laneway.Api.Tests;
 public class CsrfTests : ApiTests
 {
     public static TheoryData<string> CookieRoutes =>
-        ["/api/v1/auth/sign-up", "/api/v1/auth/sign-in", "/api/v1/auth/refresh"];
+        ["/api/v1/auth/sign-up", "/api/v1/auth/sign-in", "/api/v1/auth/refresh", "/api/v1/auth/verify-email"];
 
-    public static TheoryData<string> BodyRoutes => ["/api/v1/auth/sign-up", "/api/v1/auth/sign-in"];
+    public static TheoryData<string> BodyRoutes =>
+        ["/api/v1/auth/sign-up", "/api/v1/auth/sign-in", "/api/v1/auth/verify-email"];
 
     public CsrfTests(TestStack stack) : base(stack)
     {

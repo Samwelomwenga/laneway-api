@@ -45,7 +45,7 @@ public class PasswordPolicyTests : ApiTests
     {
         using var response = await SignUpAsync(SignUpBody(email, password, username));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public class PasswordPolicyTests : ApiTests
 
         using var response = await SignUpAsync(SignUpBody("ana@example.com", "violet harbor kettle"));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.Single(PwnedPasswords.Requests);
     }
 
@@ -141,7 +141,7 @@ public class PasswordPolicyTests : ApiTests
 
         using var response = await SignUpAsync(SignUpBody("ana@example.com", "violet harbor kettle"));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var logged = Assert.Single(Logs(), log => log.Id.Name == "BreachedCheckUnavailable");
         Assert.Equal(AuthLog.Category, logged.Category);
         Assert.Equal(LogLevel.Warning, logged.Level);
@@ -157,7 +157,7 @@ public class PasswordPolicyTests : ApiTests
 
         using var response = await SignUpAsync(SignUpBody("ana@example.com", password));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.DoesNotContain(Logs(), log =>
             log.Message.Contains(prefix, StringComparison.OrdinalIgnoreCase)
             || (log.StructuredState ?? []).Any(pair =>

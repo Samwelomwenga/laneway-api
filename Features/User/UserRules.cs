@@ -44,6 +44,25 @@ public static class UserRules
         user.ProfilePictureUrl = profile.ProfilePictureUrl;
     }
 
+    public static void Replace(this User user, NewUser fields, string passwordHash, DateTime now)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(fields);
+
+        user.Username = fields.Username;
+        user.PasswordHash = passwordHash;
+        user.FirstName = fields.FirstName;
+        user.LastName = fields.LastName;
+        user.PhoneNumber = fields.PhoneNumber;
+        user.Bio = fields.Bio;
+        user.Language = fields.Language;
+        user.TimeZone = fields.TimeZone;
+        user.Location = fields.Location;
+        user.ProfilePictureUrl = fields.ProfilePictureUrl;
+        user.UpdatedAt = now;
+        user.UpdatedBy = user.Id;
+    }
+
     public static User Create(NewUser fields, string passwordHash, DateTime now)
     {
         ArgumentNullException.ThrowIfNull(fields);

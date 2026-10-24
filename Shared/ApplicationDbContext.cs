@@ -29,6 +29,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Account> Accounts { get; set; }
     public DbSet<Session> Sessions { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<AuthToken> AuthTokens { get; set; }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -138,6 +139,17 @@ public class ApplicationDbContext : DbContext
                 .HasForeignKey(t => t.SessionId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(t => t.TokenHash).IsUnique();
+        });
+
+        modelBuilder.Entity<AuthToken>(entity =>
+        {
+            entity.Property(t => t.Kind).HasColumnType("varchar(32)");
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(t => t.TokenHash).IsUnique();
+            entity.HasIndex(t => new { t.UserId, t.Kind });
         });
 
         modelBuilder.Entity<WorkSpace>(entity =>

@@ -26,8 +26,8 @@ public static class AuthLog
         LoggerMessage.Define(
             LogLevel.Warning, BreachedCheckUnavailableId, "Breached password check unavailable, password accepted");
 
-    private static readonly Action<ILogger, Guid, Guid, Exception?> SignUpEvent =
-        LoggerMessage.Define<Guid, Guid>(LogLevel.Information, SignUpId, "Signed up: sub {sub}, sid {sid}");
+    private static readonly Action<ILogger, Guid, Exception?> SignUpEvent =
+        LoggerMessage.Define<Guid>(LogLevel.Information, SignUpId, "Signed up: sub {sub}");
 
     private static readonly Action<ILogger, Guid, Guid, Exception?> SignInSucceededEvent =
         LoggerMessage.Define<Guid, Guid>(LogLevel.Information, SignInSucceededId, "Signed in: sub {sub}, sid {sid}");
@@ -115,8 +115,8 @@ public static class AuthLog
     private static readonly Action<ILogger, string, Exception?> RateLimitedWithoutSub =
         LoggerMessage.Define<string>(LogLevel.Warning, RateLimitedId, "Rate limited: policy {policy}");
 
-    public static void SignUp(this ILogger logger, Guid userId, Guid sessionId) =>
-        SignUpEvent(logger, userId, sessionId, null);
+    public static void SignUp(this ILogger logger, Guid userId) =>
+        SignUpEvent(logger, userId, null);
 
     public static void SignInSucceeded(this ILogger logger, Guid userId, Guid sessionId) =>
         SignInSucceededEvent(logger, userId, sessionId, null);

@@ -13,7 +13,7 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | Id | Event | Level | Fields |
 |---|---|---|---|
 | 1 | `AccessTokenRejected` | Information | `reason`, and `kid` when it names a configured key, otherwise `kidKnown: false` |
-| 2 | `SignUp` | Information | `sub`, `sid` |
+| 2 | `SignUp` | Information | `sub` |
 | 3 | `SignInSucceeded` | Information | `sub`, `sid` |
 | 4 | `SignInFailed` | Warning | `sub` when the email belongs to a user, otherwise `accountFound: false`, and `blocked` |
 | 5 | `BreachedCheckUnavailable` | Warning | the exception from the Pwned Passwords call |
@@ -38,7 +38,11 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 
 `SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment. `endReason` is `SignedOut`, `SignedOutEverywhere`, `EndedFromSessionList`, `PasswordChanged`, `UserDeleted`, or `TokenReused`. Sign-out everywhere, change password, and delete user log one entry per session they end. Ending a session that already ended logs nothing.
 
-`CsrfRejected` is a sign-up, sign-in, or refresh that failed a CSRF check. `check` names the first one that failed: `header` when `X-Laneway-Csrf: 1` is missing, `origin` when `Origin` isn't in `Cors:AllowedOrigins`, or `fetch-site` when `Sec-Fetch-Site` is `cross-site`. The 403 body is the same for all three.
+`SignUp` logs when a sign-up creates an unverified user or takes over one, so `sub` is the user who gets the verification email. A sign-up whose address belongs to a verified user logs nothing. No session exists yet, so there is no `sid`. Using the verification link logs `SignInSucceeded` with the new session, and the counter tags it `succeeded`.
+
+`CsrfRejected` is a sign-up, verification, sign-in, or refresh that failed a CSRF check. `check` names the first one that failed: `header` when `X-Laneway-Csrf: 1` is missing, `origin` when `Origin` isn't in `Cors:AllowedOrigins`, or `fetch-site` when `Sec-Fetch-Site` is `cross-site`. The 403 body is the same for all three.
+
+An unverified user who sends the right password gets a 403 and logs `SignInFailed` with `blocked: false`. The counter tags that attempt `unverified`.
 
 `SignInFailed` has `blocked: true` when the user was in a sign-in block, whatever password they sent. An unknown email always has `blocked: false`. `SignInBlockStarted` logs when a block starts, on every 5th wrong password since the count last reset. `failureCount` is the count that started the block, and `blockedUntil` is when it ends. Attempts during a block don't add to the count. A successful sign-in resets the count, and so do 12 hours with no wrong password.
 
@@ -121,7 +125,7 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 
 | Counter | Tags |
 |---|---|
-| `laneway.auth.sign_in.attempts` | `result`: `succeeded`, `wrong_password`, `unknown_account`, or `blocked` |
+| `laneway.auth.sign_in.attempts` | `result`: `succeeded`, `wrong_password`, `unknown_account`, `blocked`, or `unverified` |
 | `laneway.auth.sign_in.blocks` | none |
 | `laneway.auth.password_check.failures` | `endpoint`: `change_password`, `change_email`, or `delete_user`. `blocked`: `true` or `false` |
 | `laneway.auth.breached_check.unavailable` | none |

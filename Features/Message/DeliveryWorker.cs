@@ -234,7 +234,7 @@ public sealed class DeliveryWorker : BackgroundService
     private async Task TrySendAsync(
         ApplicationDbContext database, IEmailProvider provider, Delivery delivery, string address, CancellationToken token)
     {
-        var body = EmailTemplates.Render(delivery.Type, delivery.Message, _links);
+        var body = EmailTemplates.Render(delivery.Type, delivery.Message, delivery.Secret, _links);
         EmailSent sent;
         try
         {

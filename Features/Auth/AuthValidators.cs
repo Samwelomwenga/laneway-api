@@ -19,6 +19,14 @@ public sealed class SignUpDtoValidator : AbstractValidator<SignUpDto>
     }
 }
 
+public sealed class VerifyEmailDtoValidator : AbstractValidator<VerifyEmailDto>
+{
+    public VerifyEmailDtoValidator()
+    {
+        RuleFor(x => x.Token).Required();
+    }
+}
+
 public sealed class SignInDtoValidator : AbstractValidator<SignInDto>
 {
     public SignInDtoValidator()

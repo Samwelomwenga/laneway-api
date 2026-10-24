@@ -11,6 +11,13 @@ public static class RowLocks
         return await LockAsync(context.Boards, boardId);
     }
 
+    public static async Task<bool> TryLockUserAsync(this ApplicationDbContext context, Guid userId)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        return await LockAsync(context.Users, userId);
+    }
+
     public static async Task<bool> TryLockWorkspaceAsync(this ApplicationDbContext context, Guid workspaceId)
     {
         ArgumentNullException.ThrowIfNull(context);

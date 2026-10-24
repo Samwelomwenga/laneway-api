@@ -49,4 +49,6 @@ public static class ErrorCodes
     public const string CommentingDisabled = "commentingDisabled";
     public const string LastAdmin = "lastAdmin";
     public const string LastMember = "lastMember";
+    public const string InvalidToken = "invalidToken";
+    public const string EmailNotVerified = "emailNotVerified";
 }

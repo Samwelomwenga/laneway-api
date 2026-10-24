@@ -20,12 +20,10 @@ public class SignInTests : ApiTests
     }
 
     [Fact]
-    public async Task A_new_user_signs_up_and_writes_with_the_returned_token()
+    public async Task A_new_user_verifies_and_writes_with_the_returned_token()
     {
-        using var response = await SignUpAsync(SignUpBody("Ana@Example.com"));
+        var (signedUp, _) = await SignUpOverHttpsAsync("Ana@Example.com");
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var signedUp = (await response.ReadEnvelope<SignedUpDto>()).Data!;
         Assert.Equal("ana@example.com", signedUp.User.Email);
         Assert.Single(signedUp.User.Accounts);
         Assert.Equal(Time.GetUtcNow().UtcDateTime.AddMinutes(15), signedUp.AccessTokenExpiresAt, TimeSpan.FromSeconds(1));
@@ -39,36 +37,23 @@ public class SignInTests : ApiTests
     }
 
     [Fact]
-    public async Task Sign_up_logs_the_new_user_and_session()
+    public async Task Sign_up_logs_the_new_user_without_a_session()
     {
         using var response = await SignUpAsync(SignUpBody("ana@example.com"));
-        var signedUp = (await response.ReadEnvelope<SignedUpDto>()).Data!;
 
         var logged = Assert.Single(Logs(), log => log.Id.Name == "SignUp");
         Assert.Equal(AuthLog.Category, logged.Category);
-        Assert.Equal(signedUp.User.Id.ToString(), logged.GetStructuredStateValue("sub"));
-        Assert.Equal(await OnlySessionIdAsync(signedUp.User.Id), logged.GetStructuredStateValue("sid"));
-    }
-
-    [Fact]
-    public async Task A_taken_username_or_email_still_gets_409()
-    {
-        using var first = await SignUpAsync(SignUpBody("ana@example.com", username: "ana"));
-        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
-
-        using var response = await SignUpAsync(SignUpBody(" ANA@example.com", username: "ana"));
-
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.Equal(
-            ["email", "username"],
-            (await response.ReadEnvelope<object>()).Errors!.Select(error => error.Field).Order(StringComparer.Ordinal));
+        var userId = await FromDatabaseAsync(database =>
+            database.Users.Where(u => u.Email == "ana@example.com").Select(u => u.Id).SingleAsync());
+        Assert.Equal(userId.ToString(), logged.GetStructuredStateValue("sub"));
+        Assert.Null(logged.GetStructuredStateValue("sid"));
+        Assert.False(await FromDatabaseAsync(database => database.Sessions.AnyAsync(s => s.UserId == userId)));
     }
 
     [Fact]
     public async Task A_user_signs_in_with_their_email_in_any_case()
     {
-        using var signUp = await SignUpAsync(SignUpBody("Ana.Waweru@Example.com"));
-        var userId = (await signUp.ReadEnvelope<SignedUpDto>()).Data!.User.Id;
+        var userId = (await SignUpOverHttpsAsync("Ana.Waweru@Example.com")).SignedUp.User.Id;
 
         using var response = await SignInAsync("  ANA.waweru@example.COM ", SignUpPassword);
 
@@ -82,7 +67,7 @@ public class SignInTests : ApiTests
             HttpMethod.Post, "/api/v1/workspaces", signedIn.AccessToken, new { name = "Design", visibility = "Public" });
         Assert.Equal(userId, (await write.ReadEnvelope<WorkSpaceDto>()).Data!.CreatedBy);
 
-        var logged = Assert.Single(Logs(), log => log.Id.Name == "SignInSucceeded");
+        var logged = Logs().Last(log => log.Id.Name == "SignInSucceeded");
         Assert.Equal(userId.ToString(), logged.GetStructuredStateValue("sub"));
         Assert.NotNull(logged.GetStructuredStateValue("sid"));
     }
@@ -174,7 +159,7 @@ public class SignInTests : ApiTests
     {
         using var response = await SignUpAsync(SignUpBody("ana@example.com", PasswordOfLength(length)));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
     }
 
     [Fact]
@@ -187,14 +172,13 @@ public class SignInTests : ApiTests
         using var longest = await SignUpAsync(SignUpBody("ben@example.com", hundredTwentyEightEmoji));
 
         Assert.Equal(ErrorCodes.TooShort, Assert.Single((await tooShort.ReadEnvelope<object>()).Errors!).Code);
-        Assert.Equal(HttpStatusCode.Created, longest.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, longest.StatusCode);
     }
 
     [Fact]
     public async Task Passwords_are_nfkc_normalized_and_never_trimmed()
     {
-        using var signUp = await SignUpAsync(SignUpBody("ana@example.com", " ﬁve plum tractors "));
-        Assert.Equal(HttpStatusCode.Created, signUp.StatusCode);
+        await SignUpOverHttpsAsync("ana@example.com", " ﬁve plum tractors ");
 
         using var expanded = await SignInAsync("ana@example.com", " five plum tractors ");
         using var ligature = await SignInAsync("ana@example.com", " \uFB01ve plum tractors ");
@@ -289,10 +273,6 @@ public class SignInTests : ApiTests
 
     private Task<HttpResponseMessage> SignInAsync(string email, string password, string? userAgent = null) =>
         SendFromBrowserAsync("/api/v1/auth/sign-in", new { email, password }, userAgent: userAgent);
-
-    private Task<string> OnlySessionIdAsync(Guid userId) =>
-        FromDatabaseAsync(async database =>
-            (await database.Sessions.SingleAsync(session => session.UserId == userId)).Id.ToString());
 
     private Task SetPasswordHashAsync(Guid userId, string hash) =>
         FromDatabaseAsync(database => database.Users

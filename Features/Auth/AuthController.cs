@@ -21,9 +21,20 @@ public class AuthController : ApiControllerBase
     [RateLimited(RateLimits.SignUp)]
     [AllowAnonymous]
     [CsrfChecked]
-    public async Task<ActionResult<ApiResponse<SignedUpDto>>> SignUp([FromBody] SignUpDto signUpDto)
+    public async Task<ActionResult<ApiResponse<object?>>> SignUp([FromBody] SignUpDto signUpDto)
     {
-        return Reply(await _authService.SignUpAsync(SignUpWrite.Of(signUpDto), Request.Headers.UserAgent.ToString()));
+        return ToActionResult(await _authService.SignUpAsync(SignUpWrite.Of(signUpDto)));
+    }
+
+    [HttpPost("verify-email")]
+    [AllowAnonymous]
+    [CsrfChecked]
+    public async Task<ActionResult<ApiResponse<SignedInDto>>> VerifyEmail([FromBody] VerifyEmailDto verifyEmailDto)
+    {
+        ArgumentNullException.ThrowIfNull(verifyEmailDto);
+
+        return Reply(await _authService.VerifyEmailAsync(
+            Writes.Required(verifyEmailDto.Token, "token"), Request.Headers.UserAgent.ToString()));
     }
 
     [HttpGet("username-available")]

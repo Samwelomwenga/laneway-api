@@ -5,7 +5,8 @@ namespace Laneway.Api;
 
 public interface IAuthService
 {
-    Task<AuthReply<SignedUpDto>> SignUpAsync(SignUpWrite write, string? userAgent);
+    Task<ApiResponse<object?>> SignUpAsync(SignUpWrite write);
+    Task<AuthReply<SignedInDto>> VerifyEmailAsync(string token, string? userAgent);
     Task<ApiResponse<UsernameAvailabilityDto>> UsernameAvailableAsync(string? username);
     Task<AuthReply<SignedInDto>> SignInAsync(SignInWrite write, string? userAgent);
     Task<AuthReply<SignedInDto>> RefreshAsync(string? presented);
@@ -30,59 +31,152 @@ public sealed class AuthService(
 {
     private const string IncorrectCredentials = "Email or password is incorrect.";
 
+    private const string CheckYourEmail = "Check your email to finish signing up.";
+
+    private const string ConfirmEmailFirst = "Confirm your email before signing in. Check your inbox for the link.";
+
     private const string RefreshedElsewhere = "Another request refreshed this session. Retry with its cookie.";
 
     private const string TooManyWrongPasswords = "Too many wrong passwords. Try again after the Retry-After delay.";
 
     private readonly ILogger _log = loggers.CreateLogger(AuthLog.Category);
 
-    public async Task<AuthReply<SignedUpDto>> SignUpAsync(SignUpWrite write, string? userAgent)
+    public async Task<ApiResponse<object?>> SignUpAsync(SignUpWrite write)
     {
         ArgumentNullException.ThrowIfNull(write);
 
-        var taken = await UserRules.TakenAsync(database, write.User.Username, write.User.Email, exceptId: null);
-        if (taken.Count > 0)
+        var fields = write.User;
+        if (await UsernameTakenAsync(fields.Username))
         {
-            return AuthReply.Of(UserRules.AlreadyExists<SignedUpDto>(taken));
+            return UsernameTaken();
         }
 
-        if (await passwordPolicy.CheckAsync(write.Password, write.User.Username, write.User.Email) is { } refused)
+        if (await passwordPolicy.CheckAsync(write.Password, fields.Username, fields.Email) is { } refused)
         {
-            return AuthReply.Of(
-                ApiResponse<SignedUpDto>.ErrorResponse("Invalid data", StatusCodes.Status400BadRequest, [refused]));
+            return ApiResponse<object?>.ErrorResponse("Invalid data", StatusCodes.Status400BadRequest, [refused]);
         }
 
+        var passwordHash = passwords.Hash(write.Password);
         var now = time.GetUtcNow().UtcDateTime;
-        var user = UserRules.Create(write.User, passwords.Hash(write.Password), now);
-        database.Users.Add(user);
-        var session = database.Sessions.Add(Session.Start(user.Id, userAgent, now)).Entity;
-        var (cookie, _) = AddRefreshToken(session, now);
-        try
+        for (var attempt = 1; ; attempt++)
         {
-            await database.SaveChangesAsync();
-        }
-        catch (DbUpdateException exception)
-            when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            database.ChangeTracker.Clear();
-            taken = await UserRules.TakenAsync(database, write.User.Username, write.User.Email, exceptId: null);
-            if (taken.Count == 0)
+            try
             {
-                throw;
-            }
+                await using var transaction = await database.Database.BeginTransactionAsync();
+                if (await SignUpUserAsync(fields, passwordHash, now) is { } userId)
+                {
+                    await database.SaveChangesAsync();
+                    _log.SignUp(userId);
+                }
 
-            return AuthReply.Of(UserRules.AlreadyExists<SignedUpDto>(taken));
+                await transaction.CommitAsync();
+                return ApiResponse<object?>.SuccessResponse(null, CheckYourEmail, StatusCodes.Status202Accepted);
+            }
+            catch (DbUpdateException exception)
+                when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                database.ChangeTracker.Clear();
+                if (await UsernameTakenAsync(fields.Username))
+                {
+                    return UsernameTaken();
+                }
+
+                if (attempt > 1 || !await database.Users.AnyAsync(u => u.Email == fields.Email))
+                {
+                    throw;
+                }
+            }
+        }
+    }
+
+    private async Task<Guid?> SignUpUserAsync(NewUser fields, string passwordHash, DateTime now)
+    {
+        var heldBy = await database.Users
+            .Where(u => u.Email == fields.Email)
+            .Select(u => (Guid?)u.Id)
+            .SingleOrDefaultAsync();
+        if (heldBy is null)
+        {
+            var user = UserRules.Create(fields, passwordHash, now);
+            database.Users.Add(user);
+            AddVerification(user.Id, now);
+            return user.Id;
         }
 
-        _log.SignUp(user.Id, session.Id);
-        var token = tokens.Issue(user.Id, session.Id);
-        return new AuthReply<SignedUpDto>(
-            ApiResponse<SignedUpDto>.SuccessResponse(
-                new SignedUpDto(token.Value, token.ExpiresAt, session.ExpiresAt, UserView.Of(user)),
-                "Signed up",
-                201),
-            cookie);
+        await database.TryLockUserAsync(heldBy.Value);
+        var held = await database.Users.SingleOrDefaultAsync(u => u.Id == heldBy);
+        if (held is null || held.Verified)
+        {
+            return null;
+        }
+
+        held.Replace(fields, passwordHash, now);
+        await database.AuthTokens
+            .Where(t => t.UserId == held.Id && t.Kind == AuthTokenKind.Verification)
+            .ExecuteDeleteAsync();
+        AddVerification(held.Id, now);
+        return held.Id;
     }
+
+    private void AddVerification(Guid userId, DateTime now)
+    {
+        var (row, value) = AuthToken.Issue(userId, AuthTokenKind.Verification, AuthToken.VerificationLifetime, now);
+        database.AuthTokens.Add(row);
+        messages.Add(new VerifyEmail(userId) { Token = value });
+    }
+
+    private Task<bool> UsernameTakenAsync(string username) =>
+        database.Users.AnyAsync(u => u.Username == username);
+
+    private static ApiResponse<object?> UsernameTaken() =>
+        UserRules.AlreadyExists<object?>(
+            [new ApiError("username", ErrorCodes.Duplicate, "A user with this username already exists.")]);
+
+    public async Task<AuthReply<SignedInDto>> VerifyEmailAsync(string token, string? userAgent)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+
+        var hash = AuthToken.Hash(token);
+        var now = time.GetUtcNow().UtcDateTime;
+        var userId = await database.AuthTokens
+            .Where(t => t.TokenHash == hash && t.Kind == AuthTokenKind.Verification && t.ExpiresAt > now)
+            .Select(t => (Guid?)t.UserId)
+            .SingleOrDefaultAsync();
+        if (userId is not { } id)
+        {
+            return InvalidToken();
+        }
+
+        await using var transaction = await database.Database.BeginTransactionAsync();
+        var used = await database.TryLockUserAsync(id)
+            && await database.AuthTokens.Where(t => t.TokenHash == hash && t.ExpiresAt > now).ExecuteDeleteAsync() == 1;
+        if (!used)
+        {
+            return InvalidToken();
+        }
+
+        await database.Users.Where(u => u.Id == id).ExecuteUpdateAsync(u => u
+            .SetProperty(e => e.Verified, true)
+            .SetProperty(e => e.FailedSignInCount, 0)
+            .SetProperty(e => e.LastFailedSignInAt, (DateTime?)null)
+            .SetProperty(e => e.SignInBlockedUntil, (DateTime?)null)
+            .SetProperty(e => e.UpdatedAt, now)
+            .SetProperty(e => e.UpdatedBy, id));
+        var session = database.Sessions.Add(Session.Start(id, userAgent, now)).Entity;
+        var (cookie, _) = AddRefreshToken(session, now);
+        await database.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        _log.SignInSucceeded(id, session.Id);
+        meter.SignInAttempted(SignInResult.Succeeded);
+        return SignedIn(session, cookie, "Email verified");
+    }
+
+    private static AuthReply<SignedInDto> InvalidToken() =>
+        AuthReply.Of(ApiResponse<SignedInDto>.ErrorResponse(
+            "Invalid data",
+            StatusCodes.Status400BadRequest,
+            [new ApiError("token", ErrorCodes.InvalidToken, "This link is invalid or has expired.")]));
 
     public async Task<ApiResponse<UsernameAvailabilityDto>> UsernameAvailableAsync(string? username)
     {
@@ -117,6 +211,16 @@ public sealed class AuthService(
             return await CountFailureAsync(user, now) is null
                 ? Rejected(user.Id, SignInResult.WrongPassword)
                 : Rejected(user.Id, SignInResult.Blocked);
+        }
+
+        if (!user.Verified)
+        {
+            _log.SignInFailed(user.Id, blocked: false);
+            meter.SignInAttempted(SignInResult.Unverified);
+            return AuthReply.Of(ApiResponse<SignedInDto>.ErrorResponse(
+                ConfirmEmailFirst,
+                StatusCodes.Status403Forbidden,
+                [new ApiError(null, ErrorCodes.EmailNotVerified, ConfirmEmailFirst)]));
         }
 
         await using var transaction = await database.Database.BeginTransactionAsync();

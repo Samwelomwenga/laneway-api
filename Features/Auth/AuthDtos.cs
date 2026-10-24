@@ -65,13 +65,7 @@ public record SignedInDto
     DateTime SessionExpiresAt
 );
 
-public record SignedUpDto
-(
-    string AccessToken,
-    DateTime AccessTokenExpiresAt,
-    DateTime SessionExpiresAt,
-    UserDto User
-) : SignedInDto(AccessToken, AccessTokenExpiresAt, SessionExpiresAt);
+public record VerifyEmailDto(string? Token);
 
 public record UsernameCheckDto(string? Username);
 

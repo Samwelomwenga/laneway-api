@@ -1,0 +1,9 @@
+Laneway
+
+Confirm this is your email to finish signing up for Laneway.
+
+https://app.laneway.example/verify-email#token=Zm9yLXRoZS1zYW1wbGUtb25seS1ub3QtYS1yZWFsLXRva2Vu
+
+The link works for 24 hours. If you didn't sign up, ignore this email. The account is removed after 7 days.
+
+You got this email because it belongs to a Laneway account.

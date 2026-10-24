@@ -1,7 +1,5 @@
 using System.Net;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -30,10 +28,12 @@ public class UsernameTests : ApiTests
     [Fact]
     public async Task Sign_up_trims_and_lowercases_the_username()
     {
-        using var response = await SignUpAsync(SignUpBody(NewEmail(), username: "  Ana_W-2 "));
+        var email = NewEmail();
+        using var response = await SignUpAsync(SignUpBody(email, username: "  Ana_W-2 "));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        Assert.Equal("ana_w-2", (await response.ReadEnvelope<SignedUpDto>()).Data!.User.Username);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal("ana_w-2", await FromDatabaseAsync(database =>
+            database.Users.Where(u => u.Email == email).Select(u => u.Username).SingleAsync()));
     }
 
     [Theory]
@@ -143,53 +143,22 @@ public class UsernameTests : ApiTests
     public async Task The_migration_lowercases_names_and_renames_the_newer_of_a_pair_and_every_broken_one()
     {
         var now = Time.GetUtcNow().UtcDateTime;
-        var oldest = NewUser("Bob", now.AddDays(-2));
-        var newer = NewUser("bob", now.AddDays(-1));
-        var broken = NewUser("Ana Wanjiru", now);
-        var kept = NewUser("  Kamau ", now);
-        await FromDatabaseAsync(async database =>
-        {
-            var migrator = database.GetService<IMigrator>();
-            await migrator.MigrateAsync(PreviousMigration(database));
-            database.Users.AddRange(oldest, newer, broken, kept);
-            await database.SaveChangesAsync();
-            await migrator.MigrateAsync();
-            return 0;
-        });
+        var (oldest, newer, broken, kept) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        await MigrateWithUsersAsync(
+            "LowercaseUsernames",
+            (oldest, "Bob", now.AddDays(-2)),
+            (newer, "bob", now.AddDays(-1)),
+            (broken, "Ana Wanjiru", now),
+            (kept, "  Kamau ", now));
 
         var names = await FromDatabaseAsync(database => database.Users
             .AsNoTracking()
-            .Where(user => new[] { oldest.Id, newer.Id, broken.Id, kept.Id }.Contains(user.Id))
+            .Where(user => new[] { oldest, newer, broken, kept }.Contains(user.Id))
             .ToDictionaryAsync(user => user.Id, user => user.Username));
-        Assert.Equal("bob", names[oldest.Id]);
-        Assert.Equal($"user-{newer.Id:n}"[..13], names[newer.Id]);
-        Assert.Equal($"user-{broken.Id:n}"[..13], names[broken.Id]);
-        Assert.Equal("kamau", names[kept.Id]);
-    }
-
-    private static string PreviousMigration(ApplicationDbContext database)
-    {
-        var applied = database.Database.GetMigrations().ToList();
-        return applied[applied.IndexOf(applied.Single(name => name.EndsWith("_LowercaseUsernames", StringComparison.Ordinal))) - 1];
-    }
-
-    private static User NewUser(string username, DateTime createdAt)
-    {
-        var id = Guid.NewGuid();
-        return new User
-        {
-            Id = id,
-            Username = username,
-            Email = $"{id:n}@example.com",
-            PasswordHash = "hash",
-            FirstName = "Ana",
-            LastName = "Waweru",
-            Language = "en-US",
-            TimeZone = "UTC",
-            Location = "Nairobi",
-            CreatedAt = createdAt,
-            CreatedBy = id
-        };
+        Assert.Equal("bob", names[oldest]);
+        Assert.Equal($"user-{newer:n}"[..13], names[newer]);
+        Assert.Equal($"user-{broken:n}"[..13], names[broken]);
+        Assert.Equal("kamau", names[kept]);
     }
 
     private async Task<bool> AvailableAsync(string username)
