@@ -17,4 +17,6 @@ regexes = [
   # JWT signing keys the test host and BearerTokenTests use. No real issuer trusts them.
   '''cNDergQ\+t0OsqAmWjqRYls/RSPk11lB9DEUWpkpREDU=''',
   '''sPrCzru4irSfWucz67ISqUecyHq28c\+ty6TQ0jhRkdQ=''',
+  # The made-up verification token in the VerifyEmail email sample. It decodes to "for-the-sample-only-not-a-real-token".
+  '''Zm9yLXRoZS1zYW1wbGUtb25seS1ub3QtYS1yZWFsLXRva2Vu''',
 ]
