@@ -19,17 +19,19 @@ public class RefreshTests : ApiTests
     }
 
     [Fact]
-    public async Task Sign_up_sets_the_refresh_cookie_and_stores_only_its_hash()
+    public async Task Verifying_the_email_sets_the_refresh_cookie_and_stores_only_its_hash()
     {
-        using var response = await PostOverHttpsAsync("/api/v1/auth/sign-up", SignUpBody(NewEmail()));
+        var email = NewEmail();
+        using var signUp = await PostOverHttpsAsync("/api/v1/auth/sign-up", SignUpBody(email));
+        using var response = await VerifyEmailAsync(await VerifyTokenSentToAsync(email));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var token = RefreshCookieAssert.Set(response, Session.AbsoluteLifetime);
         Assert.DoesNotContain(token, await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         var stored = await FromDatabaseAsync(database => database.RefreshTokens.SingleAsync());
         Assert.Equal(SHA256.HashData(Encoding.ASCII.GetBytes(token)), stored.TokenHash);
         Assert.Null(stored.RetiredAt);
-        Assert.Equal(SessionOf((await response.ReadEnvelope<SignedUpDto>()).Data!.AccessToken), stored.SessionId);
+        Assert.Equal(SessionOf((await response.ReadEnvelope<SignedInDto>()).Data!.AccessToken), stored.SessionId);
     }
 
     [Fact]

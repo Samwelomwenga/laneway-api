@@ -13,4 +13,6 @@ public sealed record PasswordChanged(
     Guid? IMessage.UserId => UserId;
 
     string? IMessage.Address => null;
+
+    string? IMessage.Secret => null;
 }

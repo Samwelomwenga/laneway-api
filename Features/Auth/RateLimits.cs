@@ -14,6 +14,10 @@ public static class RateLimits
 
     public const string Refresh = "refresh";
 
+    public const string UsernameCheck = "username-check";
+
+    public const string EmailRequest = "email-request";
+
     public const string PasswordCheck = "password-check";
 
     public const string AddMember = "add-member";
@@ -37,6 +41,8 @@ public static class RateLimits
         new(SignIn, 10, TimeSpan.FromMinutes(1), CountsBy.Ip),
         new(SignUp, 10, TimeSpan.FromHours(1), CountsBy.Ip),
         new(Refresh, 60, TimeSpan.FromMinutes(1), CountsBy.Ip),
+        new(UsernameCheck, 30, TimeSpan.FromMinutes(1), CountsBy.Ip),
+        new(EmailRequest, 10, TimeSpan.FromHours(1), CountsBy.Ip),
         new(PasswordCheck, 5, TimeSpan.FromMinutes(1), CountsBy.Sub),
         new(AddMember, 20, TimeSpan.FromMinutes(1), CountsBy.Sub),
         new(Webhook, 600, TimeSpan.FromMinutes(1), CountsBy.Ip)

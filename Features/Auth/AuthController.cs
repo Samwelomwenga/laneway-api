@@ -21,9 +21,42 @@ public class AuthController : ApiControllerBase
     [RateLimited(RateLimits.SignUp)]
     [AllowAnonymous]
     [CsrfChecked]
-    public async Task<ActionResult<ApiResponse<SignedUpDto>>> SignUp([FromBody] SignUpDto signUpDto)
+    public async Task<ActionResult<ApiResponse<object?>>> SignUp([FromBody] SignUpDto signUpDto)
     {
-        return Reply(await _authService.SignUpAsync(SignUpWrite.Of(signUpDto), Request.Headers.UserAgent.ToString()));
+        return ToActionResult(await _authService.SignUpAsync(SignUpWrite.Of(signUpDto)));
+    }
+
+    [HttpPost("verify-email")]
+    [AllowAnonymous]
+    [CsrfChecked]
+    public async Task<ActionResult<ApiResponse<SignedInDto>>> VerifyEmail([FromBody] VerifyEmailDto verifyEmailDto)
+    {
+        ArgumentNullException.ThrowIfNull(verifyEmailDto);
+
+        return Reply(await _authService.VerifyEmailAsync(
+            Writes.Required(verifyEmailDto.Token, "token"), Request.Headers.UserAgent.ToString()));
+    }
+
+    [HttpPost("resend-verification")]
+    [RateLimited(RateLimits.EmailRequest)]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<object?>>> ResendVerification(
+        [FromBody] ResendVerificationDto resendDto)
+    {
+        ArgumentNullException.ThrowIfNull(resendDto);
+
+        return ToActionResult(await _authService.ResendVerificationAsync(Writes.Required(resendDto.Email, "email")));
+    }
+
+    [HttpGet("username-available")]
+    [RateLimited(RateLimits.UsernameCheck)]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<UsernameAvailabilityDto>>> UsernameAvailable(
+        [FromQuery] UsernameCheckDto check)
+    {
+        ArgumentNullException.ThrowIfNull(check);
+
+        return ToActionResult(await _authService.UsernameAvailableAsync(check.Username));
     }
 
     [HttpPost("sign-in")]

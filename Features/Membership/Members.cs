@@ -11,9 +11,10 @@ public static class Members
 
         return lookup switch
         {
-            { UserId: { } id } => context.Users.FirstOrDefaultAsync(user => user.Id == id),
-            { Username: { } username } => context.Users.FirstOrDefaultAsync(user => user.Username == username),
-            _ => context.Users.FirstOrDefaultAsync(user => user.Email == lookup.Email)
+            { UserId: { } id } => context.Users.FirstOrDefaultAsync(user => user.Id == id && user.Verified),
+            { Username: { } username } =>
+                context.Users.FirstOrDefaultAsync(user => user.Username == username && user.Verified),
+            _ => context.Users.FirstOrDefaultAsync(user => user.Email == lookup.Email && user.Verified)
         };
     }
 

@@ -18,14 +18,15 @@ The minimum password length is 8, which meets 6.2.1 at every level, so it isn't 
   - A new password must pass a top-100k common-password list (6.2.4), a context-word check (6.2.11), and a Have I Been Pwned range lookup (6.2.12).
 - What closes it: the MFA effort.
 
-### 6.3.8, sign-up and change-email enumeration (L3)
+### 6.3.8, enumeration (L3)
 
-6.3.8 is an L3 item, so it isn't strictly owed at L2. It's listed so the email effort finds it.
+6.3.8 is an L3 item, so it isn't strictly owed at L2. It stays listed because some answers still show whether an account exists.
 
-- What Laneway doesn't do: hide whether a username or email is taken. Sign-up answers 409 for a taken one. Change email answers 409 when another user has the new email.
-- Why: without email, neither endpoint has a way to tell a user their address is taken without telling everyone who tries it.
-- Mitigating controls: the `sign-up` rate limit, 10 per hour per IP. It slows harvesting from one IP and doesn't stop a botnet. Change email gives away no more than sign-up already does. It also needs an access token and the current password, and the `password-check` limit of 5 per minute by `sub` caps it. Sign-in itself resists enumeration with one 401 for an unknown user or a wrong password, and a dummy hash so the timing matches. Adding a member by email answers 400 `notFound` for an address with no account, so it gives away no more than sign-up already does. It needs an access token and the right to add members to a place, and the `add-member` limit of 20 per minute by `sub` caps it.
-- What closes it: Laneway sending email. Sign-up then answers "check your email" whether the address is taken or not. Change email sends a confirmation link to the new address and answers the same way.
+- Closed: sign-up by email. Past the username check, sign-up always answers 202 with no session. A new address, an unverified user's address, and a verified user's address all get the same reply, and the taken path still runs the password policy and the hash.
+- What Laneway doesn't do: hide whether a username is taken, or whether another user has an email in two places. Sign-up and the username checker answer 409 or `false` for a taken username. Change email answers 409 when another user has the new email. Adding a member by email answers 400 `notFound` when no verified user has the address.
+- Why: usernames are public handles, so a taken one isn't a secret. Change email keeps its 409 because only a signed-in user who knows their password can ask.
+- Mitigating controls: the `sign-up` limit of 10 per hour per IP and the `username-check` limit of 30 per minute per IP cap username harvesting. The checker looks up usernames only, never emails. Change email needs an access token and the current password, and the `password-check` limit of 5 per minute by `sub` caps it. Adding a member needs an access token and the right to add members to a place, and the `add-member` limit of 20 per minute by `sub` caps it. Sign-in resists enumeration with one 401 for an unknown user or a wrong password, and a dummy hash so the timing matches. The 403 for an unverified user only comes with the right password.
+- What closes it: nothing planned. Account recovery adds forgot password, which always answers 202. The username and change-email answers stay as accepted risk under the limits above.
 
 ### 13.2.1, short-lived service credentials (L2)
 

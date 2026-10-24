@@ -557,7 +557,8 @@ public abstract class AccessMatrix : ApiTests
             LastName = "Otieno",
             Language = "en-US",
             TimeZone = "UTC",
-            Location = "Kisumu"
+            Location = "Kisumu",
+            Verified = true
         };
         user.CreatedBy = user.Id;
         await FromDatabaseAsync(async database =>

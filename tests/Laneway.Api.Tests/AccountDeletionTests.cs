@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -29,6 +30,22 @@ public class AccountDeletionTests : ApiTests
         Assert.Contains("'Roadmap'", errors[1].Message, StringComparison.Ordinal);
         using var stillHere = await GetAsync("/api/v1/profile");
         Assert.Equal(HttpStatusCode.OK, stillHere.StatusCode);
+    }
+
+    [Fact]
+    public async Task Deleting_a_user_deletes_their_token_rows()
+    {
+        await FromDatabaseAsync(database =>
+        {
+            database.AuthTokens.Add(AuthToken.Issue(
+                ActorId, AuthTokenKind.Verification, AuthToken.VerificationLifetime, Time.GetUtcNow().UtcDateTime).Row);
+            return database.SaveChangesAsync();
+        });
+
+        using var response = await DeleteUserAsync(ActorUser);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.False(await FromDatabaseAsync(database => database.AuthTokens.AnyAsync(t => t.UserId == ActorId)));
     }
 
     [Fact]

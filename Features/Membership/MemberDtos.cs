@@ -55,7 +55,7 @@ public record AddWorkspaceMemberDto
     WorkspaceRole? Role
 ) : INamesAUser
 {
-    public string? Username { get; init; } = Username?.Trim();
+    public string? Username { get; init; } = Usernames.Normalize(Username);
     public string? Email { get; init; } = Emails.Normalize(Email);
 }
 
@@ -67,7 +67,7 @@ public record AddBoardMemberDto
     BoardRole? Role
 ) : INamesAUser
 {
-    public string? Username { get; init; } = Username?.Trim();
+    public string? Username { get; init; } = Usernames.Normalize(Username);
     public string? Email { get; init; } = Emails.Normalize(Email);
 }
 

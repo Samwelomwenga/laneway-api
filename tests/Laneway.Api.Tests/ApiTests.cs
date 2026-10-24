@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Testing;
@@ -171,13 +173,46 @@ public abstract class ApiTests : IAsyncLifetime
     protected static Guid SessionOf(string accessToken) =>
         Guid.Parse(new JsonWebToken(accessToken).GetPayloadValue<string>(AccessTokens.SessionClaim));
 
-    protected async Task<(SignedUpDto SignedUp, string Cookie)> SignUpOverHttpsAsync()
+    protected sealed record SignedUp(
+        string AccessToken, DateTime AccessTokenExpiresAt, DateTime SessionExpiresAt, UserDto User);
+
+    protected async Task<(SignedUp SignedUp, string Cookie)> SignUpOverHttpsAsync(
+        string? email = null, string password = SignUpPassword)
     {
-        using var response = await PostOverHttpsAsync("/api/v1/auth/sign-up", SignUpBody(NewEmail()));
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        return ((await response.ReadEnvelope<SignedUpDto>()).Data!,
-            RefreshCookieAssert.Set(response, Session.AbsoluteLifetime));
+        email ??= NewEmail();
+        using var signUp = await PostOverHttpsAsync("/api/v1/auth/sign-up", SignUpBody(email, password));
+        Assert.Equal(HttpStatusCode.Accepted, signUp.StatusCode);
+        using var verify = await VerifyEmailAsync(await VerifyTokenSentToAsync(email));
+        Assert.Equal(HttpStatusCode.OK, verify.StatusCode);
+
+        var signedIn = (await verify.ReadEnvelope<SignedInDto>()).Data!;
+        using var profile = await SendWithTokenAsync(HttpMethod.Get, "/api/v1/profile", signedIn.AccessToken);
+        var user = (await profile.ReadEnvelope<UserDto>()).Data!;
+        return (new SignedUp(signedIn.AccessToken, signedIn.AccessTokenExpiresAt, signedIn.SessionExpiresAt, user),
+            RefreshCookieAssert.Set(verify, Session.AbsoluteLifetime));
     }
+
+    protected async Task<string> VerifyTokenSentToAsync(string email) =>
+        (await AwaitEmailAsync(Emails.Normalize(email))).TokenFrom(AppRoutes.VerifyEmail);
+
+    protected Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
+        PostOverHttpsAsync("/api/v1/auth/verify-email", new { token });
+
+    protected Task<HttpResponseMessage> ResendVerificationAsync(string email) =>
+        SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/resend-verification", new { email });
+
+    protected Task SuppressAsync(string email) =>
+        FromDatabaseAsync(database =>
+        {
+            database.Suppressions.Add(new Suppression
+            {
+                AddressHash = Suppressions.Hash(email),
+                Kind = SuppressionKind.HardBounce,
+                SuppressedAt = Time.GetUtcNow().UtcDateTime,
+                MessageId = "<seeded@smtp-relay.mailin.fr>"
+            });
+            return database.SaveChangesAsync();
+        });
 
     protected async Task<HttpResponseMessage> RefreshAsync(
         string? cookie, IReadOnlyDictionary<string, string>? headers = null)
@@ -242,7 +277,8 @@ public abstract class ApiTests : IAsyncLifetime
             Language = "en-US",
             TimeZone = "UTC",
             Location = "Nairobi",
-            CreatedAt = now
+            CreatedAt = now,
+            Verified = true
         };
         user.CreatedBy = user.Id;
         var session = new Session
@@ -752,6 +788,26 @@ public abstract class ApiTests : IAsyncLifetime
         await using var scope = factory.Services.CreateAsyncScope();
         return await read(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
     }
+
+    protected Task MigrateWithUsersAsync(string migration, params (Guid Id, string Username, DateTime CreatedAt)[] users) =>
+        FromDatabaseAsync(async database =>
+        {
+            var migrator = database.GetService<IMigrator>();
+            var all = database.Database.GetMigrations().ToList();
+            await migrator.MigrateAsync(all[all.FindIndex(name => name.EndsWith($"_{migration}", StringComparison.Ordinal)) - 1]);
+            foreach (var (id, username, createdAt) in users)
+            {
+                var email = $"{id:n}@example.com";
+                await database.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO "Users" ("Id", "Username", "Email", "PasswordHash", "FirstName", "LastName",
+                        "Language", "TimeZone", "Location", "CreatedAt", "CreatedBy", "FailedSignInCount")
+                    VALUES ({id}, {username}, {email}, 'hash', 'Ana', 'Waweru', 'en-US', 'UTC', 'Nairobi', {createdAt}, {id}, 0)
+                    """);
+            }
+
+            await migrator.MigrateAsync();
+            return 0;
+        });
 
     protected Task<List<Guid>> SeedCardsAsync(Guid listId, int count, bool archived = false) =>
         SeedAsync(context => context.Cards, count, n => new Card

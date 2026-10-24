@@ -40,11 +40,12 @@ public class EmailSampleTests
             PasswordChangeHow.Changed,
             At,
             "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
-            "Africa/Nairobi"))
+            "Africa/Nairobi")),
+        ["VerifyEmail"] = Render(new VerifyEmail(Guid.Empty) { Token = "Zm9yLXRoZS1zYW1wbGUtb25seS1ub3QtYS1yZWFsLXRva2Vu" })
     };
 
     private static (MessageType, EmailBody) Render(IMessage message) =>
-        (message.Type, EmailTemplates.Render(message.Type, MessageBodies.Of(message), Links));
+        (message.Type, EmailTemplates.Render(message.Type, MessageBodies.Of(message), message.Secret, Links));
 
     private static void AssertSample(string file, string rendered)
     {

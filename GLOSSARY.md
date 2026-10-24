@@ -123,7 +123,7 @@ A user who is gone for good. The work they did stays, and their activity entries
 _Avoid_: Removed user, inactive user, disabled user
 
 **Session**:
-One stretch of a user being signed in on one device. It starts when the user signs up or signs in. It ends when they sign out, sign out everywhere, or are deleted, when they change their password from another session, or when it runs out. It also ends when the user ends it from their list of sessions, or when Laneway sees one of its old refresh tokens used again. A user can have several at once.
+One stretch of a user being signed in on one device. It starts when the user signs in or uses their verification link. It ends when they sign out, sign out everywhere, or are deleted, when they change their password from another session, or when it runs out. It also ends when the user ends it from their list of sessions, or when Laneway sees one of its old refresh tokens used again. A user can have several at once.
 _Avoid_: Login, token family
 
 **Profile**:
@@ -133,3 +133,7 @@ _Avoid_: Me, account
 **Sign-in block**:
 A stretch of time when a user can't sign in, because someone typed the wrong password for them too many times. Wrong passwords count the same whether they come from signing in, changing the password or email, or deleting the user, and a block stops all four. It ends on its own, and it gets longer the more wrong passwords keep coming. The user's existing sessions keep working.
 _Avoid_: Lockout, locked account, suspended user
+
+**Verified user**:
+A user who has proved they own their email by using the link Laneway sent to it. Until then the user is unverified. An unverified user can't sign in or be added as a member. Someone else who signs up with the same email takes their place.
+_Avoid_: Confirmed user, activated account, pending user

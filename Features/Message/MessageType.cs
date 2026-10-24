@@ -2,7 +2,8 @@ namespace Laneway.Api;
 
 public enum MessageType
 {
-    PasswordChanged
+    PasswordChanged,
+    VerifyEmail
 }
 
 public enum MessageChannel

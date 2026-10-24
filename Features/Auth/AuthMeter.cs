@@ -57,6 +57,7 @@ public sealed class AuthMeter
             SignInResult.WrongPassword => "wrong_password",
             SignInResult.UnknownAccount => "unknown_account",
             SignInResult.Blocked => "blocked",
+            SignInResult.Unverified => "unverified",
             _ => throw new ArgumentOutOfRangeException(nameof(result), result, null)
         }));
 
@@ -104,7 +105,8 @@ public enum SignInResult
     Succeeded,
     WrongPassword,
     UnknownAccount,
-    Blocked
+    Blocked,
+    Unverified
 }
 
 public enum PasswordCheckedEndpoint

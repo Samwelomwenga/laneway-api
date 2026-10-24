@@ -6,7 +6,7 @@ public sealed class SignUpDtoValidator : AbstractValidator<SignUpDto>
 {
     public SignUpDtoValidator()
     {
-        RuleFor(x => x.Username).Required().MaxLength(FieldLimits.Username);
+        RuleFor(x => x.Username).Username();
         RuleFor(x => x.Email).Required().MaxLength(FieldLimits.UserEmail);
         RuleFor(x => x.Password).NewPassword();
         RuleFor(x => x.FirstName).Required().MaxLength(FieldLimits.UserFirstName);
@@ -16,6 +16,22 @@ public sealed class SignUpDtoValidator : AbstractValidator<SignUpDto>
         RuleFor(x => x.Language).Required().MaxLength(FieldLimits.UserLanguage);
         RuleFor(x => x.TimeZone).Required().MaxLength(FieldLimits.UserTimeZone);
         RuleFor(x => x.Location).Required().MaxLength(FieldLimits.UserLocation);
+    }
+}
+
+public sealed class VerifyEmailDtoValidator : AbstractValidator<VerifyEmailDto>
+{
+    public VerifyEmailDtoValidator()
+    {
+        RuleFor(x => x.Token).Required();
+    }
+}
+
+public sealed class ResendVerificationDtoValidator : AbstractValidator<ResendVerificationDto>
+{
+    public ResendVerificationDtoValidator()
+    {
+        RuleFor(x => x.Email).Required().MaxLength(FieldLimits.UserEmail);
     }
 }
 

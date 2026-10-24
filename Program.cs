@@ -61,6 +61,8 @@ builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 builder.Services.AddSingleton<SessionSweeper>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<SessionSweeper>());
+builder.Services.AddSingleton<AuthSweeper>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<AuthSweeper>());
 builder.Services.AddSingleton<Passwords>();
 builder.Services.AddHttpClient<BreachedPasswords>(BreachedPasswords.Configure).RemoveAllLoggers();
 builder.Services.AddScoped<PasswordPolicy>();

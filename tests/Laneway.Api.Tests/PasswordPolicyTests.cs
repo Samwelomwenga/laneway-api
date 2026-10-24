@@ -40,18 +40,18 @@ public class PasswordPolicyTests : ApiTests
 
     [Theory]
     [InlineData("bob", "jo@example.com", "bob and jo plant trees")]
-    [InlineData("🔑🔑🔑", "jo@example.com", "🔑🔑🔑 and plum trees")]
+    [InlineData("ana-waweru", "🔑🔑🔑@example.com", "🔑🔑🔑 and plum trees")]
     public async Task Context_words_under_4_code_points_are_ignored(string username, string email, string password)
     {
         using var response = await SignUpAsync(SignUpBody(email, password, username));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
     }
 
     [Fact]
     public async Task A_context_word_of_4_code_points_counts()
     {
-        using var response = await SignUpAsync(SignUpBody("jo@example.com", "my 🔑🔑🔑🔑 and plum trees", "🔑🔑🔑🔑"));
+        using var response = await SignUpAsync(SignUpBody("🔑🔑🔑🔑@example.com", "my 🔑🔑🔑🔑 and plum trees", "ana-waweru"));
 
         await AssertRefusedAsync(response, ErrorCodes.ContainsContextWord, "username");
     }
@@ -89,7 +89,7 @@ public class PasswordPolicyTests : ApiTests
 
         using var response = await SignUpAsync(SignUpBody("ana@example.com", "violet harbor kettle"));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.Single(PwnedPasswords.Requests);
     }
 
@@ -141,7 +141,7 @@ public class PasswordPolicyTests : ApiTests
 
         using var response = await SignUpAsync(SignUpBody("ana@example.com", "violet harbor kettle"));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var logged = Assert.Single(Logs(), log => log.Id.Name == "BreachedCheckUnavailable");
         Assert.Equal(AuthLog.Category, logged.Category);
         Assert.Equal(LogLevel.Warning, logged.Level);
@@ -157,7 +157,7 @@ public class PasswordPolicyTests : ApiTests
 
         using var response = await SignUpAsync(SignUpBody("ana@example.com", password));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.DoesNotContain(Logs(), log =>
             log.Message.Contains(prefix, StringComparison.OrdinalIgnoreCase)
             || (log.StructuredState ?? []).Any(pair =>
