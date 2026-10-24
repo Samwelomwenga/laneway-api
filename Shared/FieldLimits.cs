@@ -28,4 +28,13 @@ public static class FieldLimits
     public const int LabelsPerBoard = 1000;
     public const int LabelsPerCard = 100;
     public const int SessionUserAgent = 256;
+    public const int UserFirstName = 50;
+    public const int UserLastName = 50;
+    public const int Username = 50;
+    public const int UserEmail = 255;
+    public const int UserBio = 500;
+    public const int UserLocation = 300;
+    public const int UserPhoneNumber = 20;
+    public const int UserTimeZone = 50;
+    public const int UserLanguage = 10;
 }

@@ -121,6 +121,33 @@ public class ProfileTests : ApiTests
         Assert.Equal(HttpStatusCode.MethodNotAllowed, edit.StatusCode);
     }
 
+    public static TheoryData<string, int> ProfileLimits => new()
+    {
+        { "username", FieldLimits.Username },
+        { "firstName", FieldLimits.UserFirstName },
+        { "lastName", FieldLimits.UserLastName },
+        { "phoneNumber", FieldLimits.UserPhoneNumber },
+        { "bio", FieldLimits.UserBio },
+        { "language", FieldLimits.UserLanguage },
+        { "timeZone", FieldLimits.UserTimeZone },
+        { "location", FieldLimits.UserLocation }
+    };
+
+    [Theory]
+    [MemberData(nameof(ProfileLimits))]
+    public async Task A_profile_field_over_the_limit_is_tooLong(string field, int limit)
+    {
+        var body = Fields(ProfileBody());
+        body[field] = new string('a', limit + 1);
+
+        using var response = await PutAsync("/api/v1/profile", body);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = Assert.Single(await response.ReadErrors());
+        Assert.Equal(field, error.Field);
+        Assert.Equal(ErrorCodes.TooLong, error.Code);
+    }
+
     private static object ProfileBody(string username = "wanjiru") => new
     {
         username,
@@ -133,7 +160,4 @@ public class ProfileTests : ApiTests
         location = "Nakuru",
         profilePictureUrl = (string?)null
     };
-
-    private static Dictionary<string, object?> Fields(object body) =>
-        JsonSerializer.Deserialize<Dictionary<string, object?>>(JsonSerializer.Serialize(body))!;
 }

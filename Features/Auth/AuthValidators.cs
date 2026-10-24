@@ -6,14 +6,16 @@ public sealed class SignUpDtoValidator : AbstractValidator<SignUpDto>
 {
     public SignUpDtoValidator()
     {
-        RuleFor(x => x.Username).Required();
-        RuleFor(x => x.Email).Required();
+        RuleFor(x => x.Username).Required().MaxLength(FieldLimits.Username);
+        RuleFor(x => x.Email).Required().MaxLength(FieldLimits.UserEmail);
         RuleFor(x => x.Password).NewPassword();
-        RuleFor(x => x.FirstName).Required();
-        RuleFor(x => x.LastName).Required();
-        RuleFor(x => x.Language).Required();
-        RuleFor(x => x.TimeZone).Required();
-        RuleFor(x => x.Location).Required();
+        RuleFor(x => x.FirstName).Required().MaxLength(FieldLimits.UserFirstName);
+        RuleFor(x => x.LastName).Required().MaxLength(FieldLimits.UserLastName);
+        RuleFor(x => x.PhoneNumber).MaxLength(FieldLimits.UserPhoneNumber);
+        RuleFor(x => x.Bio).MaxLength(FieldLimits.UserBio);
+        RuleFor(x => x.Language).Required().MaxLength(FieldLimits.UserLanguage);
+        RuleFor(x => x.TimeZone).Required().MaxLength(FieldLimits.UserTimeZone);
+        RuleFor(x => x.Location).Required().MaxLength(FieldLimits.UserLocation);
     }
 }
 
@@ -40,7 +42,7 @@ public sealed class ChangeEmailDtoValidator : AbstractValidator<ChangeEmailDto>
     public ChangeEmailDtoValidator()
     {
         RuleFor(x => x.Password).Required().PasswordWithinMaximum();
-        RuleFor(x => x.NewEmail).Required();
+        RuleFor(x => x.NewEmail).Required().MaxLength(FieldLimits.UserEmail);
     }
 }
 

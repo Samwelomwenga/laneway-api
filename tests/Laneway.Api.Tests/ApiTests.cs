@@ -163,6 +163,11 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected static string NewEmail() => $"{Guid.NewGuid():n}@example.com";
 
+    protected static string EmailOfLength(int length) => new string('a', length - "@example.com".Length) + "@example.com";
+
+    protected static Dictionary<string, object?> Fields(object body) =>
+        JsonSerializer.Deserialize<Dictionary<string, object?>>(JsonSerializer.Serialize(body))!;
+
     protected static Guid SessionOf(string accessToken) =>
         Guid.Parse(new JsonWebToken(accessToken).GetPayloadValue<string>(AccessTokens.SessionClaim));
 

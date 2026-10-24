@@ -57,6 +57,20 @@ public class WorkspaceMemberTests : ApiTests
     }
 
     [Fact]
+    public async Task A_username_over_the_limit_is_tooLong()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+
+        using var response = await PostAsync(
+            WorkspaceMembersPath(workspace.Id), new { username = new string('a', FieldLimits.Username + 1) });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = Assert.Single(await response.ReadErrors());
+        Assert.Equal("username", error.Field);
+        Assert.Equal(ErrorCodes.TooLong, error.Code);
+    }
+
+    [Fact]
     public async Task Only_workspace_admins_manage_members()
     {
         var workspace = await CreateWorkspaceAsync("Design");

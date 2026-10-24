@@ -256,6 +256,34 @@ public class SignInTests : ApiTests
         Assert.Equal(ErrorCodes.InvalidFormat, error.Code);
     }
 
+    public static TheoryData<string, string> SignUpOverLimits => new()
+    {
+        { "username", new string('a', FieldLimits.Username + 1) },
+        { "email", EmailOfLength(FieldLimits.UserEmail + 1) },
+        { "firstName", new string('a', FieldLimits.UserFirstName + 1) },
+        { "lastName", new string('a', FieldLimits.UserLastName + 1) },
+        { "phoneNumber", new string('a', FieldLimits.UserPhoneNumber + 1) },
+        { "bio", new string('a', FieldLimits.UserBio + 1) },
+        { "language", new string('a', FieldLimits.UserLanguage + 1) },
+        { "timeZone", new string('a', FieldLimits.UserTimeZone + 1) },
+        { "location", new string('a', FieldLimits.UserLocation + 1) }
+    };
+
+    [Theory]
+    [MemberData(nameof(SignUpOverLimits))]
+    public async Task A_sign_up_field_over_the_limit_is_tooLong(string field, string value)
+    {
+        var body = Fields(SignUpBody(NewEmail()));
+        body[field] = value;
+
+        using var response = await SignUpAsync(body);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = Assert.Single(await response.ReadErrors());
+        Assert.Equal(field, error.Field);
+        Assert.Equal(ErrorCodes.TooLong, error.Code);
+    }
+
     private static string PasswordOfLength(int length) =>
         string.Concat(Enumerable.Repeat("plum tractor ", 10))[..length];
 
