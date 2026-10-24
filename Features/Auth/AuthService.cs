@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Laneway.Api;
 
 public interface IAuthService
 {
     Task<AuthReply<SignedUpDto>> SignUpAsync(SignUpWrite write, string? userAgent);
+    Task<ApiResponse<UsernameAvailabilityDto>> UsernameAvailableAsync(string? username);
     Task<AuthReply<SignedInDto>> SignInAsync(SignInWrite write, string? userAgent);
     Task<AuthReply<SignedInDto>> RefreshAsync(string? presented);
     Task<AuthReply<bool>> SignOutAsync(Guid userId, Guid sessionId);
@@ -55,7 +57,22 @@ public sealed class AuthService(
         database.Users.Add(user);
         var session = database.Sessions.Add(Session.Start(user.Id, userAgent, now)).Entity;
         var (cookie, _) = AddRefreshToken(session, now);
-        await database.SaveChangesAsync();
+        try
+        {
+            await database.SaveChangesAsync();
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            database.ChangeTracker.Clear();
+            taken = await UserRules.TakenAsync(database, write.User.Username, write.User.Email, exceptId: null);
+            if (taken.Count == 0)
+            {
+                throw;
+            }
+
+            return AuthReply.Of(UserRules.AlreadyExists<SignedUpDto>(taken));
+        }
 
         _log.SignUp(user.Id, session.Id);
         var token = tokens.Issue(user.Id, session.Id);
@@ -65,6 +82,16 @@ public sealed class AuthService(
                 "Signed up",
                 201),
             cookie);
+    }
+
+    public async Task<ApiResponse<UsernameAvailabilityDto>> UsernameAvailableAsync(string? username)
+    {
+        var name = Usernames.Normalize(username);
+        var available = name is not null
+            && Usernames.IsValid(name)
+            && !await database.Users.AnyAsync(user => user.Username == name);
+        return ApiResponse<UsernameAvailabilityDto>.SuccessResponse(
+            new UsernameAvailabilityDto(available), "Username checked", StatusCodes.Status200OK);
     }
 
     public async Task<AuthReply<SignedInDto>> SignInAsync(SignInWrite write, string? userAgent)

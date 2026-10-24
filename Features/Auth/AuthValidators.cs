@@ -6,7 +6,7 @@ public sealed class SignUpDtoValidator : AbstractValidator<SignUpDto>
 {
     public SignUpDtoValidator()
     {
-        RuleFor(x => x.Username).Required().MaxLength(FieldLimits.Username);
+        RuleFor(x => x.Username).Username();
         RuleFor(x => x.Email).Required().MaxLength(FieldLimits.UserEmail);
         RuleFor(x => x.Password).NewPassword();
         RuleFor(x => x.FirstName).Required().MaxLength(FieldLimits.UserFirstName);

@@ -14,6 +14,13 @@ public static class ValidationRules
             .WithErrorCode(ErrorCodes.TooLong)
             .WithMessage($"'{{PropertyName}}' must be {maxLength} characters or fewer.");
 
+    public static IRuleBuilderOptions<T, string?> Username<T>(this IRuleBuilder<T, string?> rule) =>
+        rule.Required()
+            .MaxLength(FieldLimits.Username)
+            .Must(username => string.IsNullOrEmpty(username) || username.Length > FieldLimits.Username || Usernames.IsValid(username))
+            .WithErrorCode(ErrorCodes.Invalid)
+            .WithMessage($"'{{PropertyName}}' must be {Usernames.MinimumLength} or more of a-z, 0-9, '_' and '-', starting with a letter or digit.");
+
     public static IRuleBuilderOptions<T, int?> NotNegative<T>(this IRuleBuilder<T, int?> rule) =>
         rule.GreaterThanOrEqualTo(0)
             .WithErrorCode(ErrorCodes.OutOfRange)

@@ -40,7 +40,7 @@ public class PasswordPolicyTests : ApiTests
 
     [Theory]
     [InlineData("bob", "jo@example.com", "bob and jo plant trees")]
-    [InlineData("🔑🔑🔑", "jo@example.com", "🔑🔑🔑 and plum trees")]
+    [InlineData("ana-waweru", "🔑🔑🔑@example.com", "🔑🔑🔑 and plum trees")]
     public async Task Context_words_under_4_code_points_are_ignored(string username, string email, string password)
     {
         using var response = await SignUpAsync(SignUpBody(email, password, username));
@@ -51,7 +51,7 @@ public class PasswordPolicyTests : ApiTests
     [Fact]
     public async Task A_context_word_of_4_code_points_counts()
     {
-        using var response = await SignUpAsync(SignUpBody("jo@example.com", "my 🔑🔑🔑🔑 and plum trees", "🔑🔑🔑🔑"));
+        using var response = await SignUpAsync(SignUpBody("🔑🔑🔑🔑@example.com", "my 🔑🔑🔑🔑 and plum trees", "ana-waweru"));
 
         await AssertRefusedAsync(response, ErrorCodes.ContainsContextWord, "username");
     }

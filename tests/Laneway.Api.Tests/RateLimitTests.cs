@@ -38,6 +38,16 @@ public class RateLimitTests : ApiTests
     }
 
     [Fact]
+    public async Task The_31st_username_check_in_a_minute_from_one_ip_gets_a_429()
+    {
+        await SendTimesAsync(30, () => SendAnonymousAsync(HttpMethod.Get, "/api/v1/auth/username-available?username=ana", null));
+
+        using var response = await SendAnonymousAsync(HttpMethod.Get, "/api/v1/auth/username-available?username=ana", null);
+
+        await AssertTooManyRequestsAsync(response, "10");
+    }
+
+    [Fact]
     public async Task The_61st_refresh_in_a_minute_from_one_ip_gets_a_429()
     {
         await SendTimesAsync(60, () => RefreshAsync(cookie: null));

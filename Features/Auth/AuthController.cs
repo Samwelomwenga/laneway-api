@@ -26,6 +26,17 @@ public class AuthController : ApiControllerBase
         return Reply(await _authService.SignUpAsync(SignUpWrite.Of(signUpDto), Request.Headers.UserAgent.ToString()));
     }
 
+    [HttpGet("username-available")]
+    [RateLimited(RateLimits.UsernameCheck)]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<UsernameAvailabilityDto>>> UsernameAvailable(
+        [FromQuery] UsernameCheckDto check)
+    {
+        ArgumentNullException.ThrowIfNull(check);
+
+        return ToActionResult(await _authService.UsernameAvailableAsync(check.Username));
+    }
+
     [HttpPost("sign-in")]
     [RateLimited(RateLimits.SignIn)]
     [AllowAnonymous]

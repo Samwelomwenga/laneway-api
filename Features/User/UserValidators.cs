@@ -6,7 +6,7 @@ public sealed class UpdateProfileDtoValidator : AbstractValidator<UpdateProfileD
 {
     public UpdateProfileDtoValidator()
     {
-        RuleFor(x => x.Username).Required().MaxLength(FieldLimits.Username);
+        RuleFor(x => x.Username).Username();
         RuleFor(x => x.FirstName).Required().MaxLength(FieldLimits.UserFirstName);
         RuleFor(x => x.LastName).Required().MaxLength(FieldLimits.UserLastName);
         RuleFor(x => x.PhoneNumber).MaxLength(FieldLimits.UserPhoneNumber);

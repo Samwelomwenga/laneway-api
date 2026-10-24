@@ -41,4 +41,7 @@ public record UpdateProfileDto
     string TimeZone,
     string Location,
     Uri? ProfilePictureUrl
-);
+)
+{
+    public string Username { get; init; } = Usernames.Normalize(Username);
+}

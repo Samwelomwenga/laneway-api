@@ -14,6 +14,8 @@ internal sealed class PwnedPasswordsStub : HttpMessageHandler
 
     public Exception? Failure { get; set; }
 
+    public Func<Task>? BeforeAnswer { get; set; }
+
     public IReadOnlyList<PwnedRequest> Requests => [.. _requests];
 
     public void Breach(string password) => _breached[Sha1(password)] = 0;
@@ -25,9 +27,14 @@ internal sealed class PwnedPasswordsStub : HttpMessageHandler
     public static string Sha1(string password) =>
         Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(password)));
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+
+        if (BeforeAnswer is { } beforeAnswer)
+        {
+            await beforeAnswer();
+        }
 
         _requests.Enqueue(new PwnedRequest(
             request.RequestUri!,
@@ -42,10 +49,10 @@ internal sealed class PwnedPasswordsStub : HttpMessageHandler
             .Where(hash => hash.StartsWith(prefix, StringComparison.Ordinal))
             .Select(hash => $"{hash[5..]}:3")
             .Append($"{new string('0', 35)}:0");
-        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        return new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent(string.Join("\r\n", lines))
-        });
+        };
     }
 }
 

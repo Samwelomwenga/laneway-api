@@ -15,6 +15,7 @@ public record SignUpDto
     Uri? ProfilePictureUrl
 )
 {
+    public string? Username { get; init; } = Usernames.Normalize(Username);
     public string? Email { get; init; } = Emails.Normalize(Email);
     public string? Password { get; init; } = Passwords.Normalize(Password);
 }
@@ -71,6 +72,10 @@ public record SignedUpDto
     DateTime SessionExpiresAt,
     UserDto User
 ) : SignedInDto(AccessToken, AccessTokenExpiresAt, SessionExpiresAt);
+
+public record UsernameCheckDto(string? Username);
+
+public record UsernameAvailabilityDto(bool Available);
 
 public record SessionDto
 (

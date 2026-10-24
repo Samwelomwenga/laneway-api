@@ -6,6 +6,7 @@ public static class ErrorCodes
     public const string TooLong = "tooLong";
     public const string TooShort = "tooShort";
     public const string InvalidFormat = "invalidFormat";
+    public const string Invalid = "invalid";
     public const string UnknownValue = "unknownValue";
     public const string OutOfRange = "outOfRange";
     public const string UnknownField = "unknownField";
