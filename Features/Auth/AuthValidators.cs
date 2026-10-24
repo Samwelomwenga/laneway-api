@@ -27,6 +27,14 @@ public sealed class VerifyEmailDtoValidator : AbstractValidator<VerifyEmailDto>
     }
 }
 
+public sealed class ResendVerificationDtoValidator : AbstractValidator<ResendVerificationDto>
+{
+    public ResendVerificationDtoValidator()
+    {
+        RuleFor(x => x.Email).Required().MaxLength(FieldLimits.UserEmail);
+    }
+}
+
 public sealed class SignInDtoValidator : AbstractValidator<SignInDto>
 {
     public SignInDtoValidator()

@@ -37,6 +37,17 @@ public class AuthController : ApiControllerBase
             Writes.Required(verifyEmailDto.Token, "token"), Request.Headers.UserAgent.ToString()));
     }
 
+    [HttpPost("resend-verification")]
+    [RateLimited(RateLimits.EmailRequest)]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<object?>>> ResendVerification(
+        [FromBody] ResendVerificationDto resendDto)
+    {
+        ArgumentNullException.ThrowIfNull(resendDto);
+
+        return ToActionResult(await _authService.ResendVerificationAsync(Writes.Required(resendDto.Email, "email")));
+    }
+
     [HttpGet("username-available")]
     [RateLimited(RateLimits.UsernameCheck)]
     [AllowAnonymous]

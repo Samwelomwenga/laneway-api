@@ -115,6 +115,20 @@ public static class AuthLog
     private static readonly Action<ILogger, string, Exception?> RateLimitedWithoutSub =
         LoggerMessage.Define<string>(LogLevel.Warning, RateLimitedId, "Rate limited: policy {policy}");
 
+    private static readonly EventId MessageSkippedId = new(18, "MessageSkipped");
+
+    private static readonly Action<ILogger, MessageType, string, Guid, Exception?> MessageSkippedWithSub =
+        LoggerMessage.Define<MessageType, string, Guid>(
+            LogLevel.Information, MessageSkippedId, "Message skipped: {messageType}, {reason}, sub {sub}");
+
+    private static readonly Action<ILogger, MessageType, string, Exception?> MessageSkippedWithoutSub =
+        LoggerMessage.Define<MessageType, string>(
+            LogLevel.Information, MessageSkippedId, "Message skipped: {messageType}, {reason}");
+
+    private static readonly Action<ILogger, MessageType, string, Guid, Exception?> MessageSkippedAsWarning =
+        LoggerMessage.Define<MessageType, string, Guid>(
+            LogLevel.Warning, MessageSkippedId, "Message skipped: {messageType}, {reason}, sub {sub}");
+
     public static void SignUp(this ILogger logger, Guid userId) =>
         SignUpEvent(logger, userId, null);
 
@@ -196,6 +210,22 @@ public static class AuthLog
         }
     }
 
+    public static void MessageSkipped(this ILogger logger, MessageType type, string reason, Guid? userId)
+    {
+        if (userId is not { } sub)
+        {
+            MessageSkippedWithoutSub(logger, type, reason, null);
+        }
+        else if (reason == MessageSkip.AddressCapped)
+        {
+            MessageSkippedAsWarning(logger, type, reason, sub, null);
+        }
+        else
+        {
+            MessageSkippedWithSub(logger, type, reason, sub, null);
+        }
+    }
+
     public static void AccessTokenRejected(this ILogger logger, string reason, string? knownKid)
     {
         if (knownKid is null)
@@ -221,6 +251,15 @@ public static class AccessTokenRejection
     public const string InvalidAudience = "invalidAudience";
     public const string SessionEnded = "sessionEnded";
     public const string Invalid = "invalid";
+}
+
+public static class MessageSkip
+{
+    public const string UnknownAccount = "unknownAccount";
+    public const string Verified = "verified";
+    public const string Unverified = "unverified";
+    public const string Suppressed = "suppressed";
+    public const string AddressCapped = "addressCapped";
 }
 
 public static class RefreshRejection

@@ -29,6 +29,7 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | 15 | `EmailChanged` | Information | `sub`, `sid` |
 | 16 | `UserDeleted` | Information | `sub`, `sid` |
 | 17 | `RateLimited` | Warning | `policy`, and `sub` when the policy counts by user |
+| 18 | `MessageSkipped` | Information, or Warning for `addressCapped` | `messageType`, `reason`, and `sub` when the address belongs to a user |
 
 `reason` is one of `malformed`, `expired`, `unknownKey`, `invalidSignature`, `invalidAlgorithm`, `invalidType`, `invalidIssuer`, `invalidAudience`, `sessionEnded`, or `invalid`.
 
@@ -38,7 +39,15 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 
 `SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment. `endReason` is `SignedOut`, `SignedOutEverywhere`, `EndedFromSessionList`, `PasswordChanged`, `UserDeleted`, or `TokenReused`. Sign-out everywhere, change password, and delete user log one entry per session they end. Ending a session that already ended logs nothing.
 
-`SignUp` logs when a sign-up creates an unverified user or takes over one, so `sub` is the user who gets the verification email. A sign-up whose address belongs to a verified user logs nothing. No session exists yet, so there is no `sid`. Using the verification link logs `SignInSucceeded` with the new session, and the counter tags it `succeeded`.
+`SignUp` logs when a sign-up creates an unverified user or takes over one. A sign-up whose address belongs to a verified user logs `MessageSkipped` instead. `AuthSweeper` runs hourly and logs nothing per row. It deletes expired token rows and hard-deletes users still unverified 7 days after their latest sign-up, in batches of 1,000. A failed sweep logs a plain Warning with no id. No session exists yet, so there is no `sid`. Using the verification link logs `SignInSucceeded` with the new session, and the counter tags it `succeeded`.
+
+`MessageSkipped` logs when sign-up or resend verification sends no email and still answers 202. `messageType` is `VerifyEmail`. `reason` is one of these:
+
+- `unknownAccount`: no user has the address. Only resend logs it, and it has no `sub`.
+- `verified`: a verified user has the address.
+- `unverified`: the address belongs to an unverified user, for a message only verified users get. Nothing logs it yet. Forgot password will.
+- `suppressed`: the address hard-bounced, marked mail as spam, or was blocked. Sign-up still creates or takes over the user.
+- `addressCapped`: the user already got 5 token emails in the last 24 hours. The request changed nothing. It logs at Warning, since that many to one address looks like mail-bombing.
 
 `CsrfRejected` is a sign-up, verification, sign-in, or refresh that failed a CSRF check. `check` names the first one that failed: `header` when `X-Laneway-Csrf: 1` is missing, `origin` when `Origin` isn't in `Cors:AllowedOrigins`, or `fetch-site` when `Sec-Fetch-Site` is `cross-site`. The 403 body is the same for all three.
 
@@ -50,7 +59,7 @@ An unverified user who sends the right password gets a 403 and logs `SignInFaile
 
 `PasswordChanged`, `EmailChanged`, and `UserDeleted` log the action itself, with the `sid` of the session that made it. `EmailChanged` never logs either email.
 
-`RateLimited` logs a request that got a 429 from a rate limit. `policy` is `sign-in`, `sign-up`, `refresh`, `password-check`, `signed-in`, or `anonymous`. Only `password-check` and `signed-in` count by user, so only they log `sub`. The limits are in [Rate limits](rate-limits.md).
+`RateLimited` logs a request that got a 429 from a rate limit. `policy` is any policy in [Rate limits](rate-limits.md), such as `sign-in`, `email-request`, or `anonymous`. Only `password-check` and `signed-in` count by user, so only they log `sub`. The limits are in [Rate limits](rate-limits.md).
 
 `BreachedCheckUnavailable` means the Pwned Passwords check failed or took over 2 seconds, so the password was accepted without it. Each entry is one password that skipped ASVS 6.2.12.
 

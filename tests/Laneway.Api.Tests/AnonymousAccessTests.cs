@@ -24,7 +24,7 @@ public partial class AnonymousAccessTests : ApiTests
     }
 
     [Fact]
-    public async Task Only_sign_up_sign_in_refresh_the_username_checker_and_the_brevo_webhook_take_an_anonymous_request()
+    public async Task Only_the_anonymous_auth_routes_and_the_brevo_webhook_take_an_anonymous_request()
     {
         var (client, services) = ProductionHost(OverHttps);
         var routes = Routes(services);
@@ -49,6 +49,7 @@ public partial class AnonymousAccessTests : ApiTests
             [
                 "GET /api/v1/auth/username-available",
                 "POST /api/v1/auth/refresh",
+                "POST /api/v1/auth/resend-verification",
                 "POST /api/v1/auth/sign-in",
                 "POST /api/v1/auth/sign-up",
                 "POST /api/v1/auth/verify-email",

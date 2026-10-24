@@ -51,6 +51,37 @@ public class SignUpVerificationTests : ApiTests
     }
 
     [Fact]
+    public async Task Sign_up_with_a_verified_users_email_logs_why_nothing_went_out()
+    {
+        using var response = await SignUpAsync(SignUpBody(ActorUser.User.Email));
+
+        var skipped = Assert.Single(Logs(), log => log.Id.Name == "MessageSkipped");
+        Assert.Equal(AuthLog.Category, skipped.Category);
+        Assert.Equal("VerifyEmail", skipped.GetStructuredStateValue("messageType"));
+        Assert.Equal("verified", skipped.GetStructuredStateValue("reason"));
+        Assert.Equal(ActorId.ToString(), skipped.GetStructuredStateValue("sub"));
+        Assert.DoesNotContain(Logs(), log => log.Id.Name == "SignUp");
+    }
+
+    [Fact]
+    public async Task Sign_up_with_a_suppressed_address_creates_the_user_but_sends_nothing()
+    {
+        var email = NewEmail();
+        await SuppressAsync(email);
+
+        using var response = await SignUpAsync(SignUpBody(email));
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var user = await UserByEmailAsync(email);
+        Assert.False(user.Verified);
+        Assert.False(await FromDatabaseAsync(database => database.Deliveries.AnyAsync()));
+        Assert.False(await FromDatabaseAsync(database => database.AuthTokens.AnyAsync()));
+        var skipped = Assert.Single(Logs(), log => log.Id.Name == "MessageSkipped");
+        Assert.Equal("suppressed", skipped.GetStructuredStateValue("reason"));
+        Assert.Equal(user.Id.ToString(), skipped.GetStructuredStateValue("sub"));
+    }
+
+    [Fact]
     public async Task A_taken_address_answers_exactly_like_a_new_one()
     {
         using var taken = await SignUpAsync(SignUpBody(ActorUser.User.Email));
@@ -95,6 +126,26 @@ public class SignUpVerificationTests : ApiTests
         Assert.Equal(HttpStatusCode.OK, verified.StatusCode);
         using var signIn = await SignInAsync(email, SignUpPassword);
         Assert.Equal(HttpStatusCode.OK, signIn.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_capped_address_keeps_its_unverified_user_as_it_was()
+    {
+        var email = NewEmail();
+        using var squatter = await SignUpAsync(SignUpBody(email, username: "squatter"));
+        for (var resend = 0; resend < 4; resend++)
+        {
+            using var sent = await ResendVerificationAsync(email);
+        }
+
+        using var owner = await SignUpAsync(SignUpBody(email, username: "owner"));
+
+        Assert.Equal(HttpStatusCode.Accepted, owner.StatusCode);
+        Assert.Equal("squatter", (await UserByEmailAsync(email)).Username);
+        Assert.Equal(5, await FromDatabaseAsync(database => database.Deliveries.CountAsync()));
+        Assert.Equal(
+            "addressCapped",
+            Assert.Single(Logs(), log => log.Id.Name == "MessageSkipped").GetStructuredStateValue("reason"));
     }
 
     [Fact]

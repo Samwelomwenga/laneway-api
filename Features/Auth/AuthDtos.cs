@@ -67,6 +67,11 @@ public record SignedInDto
 
 public record VerifyEmailDto(string? Token);
 
+public record ResendVerificationDto(string? Email)
+{
+    public string? Email { get; init; } = Emails.Normalize(Email);
+}
+
 public record UsernameCheckDto(string? Username);
 
 public record UsernameAvailabilityDto(bool Available);

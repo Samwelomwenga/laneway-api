@@ -198,6 +198,22 @@ public abstract class ApiTests : IAsyncLifetime
     protected Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
         PostOverHttpsAsync("/api/v1/auth/verify-email", new { token });
 
+    protected Task<HttpResponseMessage> ResendVerificationAsync(string email) =>
+        SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/resend-verification", new { email });
+
+    protected Task SuppressAsync(string email) =>
+        FromDatabaseAsync(database =>
+        {
+            database.Suppressions.Add(new Suppression
+            {
+                AddressHash = Suppressions.Hash(email),
+                Kind = SuppressionKind.HardBounce,
+                SuppressedAt = Time.GetUtcNow().UtcDateTime,
+                MessageId = "<seeded@smtp-relay.mailin.fr>"
+            });
+            return database.SaveChangesAsync();
+        });
+
     protected async Task<HttpResponseMessage> RefreshAsync(
         string? cookie, IReadOnlyDictionary<string, string>? headers = null)
     {

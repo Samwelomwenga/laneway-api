@@ -7,6 +7,7 @@ public interface IAuthService
 {
     Task<ApiResponse<object?>> SignUpAsync(SignUpWrite write);
     Task<AuthReply<SignedInDto>> VerifyEmailAsync(string token, string? userAgent);
+    Task<ApiResponse<object?>> ResendVerificationAsync(string email);
     Task<ApiResponse<UsernameAvailabilityDto>> UsernameAvailableAsync(string? username);
     Task<AuthReply<SignedInDto>> SignInAsync(SignInWrite write, string? userAgent);
     Task<AuthReply<SignedInDto>> RefreshAsync(string? presented);
@@ -63,14 +64,12 @@ public sealed class AuthService(
             try
             {
                 await using var transaction = await database.Database.BeginTransactionAsync();
-                if (await SignUpUserAsync(fields, passwordHash, now) is { } userId)
-                {
-                    await database.SaveChangesAsync();
-                    _log.SignUp(userId);
-                }
-
+                var outcome = await SignUpUserAsync(fields, passwordHash, now);
+                await database.SaveChangesAsync();
                 await transaction.CommitAsync();
-                return ApiResponse<object?>.SuccessResponse(null, CheckYourEmail, StatusCodes.Status202Accepted);
+
+                LogVerification(outcome);
+                return CheckEmail();
             }
             catch (DbUpdateException exception)
                 when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
@@ -89,7 +88,7 @@ public sealed class AuthService(
         }
     }
 
-    private async Task<Guid?> SignUpUserAsync(NewUser fields, string passwordHash, DateTime now)
+    private async Task<Verification> SignUpUserAsync(NewUser fields, string passwordHash, DateTime now)
     {
         var heldBy = await database.Users
             .Where(u => u.Email == fields.Email)
@@ -99,24 +98,115 @@ public sealed class AuthService(
         {
             var user = UserRules.Create(fields, passwordHash, now);
             database.Users.Add(user);
-            AddVerification(user.Id, now);
-            return user.Id;
+            return await IssueVerificationAsync(user.Id, fields.Email, now);
         }
 
         await database.TryLockUserAsync(heldBy.Value);
         var held = await database.Users.SingleOrDefaultAsync(u => u.Id == heldBy);
-        if (held is null || held.Verified)
+        if (held is null)
         {
-            return null;
+            return Verification.Nothing;
+        }
+
+        if (held.Verified)
+        {
+            return Verification.Skip(held.Id, MessageSkip.Verified);
+        }
+
+        if (await AddressCap.ReachedAsync(database, held.Id, now))
+        {
+            return Verification.Skip(held.Id, MessageSkip.AddressCapped);
         }
 
         held.Replace(fields, passwordHash, now);
-        await database.AuthTokens
-            .Where(t => t.UserId == held.Id && t.Kind == AuthTokenKind.Verification)
-            .ExecuteDeleteAsync();
-        AddVerification(held.Id, now);
-        return held.Id;
+        await DeleteVerificationAsync(held.Id);
+        return await IssueVerificationAsync(held.Id, held.Email, now);
     }
+
+    public async Task<ApiResponse<object?>> ResendVerificationAsync(string email)
+    {
+        ArgumentNullException.ThrowIfNull(email);
+
+        var now = time.GetUtcNow().UtcDateTime;
+        await using var transaction = await database.Database.BeginTransactionAsync();
+        var outcome = await ResendToAsync(email, now);
+        await database.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        LogVerification(outcome);
+        return CheckEmail();
+    }
+
+    private async Task<Verification> ResendToAsync(string email, DateTime now)
+    {
+        var userId = await database.Users.Where(u => u.Email == email).Select(u => (Guid?)u.Id).SingleOrDefaultAsync();
+        if (userId is not { } id || !await database.TryLockUserAsync(id))
+        {
+            return Verification.Skip(null, MessageSkip.UnknownAccount);
+        }
+
+        if (await database.Users.Where(u => u.Id == id).Select(u => u.Verified).SingleAsync())
+        {
+            return Verification.Skip(id, MessageSkip.Verified);
+        }
+
+        if (await AddressCap.ReachedAsync(database, id, now))
+        {
+            return Verification.Skip(id, MessageSkip.AddressCapped);
+        }
+
+        if (await SuppressedAsync(email))
+        {
+            return Verification.Skip(id, MessageSkip.Suppressed);
+        }
+
+        await DeleteVerificationAsync(id);
+        AddVerification(id, now);
+        return new Verification(id, SignedUp: false, Skipped: null);
+    }
+
+    private async Task<Verification> IssueVerificationAsync(Guid userId, string email, DateTime now)
+    {
+        if (await SuppressedAsync(email))
+        {
+            return new Verification(userId, SignedUp: true, MessageSkip.Suppressed);
+        }
+
+        AddVerification(userId, now);
+        return new Verification(userId, SignedUp: true, Skipped: null);
+    }
+
+    private async Task<bool> SuppressedAsync(string email) =>
+        await Suppressions.StoppingAsync(
+            database, email, MessageRoutes.For(MessageType.VerifyEmail), CancellationToken.None) is not null;
+
+    private void LogVerification(Verification outcome)
+    {
+        if (outcome is { SignedUp: true, UserId: { } signedUp })
+        {
+            _log.SignUp(signedUp);
+        }
+
+        if (outcome.Skipped is { } reason)
+        {
+            _log.MessageSkipped(MessageType.VerifyEmail, reason, outcome.UserId);
+        }
+    }
+
+    private sealed record Verification(Guid? UserId, bool SignedUp, string? Skipped)
+    {
+        public static Verification Nothing { get; } = new(null, SignedUp: false, Skipped: null);
+
+        public static Verification Skip(Guid? userId, string reason) => new(userId, SignedUp: false, reason);
+    }
+
+    private static ApiResponse<object?> CheckEmail() =>
+        ApiResponse<object?>.SuccessResponse(null, CheckYourEmail, StatusCodes.Status202Accepted);
+
+    private Task DeleteVerificationAsync(Guid userId) =>
+        database.AuthTokens
+            .Where(t => t.UserId == userId && t.Kind == AuthTokenKind.Verification)
+            .ExecuteDeleteAsync();
 
     private void AddVerification(Guid userId, DateTime now)
     {
@@ -384,6 +474,7 @@ public sealed class AuthService(
 
             await database.WorkspaceMembers.Where(m => m.UserId == userId).ExecuteDeleteAsync();
             await database.BoardMembers.Where(m => m.UserId == userId).ExecuteDeleteAsync();
+            await database.AuthTokens.Where(t => t.UserId == userId).ExecuteDeleteAsync();
             await database.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u
                 .SetProperty(e => e.DeletedAt, now)
                 .SetProperty(e => e.UpdatedAt, now)

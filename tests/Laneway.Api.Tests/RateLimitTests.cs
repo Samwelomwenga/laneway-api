@@ -38,6 +38,16 @@ public class RateLimitTests : ApiTests
     }
 
     [Fact]
+    public async Task The_11th_verification_resend_in_an_hour_from_one_ip_gets_a_429()
+    {
+        await SendTimesAsync(10, () => ResendVerificationAsync(NewEmail()));
+
+        using var response = await ResendVerificationAsync(NewEmail());
+
+        await AssertTooManyRequestsAsync(response, "600");
+    }
+
+    [Fact]
     public async Task The_31st_username_check_in_a_minute_from_one_ip_gets_a_429()
     {
         await SendTimesAsync(30, () => SendAnonymousAsync(HttpMethod.Get, "/api/v1/auth/username-available?username=ana", null));
