@@ -123,8 +123,16 @@ A user who is gone for good. The work they did stays, and their activity entries
 _Avoid_: Removed user, inactive user, disabled user
 
 **Session**:
-One stretch of a user being signed in on one device. It starts when the user signs in or uses their verification link. It ends when they sign out, sign out everywhere, or are deleted, when they change their password from another session, or when it runs out. It also ends when the user ends it from their list of sessions, or when Laneway sees one of its old refresh tokens used again. A user can have several at once.
+One stretch of a user being signed in on one device. It starts when the user signs in or uses their verification link. It ends when they sign out, sign out everywhere, or are deleted, when they change their password from another session, when their password is reset, or when it runs out. It also ends when the user ends it from their list of sessions, or when Laneway sees one of its old refresh tokens used again. A user can have several at once.
 _Avoid_: Login, token family
+
+**Password reset**:
+Setting a new password through a link Laneway emails to a verified user who forgot theirs. The link works for 1 hour, and only the newest one works. A reset ends every session and any sign-in block, and signs nobody in.
+_Avoid_: Password recovery
+
+**Password history**:
+The hashes a user's password had before each change or reset, with when each was replaced. Laneway never shows it. It exists so undoing an email change can ask for a password the account used recently.
+_Avoid_: Old passwords, previous passwords
 
 **Profile**:
 The signed-in user's own data, which only they can see or change. Other users see a smaller summary of it.

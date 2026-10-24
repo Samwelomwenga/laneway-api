@@ -48,6 +48,26 @@ public class AuthController : ApiControllerBase
         return ToActionResult(await _authService.ResendVerificationAsync(Writes.Required(resendDto.Email, "email")));
     }
 
+    [HttpPost("forgot-password")]
+    [RateLimited(RateLimits.EmailRequest)]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<object?>>> ForgotPassword([FromBody] ForgotPasswordDto forgotDto)
+    {
+        ArgumentNullException.ThrowIfNull(forgotDto);
+
+        return ToActionResult(await _authService.ForgotPasswordAsync(Writes.Required(forgotDto.Email, "email")));
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    public async Task<ActionResult> ResetPassword([FromBody] ResetPasswordDto resetDto)
+    {
+        ArgumentNullException.ThrowIfNull(resetDto);
+
+        return Reply(await _authService.ResetPasswordAsync(
+            Writes.Required(resetDto.Token, "token"), Writes.Required(resetDto.NewPassword, "newPassword")));
+    }
+
     [HttpGet("username-available")]
     [RateLimited(RateLimits.UsernameCheck)]
     [AllowAnonymous]

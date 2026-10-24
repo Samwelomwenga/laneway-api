@@ -9,7 +9,9 @@ public static class EmailTemplates
         [MessageType.PasswordChanged] = (stored, _, links) =>
             PasswordChangedEmail.Render(MessageBodies.In<PasswordChanged>(stored), links),
         [MessageType.VerifyEmail] = (stored, secret, links) =>
-            VerifyEmailEmail.Render(MessageBodies.In<VerifyEmail>(stored) with { Token = secret! }, links)
+            VerifyEmailEmail.Render(MessageBodies.In<VerifyEmail>(stored) with { Token = secret! }, links),
+        [MessageType.ResetPassword] = (stored, secret, links) =>
+            ResetPasswordEmail.Render(MessageBodies.In<ResetPassword>(stored) with { Token = secret! }, links)
     };
 
     public static bool Has(MessageType type) => Templates.ContainsKey(type);

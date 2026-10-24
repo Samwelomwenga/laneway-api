@@ -97,6 +97,9 @@ public static class AuthLog
     private static readonly Action<ILogger, Guid, Guid, Exception?> PasswordChangedEvent =
         LoggerMessage.Define<Guid, Guid>(LogLevel.Information, PasswordChangedId, "Password changed: sub {sub}, sid {sid}");
 
+    private static readonly Action<ILogger, Guid, Exception?> PasswordResetEvent =
+        LoggerMessage.Define<Guid>(LogLevel.Information, PasswordChangedId, "Password reset: sub {sub}");
+
     private static readonly EventId EmailChangedId = new(15, "EmailChanged");
 
     private static readonly Action<ILogger, Guid, Guid, Exception?> EmailChangedEvent =
@@ -155,6 +158,9 @@ public static class AuthLog
 
     public static void PasswordChanged(this ILogger logger, Guid userId, Guid sessionId) =>
         PasswordChangedEvent(logger, userId, sessionId, null);
+
+    public static void PasswordReset(this ILogger logger, Guid userId) =>
+        PasswordResetEvent(logger, userId, null);
 
     public static void EmailChanged(this ILogger logger, Guid userId, Guid sessionId) =>
         EmailChangedEvent(logger, userId, sessionId, null);

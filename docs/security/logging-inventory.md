@@ -25,7 +25,7 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | 11 | `CsrfRejected` | Warning | `check` |
 | 12 | `SignInBlockStarted` | Warning | `sub`, `failureCount`, `blockedUntil` |
 | 13 | `PasswordCheckFailed` | Warning | `sub`, `sid`, `blocked` |
-| 14 | `PasswordChanged` | Information | `sub`, `sid` |
+| 14 | `PasswordChanged` | Information | `sub`, and `sid` when a session made the change |
 | 15 | `EmailChanged` | Information | `sub`, `sid` |
 | 16 | `UserDeleted` | Information | `sub`, `sid` |
 | 17 | `RateLimited` | Warning | `policy`, and `sub` when the policy counts by user |
@@ -37,15 +37,15 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 
 `RefreshSuperseded` is a refresh that lost a race inside the 10-second grace window. It ends nothing. `RefreshTokenReused` is a retired token back after that window, and a `SessionEnded` with `endReason` `TokenReused` follows it.
 
-`SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment. `endReason` is `SignedOut`, `SignedOutEverywhere`, `EndedFromSessionList`, `PasswordChanged`, `UserDeleted`, or `TokenReused`. Sign-out everywhere, change password, and delete user log one entry per session they end. Ending a session that already ended logs nothing.
+`SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment. `endReason` is `SignedOut`, `SignedOutEverywhere`, `EndedFromSessionList`, `PasswordChanged`, `UserDeleted`, `TokenReused`, or `PasswordReset`. Sign-out everywhere, change password, password reset, and delete user log one entry per session they end. Ending a session that already ended logs nothing.
 
 `SignUp` logs when a sign-up creates an unverified user or takes over one. A sign-up whose address belongs to a verified user logs `MessageSkipped` instead. `AuthSweeper` runs hourly and logs nothing per row. It deletes expired token rows and hard-deletes users still unverified 7 days after their latest sign-up, in batches of 1,000. A failed sweep logs a plain Warning with no id. No session exists yet, so there is no `sid`. Using the verification link logs `SignInSucceeded` with the new session, and the counter tags it `succeeded`.
 
-`MessageSkipped` logs when sign-up or resend verification sends no email and still answers 202. `messageType` is `VerifyEmail`. `reason` is one of these:
+`MessageSkipped` logs when sign-up, resend verification, or forgot password sends no email and still answers 202. `messageType` is `VerifyEmail` for the first two and `ResetPassword` for forgot password. `reason` is one of these:
 
-- `unknownAccount`: no user has the address. Only resend logs it, and it has no `sub`.
-- `verified`: a verified user has the address.
-- `unverified`: the address belongs to an unverified user, for a message only verified users get. Nothing logs it yet. Forgot password will.
+- `unknownAccount`: no user has the address. Only resend and forgot password log it, and it has no `sub`.
+- `verified`: a verified user has the address, for `VerifyEmail`.
+- `unverified`: an unverified user has the address, for `ResetPassword`. Only verified users get a reset link.
 - `suppressed`: the address hard-bounced, marked mail as spam, or was blocked. Sign-up still creates or takes over the user.
 - `addressCapped`: the user already got 5 token emails in the last 24 hours. The request changed nothing. It logs at Warning, since that many to one address looks like mail-bombing.
 
@@ -57,7 +57,7 @@ An unverified user who sends the right password gets a 403 and logs `SignInFaile
 
 `PasswordCheckFailed` is a wrong password, or any password during a sign-in block, sent to change password, change email, or delete user. `sid` is the session that sent it. A wrong password there counts toward the sign-in block, so it can also log `SignInBlockStarted`. `blocked: true` means the request got a 429 because a block was running.
 
-`PasswordChanged`, `EmailChanged`, and `UserDeleted` log the action itself, with the `sid` of the session that made it. `EmailChanged` never logs either email.
+`PasswordChanged`, `EmailChanged`, and `UserDeleted` log the action itself, with the `sid` of the session that made it. `EmailChanged` never logs either email. A password reset logs `PasswordChanged` with no `sid`, since a link made the change and no session did.
 
 `RateLimited` logs a request that got a 429 from a rate limit. `policy` is any policy in [Rate limits](rate-limits.md), such as `sign-in`, `email-request`, or `anonymous`. Only `password-check` and `signed-in` count by user, so only they log `sub`. The limits are in [Rate limits](rate-limits.md).
 

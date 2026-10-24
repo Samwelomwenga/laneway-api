@@ -6,12 +6,15 @@ namespace Laneway.Api;
 
 public enum AuthTokenKind
 {
-    Verification
+    Verification,
+    Reset
 }
 
 public class AuthToken
 {
     public static readonly TimeSpan VerificationLifetime = TimeSpan.FromHours(24);
+
+    public static readonly TimeSpan ResetLifetime = TimeSpan.FromHours(1);
 
     public Guid Id { get; set; }
     public Guid UserId { get; set; }

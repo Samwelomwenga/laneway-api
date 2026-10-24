@@ -8,7 +8,7 @@ public static class AddressCap
 
     public static readonly TimeSpan Window = TimeSpan.FromHours(24);
 
-    private static readonly MessageType[] Capped = [MessageType.VerifyEmail];
+    private static readonly MessageType[] Capped = [MessageType.VerifyEmail, MessageType.ResetPassword];
 
     public static async Task<bool> ReachedAsync(ApplicationDbContext database, Guid userId, DateTime now)
     {

@@ -30,6 +30,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Session> Sessions { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<AuthToken> AuthTokens { get; set; }
+    public DbSet<PasswordHistoryEntry> PasswordHistory { get; set; }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -150,6 +151,16 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(t => t.TokenHash).IsUnique();
             entity.HasIndex(t => new { t.UserId, t.Kind });
+        });
+
+        modelBuilder.Entity<PasswordHistoryEntry>(entity =>
+        {
+            entity.Property(h => h.PasswordHash).HasColumnType("varchar(500)");
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(h => h.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(h => new { h.UserId, h.ReplacedAt });
         });
 
         modelBuilder.Entity<WorkSpace>(entity =>

@@ -35,6 +35,23 @@ public sealed class ResendVerificationDtoValidator : AbstractValidator<ResendVer
     }
 }
 
+public sealed class ForgotPasswordDtoValidator : AbstractValidator<ForgotPasswordDto>
+{
+    public ForgotPasswordDtoValidator()
+    {
+        RuleFor(x => x.Email).Required().MaxLength(FieldLimits.UserEmail);
+    }
+}
+
+public sealed class ResetPasswordDtoValidator : AbstractValidator<ResetPasswordDto>
+{
+    public ResetPasswordDtoValidator()
+    {
+        RuleFor(x => x.Token).Required();
+        RuleFor(x => x.NewPassword).Required().PasswordWithinMaximum();
+    }
+}
+
 public sealed class SignInDtoValidator : AbstractValidator<SignInDto>
 {
     public SignInDtoValidator()

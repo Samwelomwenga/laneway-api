@@ -53,6 +53,18 @@ public class PasswordCheckedTests : ApiTests
     }
 
     [Fact]
+    public async Task Change_password_keeps_the_replaced_hash_in_password_history()
+    {
+        var oldHash = (await ActorRowAsync()).PasswordHash;
+
+        using var response = await ChangePasswordAsync(TestUser.Password, NewPassword);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var row = Assert.Single(await FromDatabaseAsync(database => database.PasswordHistory.AsNoTracking().ToListAsync()));
+        Assert.Equal((ActorId, oldHash), (row.UserId, row.PasswordHash));
+    }
+
+    [Fact]
     public async Task Change_password_ends_every_other_session()
     {
         var other = await SignInForTokenAsync();

@@ -7,6 +7,8 @@ public static class AppRoutes
     public const string ForgotPassword = "/forgot-password";
 
     public const string VerifyEmail = "/verify-email";
+
+    public const string ResetPassword = "/reset-password";
 }
 
 public sealed class AppLinks(IOptions<WebAppOptions> options)

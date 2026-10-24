@@ -72,6 +72,16 @@ public record ResendVerificationDto(string? Email)
     public string? Email { get; init; } = Emails.Normalize(Email);
 }
 
+public record ForgotPasswordDto(string? Email)
+{
+    public string? Email { get; init; } = Emails.Normalize(Email);
+}
+
+public record ResetPasswordDto(string? Token, string? NewPassword)
+{
+    public string? NewPassword { get; init; } = Passwords.Normalize(NewPassword);
+}
+
 public record UsernameCheckDto(string? Username);
 
 public record UsernameAvailabilityDto(bool Available);

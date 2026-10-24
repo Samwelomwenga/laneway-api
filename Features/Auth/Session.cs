@@ -59,5 +59,6 @@ public enum SessionEndReason
     EndedFromSessionList,
     PasswordChanged,
     UserDeleted,
-    TokenReused
+    TokenReused,
+    PasswordReset
 }
