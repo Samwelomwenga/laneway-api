@@ -10,7 +10,13 @@ public sealed record InviteTarget(InvitePlace Place, Guid Id, string Name)
     public Guid? BoardId => Place == InvitePlace.Board ? Id : null;
 }
 
-public sealed class Invites(ApplicationDbContext database, Messages messages, Actor actor, TimeProvider time)
+public sealed class Invites(
+    ApplicationDbContext database,
+    Messages messages,
+    Actor actor,
+    ActivityWriter activity,
+    ActivityTree tree,
+    TimeProvider time)
 {
     public const int DailyEmails = 50;
 
@@ -82,6 +88,79 @@ public sealed class Invites(ApplicationDbContext database, Messages messages, Ac
 
         await database.SaveChangesAsync();
         return ApiResponse<T>.SuccessResponse(reply(invite), "Member invited", StatusCodes.Status201Created);
+    }
+
+    /// <summary>
+    /// Deletes every live invite for the user's current address and adds the user to each place they aren't in yet,
+    /// as added by whoever sent the invite. Call it inside the transaction that proves the user owns the address. See
+    /// ADR 0010.
+    /// </summary>
+    public async Task ConvertAsync(Guid userId)
+    {
+        var now = time.GetUtcNow().UtcDateTime;
+        var user = await database.Users.AsNoTracking().SingleAsync(u => u.Id == userId);
+        var invites = await database.Invites.Where(i => i.Email == user.Email && i.ExpiresAt > now).ToListAsync();
+        if (invites.Count == 0)
+        {
+            return;
+        }
+
+        var member = MemberRef.Of(user);
+        var inviterIds = invites.Select(i => i.InvitedBy).Distinct().ToList();
+        var inviters = await database.Users
+            .IgnoreQueryFilters()
+            .Where(inviter => inviterIds.Contains(inviter.Id))
+            .ToDictionaryAsync(inviter => inviter.Id, ActorRef.Of);
+        var inWorkspaces = await database.WorkspaceMembers
+            .Where(m => m.UserId == userId)
+            .Select(m => m.WorkspaceId)
+            .ToHashSetAsync();
+        var onBoards = await database.BoardMembers.Where(m => m.UserId == userId).Select(m => m.BoardId).ToHashSetAsync();
+        foreach (var invite in invites)
+        {
+            database.Invites.Remove(invite);
+            var inviter = inviters[invite.InvitedBy];
+            if (invite.WorkspaceId is { } workspaceId && !inWorkspaces.Contains(workspaceId))
+            {
+                var role = Enum.Parse<WorkspaceRole>(invite.Role);
+                database.WorkspaceMembers.Add(new WorkspaceMember
+                {
+                    Id = Guid.NewGuid(),
+                    WorkspaceId = workspaceId,
+                    UserId = userId,
+                    Role = role,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = inviter.Id
+                });
+                var workspace = await tree.WorkspaceAsync(workspaceId);
+                activity.Add(
+                    ActivityType.AddMember,
+                    ActivityPlace.OnWorkspace(workspaceId),
+                    inviter,
+                    actorRef => new AddMemberData<WorkspaceRole>(actorRef, workspace, null, member, role));
+            }
+            else if (invite.BoardId is { } boardId && !onBoards.Contains(boardId))
+            {
+                var role = Enum.Parse<BoardRole>(invite.Role);
+                database.BoardMembers.Add(new BoardMember
+                {
+                    Id = Guid.NewGuid(),
+                    BoardId = boardId,
+                    UserId = userId,
+                    Role = role,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = inviter.Id
+                });
+                var chain = await tree.BoardAsync(boardId);
+                activity.Add(
+                    ActivityType.AddMember,
+                    chain.Place,
+                    inviter,
+                    actorRef => new AddMemberData<BoardRole>(actorRef, chain.Workspace, chain.Board, member, role));
+            }
+        }
+
+        await database.SaveChangesAsync();
     }
 
     private async Task<bool> EmailsReachedAsync(DateTime now)

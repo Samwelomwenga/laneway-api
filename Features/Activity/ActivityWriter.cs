@@ -24,12 +24,20 @@ public sealed class ActivityWriter
     {
         ArgumentNullException.ThrowIfNull(data);
 
+        return Add(type, place, await ActorAsync(), data);
+    }
+
+    public ActivityEntry Add<TData>(ActivityType type, ActivityPlace place, ActorRef actor, Func<ActorRef, TData> data)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        ArgumentNullException.ThrowIfNull(data);
+
         var entry = new ActivityEntry
         {
             Id = Guid.NewGuid(),
             Type = type,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = _actor.Id,
+            CreatedBy = actor.Id,
             WorkspaceId = place.WorkspaceId,
             BoardId = place.BoardId,
             ListId = place.ListId,
@@ -37,7 +45,7 @@ public sealed class ActivityWriter
             FromWorkspaceId = place.FromWorkspaceId,
             FromBoardId = place.FromBoardId,
             FromListId = place.FromListId,
-            Data = JsonSerializer.SerializeToDocument(data(await ActorAsync()), DataOptions)
+            Data = JsonSerializer.SerializeToDocument(data(actor), DataOptions)
         };
 
         _context.ActivityEntries.Add(entry);

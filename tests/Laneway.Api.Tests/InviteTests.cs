@@ -146,9 +146,185 @@ public class InviteTests : ApiTests
         Assert.Equal([movedInvite], await FromDatabaseAsync(database => database.Invites.Select(i => i.Id).ToListAsync()));
     }
 
-    private async Task<Guid> InviteIdAsync(string path, string email)
+    [Fact]
+    public async Task Verifying_the_address_makes_a_workspace_invite_a_membership_added_by_the_inviter()
     {
-        using var response = await PostAsync(path, new { email });
+        var workspace = await CreateWorkspaceAsync("Design");
+        var email = NewEmail();
+        await InviteIdAsync(WorkspaceMembersPath(workspace.Id), email, role: "Admin");
+
+        var joined = await SignUpAndVerifyAsync(email);
+
+        using var members = await GetAsync(WorkspaceMembersPath(workspace.Id));
+        Assert.Equal(
+            [(ActorId, WorkspaceRole.Admin), (joined, WorkspaceRole.Admin)],
+            (await members.ReadPage<WorkspaceMemberDto>()).Entries.Select(member => (member.User.Id, member.Role)));
+        var entry = Assert.Single((await ActivityAsync($"workspaceId={workspace.Id}&type=addMember")).Entries);
+        ActivityAssert.Place(entry, workspaceId: workspace.Id);
+        ActivityAssert.Actor(entry, ActorUser);
+        Assert.Equal(joined, entry.Data.Id("member.id"));
+        Assert.False(await FromDatabaseAsync(database => database.Invites.AnyAsync()));
+    }
+
+    [Fact]
+    public async Task A_board_invite_makes_someone_outside_the_workspace_a_guest()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var board = await CreateBoardAsync(workspace.Id, "Roadmap");
+        var email = NewEmail();
+        await InviteIdAsync(BoardMembersPath(board.Id), email, role: "Observer");
+
+        var joined = await SignUpAndVerifyAsync(email);
+
+        using var members = await GetAsync(BoardMembersPath(board.Id));
+        var member = Assert.Single(
+            (await members.ReadPage<BoardMemberDto>()).Entries, member => member.User.Id == joined);
+        Assert.Equal((BoardRole.Observer, true), (member.Role, member.IsGuest));
+        var entry = Assert.Single((await ActivityAsync($"boardId={board.Id}&type=addMember")).Entries,
+            entry => entry.Data.Id("member.id") == joined);
+        ActivityAssert.Place(entry, workspaceId: workspace.Id, boardId: board.Id);
+        ActivityAssert.Actor(entry, ActorUser);
+    }
+
+    [Fact]
+    public async Task Signing_up_with_another_address_converts_nothing()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        await InviteIdAsync(WorkspaceMembersPath(workspace.Id), NewEmail());
+
+        await SignUpAndVerifyAsync(NewEmail());
+
+        using var members = await GetAsync(WorkspaceMembersPath(workspace.Id));
+        Assert.Equal([ActorId], (await members.ReadPage<WorkspaceMemberDto>()).Entries.Select(member => member.User.Id));
+        Assert.Equal(1, await FromDatabaseAsync(database => database.Invites.CountAsync()));
+    }
+
+    [Fact]
+    public async Task An_invite_converts_after_its_inviter_is_removed_and_deleted()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var inviter = await AddWorkspaceMemberAsync(workspace.Id, WorkspaceRole.Admin);
+        var email = NewEmail();
+        using (var invited = await PostAsync(WorkspaceMembersPath(workspace.Id), new { email }, inviter))
+        {
+            Assert.Equal(HttpStatusCode.Created, invited.StatusCode);
+        }
+
+        using var removed = await DeleteAsync($"{WorkspaceMembersPath(workspace.Id)}/{inviter.Id}");
+        using var deleted = await PostAsync("/api/v1/auth/delete-user", new { password = TestUser.Password }, inviter);
+        Assert.Equal([HttpStatusCode.NoContent, HttpStatusCode.NoContent], [removed.StatusCode, deleted.StatusCode]);
+
+        var joined = await SignUpAndVerifyAsync(email);
+
+        var entry = Assert.Single((await ActivityAsync($"workspaceId={workspace.Id}&type=addMember")).Entries,
+            entry => entry.Data.Id("member.id") == joined);
+        ActivityAssert.Actor(entry, inviter);
+    }
+
+    [Fact]
+    public async Task Confirming_a_change_to_the_address_converts_and_undoing_it_keeps_the_membership()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var user = await CreateUserAsync();
+        var email = NewEmail();
+        await InviteIdAsync(WorkspaceMembersPath(workspace.Id), email);
+
+        await ChangeEmailAsync(user, email);
+        var undoToken = (await Brevo.AwaitEmailAsync(user.User.Email, "EmailChanged")).TokenFrom(AppRoutes.UndoEmailChange);
+        using var undo = await SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/undo-email-change",
+            new { token = undoToken, recentPassword = TestUser.Password, newPassword = "quiet harbor lantern" });
+
+        Assert.Equal(HttpStatusCode.NoContent, undo.StatusCode);
+        using var members = await GetAsync(WorkspaceMembersPath(workspace.Id));
+        Assert.Equal(
+            [(ActorId, WorkspaceRole.Admin), (user.Id, WorkspaceRole.Normal)],
+            (await members.ReadPage<WorkspaceMemberDto>()).Entries.Select(member => (member.User.Id, member.Role)));
+        Assert.False(await FromDatabaseAsync(database => database.Invites.AnyAsync()));
+    }
+
+    [Fact]
+    public async Task Verifying_converts_every_live_invite_for_the_address_and_skips_an_expired_one()
+    {
+        var design = await CreateWorkspaceAsync("Design");
+        var platform = await CreateWorkspaceAsync("Platform");
+        var archive = await CreateWorkspaceAsync("Archive");
+        var email = NewEmail();
+        await InviteIdAsync(WorkspaceMembersPath(design.Id), email);
+        await InviteIdAsync(WorkspaceMembersPath(platform.Id), email);
+        var expired = await InviteIdAsync(WorkspaceMembersPath(archive.Id), email);
+        await MoveInviteBackAsync(expired, Invites.Lifetime);
+
+        var joined = await SignUpAndVerifyAsync(email);
+
+        Assert.Equal(
+            new[] { design.Id, platform.Id }.Order(),
+            await FromDatabaseAsync(database => database.WorkspaceMembers
+                .Where(member => member.UserId == joined)
+                .Select(member => member.WorkspaceId)
+                .Order()
+                .ToListAsync()));
+        Assert.Equal([expired], await FromDatabaseAsync(database => database.Invites.Select(i => i.Id).ToListAsync()));
+    }
+
+    [Fact]
+    public async Task An_invite_for_someone_already_a_member_is_deleted_and_changes_nothing()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var board = await CreateBoardAsync(workspace.Id, "Roadmap");
+        var member = await AddWorkspaceMemberAsync(workspace.Id, WorkspaceRole.Normal);
+        using (var onBoard = await PostAsync(BoardMembersPath(board.Id), new { userId = member.Id, role = "Observer" }))
+        {
+            Assert.Equal(HttpStatusCode.Created, onBoard.StatusCode);
+        }
+
+        var email = NewEmail();
+        await InviteIdAsync(WorkspaceMembersPath(workspace.Id), email, role: "Admin");
+        await InviteIdAsync(BoardMembersPath(board.Id), email, role: "Admin");
+
+        await ChangeEmailAsync(member, email);
+
+        using var workspaceMembers = await GetAsync(WorkspaceMembersPath(workspace.Id));
+        Assert.Equal(
+            [(ActorId, WorkspaceRole.Admin), (member.Id, WorkspaceRole.Normal)],
+            (await workspaceMembers.ReadPage<WorkspaceMemberDto>()).Entries.Select(entry => (entry.User.Id, entry.Role)));
+        using var boardMembers = await GetAsync(BoardMembersPath(board.Id));
+        Assert.Equal(
+            BoardRole.Observer,
+            Assert.Single((await boardMembers.ReadPage<BoardMemberDto>()).Entries, entry => entry.User.Id == member.Id).Role);
+        Assert.Equal(2, (await ActivityAsync($"workspaceId={workspace.Id}&type=addMember")).Entries.Count);
+        Assert.False(await FromDatabaseAsync(database => database.Invites.AnyAsync()));
+    }
+
+    private async Task ChangeEmailAsync(TestUser user, string newEmail)
+    {
+        using (var change = await PostAsync(
+                   "/api/v1/auth/change-email", new { password = TestUser.Password, newEmail }, user))
+        {
+            Assert.Equal(HttpStatusCode.Accepted, change.StatusCode);
+        }
+
+        var send = await Brevo.AwaitEmailAsync(newEmail, "ConfirmEmailChange");
+        using var confirm = await SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/confirm-email-change",
+            new { token = send.TokenFrom(AppRoutes.ConfirmEmailChange) });
+        Assert.Equal(HttpStatusCode.NoContent, confirm.StatusCode);
+    }
+
+    private async Task<Guid> SignUpAndVerifyAsync(string email)
+    {
+        using (var signUp = await SignUpAsync(SignUpBody(email)))
+        {
+            Assert.Equal(HttpStatusCode.Accepted, signUp.StatusCode);
+        }
+
+        var send = await Brevo.AwaitEmailAsync(email, "VerifyEmail");
+        using var verify = await VerifyEmailAsync(send.TokenFrom(AppRoutes.VerifyEmail));
+        Assert.Equal(HttpStatusCode.OK, verify.StatusCode);
+        return await FromDatabaseAsync(database => database.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync());
+    }
+
+    private async Task<Guid> InviteIdAsync(string path, string email, string role = "Normal")
+    {
+        using var response = await PostAsync(path, new { email, role });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await response.ReadEnvelope<JsonElement>()).Data.Id("inviteId");
     }
