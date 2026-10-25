@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,12 +11,15 @@ public sealed record InviteTarget(InvitePlace Place, Guid Id, string Name)
     public Guid? BoardId => Place == InvitePlace.Board ? Id : null;
 }
 
+public sealed record InviteRow(Invite Invite, MemberUserDto? Inviter);
+
 public sealed class Invites(
     ApplicationDbContext database,
     Messages messages,
     Actor actor,
     ActivityWriter activity,
     ActivityTree tree,
+    InviteUnsubscribes unsubscribes,
     TimeProvider time)
 {
     public const int DailyEmails = 50;
@@ -83,11 +87,51 @@ public sealed class Invites(
             var inviter = await database.Users.SingleAsync(user => user.Id == actor.Id);
             invite.EmailedAt = now;
             messages.Add(new InviteSent(
-                email, inviter.Id, $"{inviter.FirstName} {inviter.LastName}", inviter.Username, target.Place, target.Name));
+                email, inviter.Id, $"{inviter.FirstName} {inviter.LastName}", inviter.Username, target.Place, target.Name)
+            {
+                UnsubscribeToken = unsubscribes.TokenFor(email)
+            });
         }
 
         await database.SaveChangesAsync();
         return ApiResponse<T>.SuccessResponse(reply(invite), "Member invited", StatusCodes.Status201Created);
+    }
+
+    /// <summary>
+    /// A page of the place's live invites, oldest first. The inviter is null once their account is deleted.
+    /// </summary>
+    public async Task<ApiResponse<List<T>>> ListAsync<T>(
+        InvitePlace place, Guid placeId, MemberSearchDto search, Func<InviteRow, T> shape)
+    {
+        ArgumentNullException.ThrowIfNull(search);
+        ArgumentNullException.ThrowIfNull(shape);
+
+        var query =
+            from invite in LiveIn(place, placeId)
+            join user in database.Users on invite.InvitedBy equals user.Id into inviters
+            from inviter in inviters.DefaultIfEmpty()
+            orderby invite.CreatedAt, invite.Id
+            select new InviteRow(
+                invite,
+                inviter == null
+                    ? null
+                    : new MemberUserDto(inviter.Id, inviter.Username, inviter.FirstName, inviter.LastName, inviter.ProfilePictureUrl));
+
+        var (rows, totalCount) = await PagedQuery.ReadAsync(query, pageNumber: search.PageNumber, pageSize: search.PageSize);
+        return PagedResponse<T>.SuccessResponse(
+            rows.ConvertAll(row => shape(row)),
+            totalCount,
+            pageSize: search.PageSize,
+            pageNumber: search.PageNumber,
+            message: "Invites retrieved successfully");
+    }
+
+    public async Task<ApiResponse<bool>> RevokeAsync(InvitePlace place, Guid placeId, Guid inviteId)
+    {
+        var deleted = await LiveIn(place, placeId).Where(invite => invite.Id == inviteId).ExecuteDeleteAsync();
+        return deleted == 0
+            ? ApiResponse<bool>.ErrorResponse("Invite not found", StatusCodes.Status404NotFound)
+            : ApiResponse<bool>.SuccessResponse(true, "Invite revoked", StatusCodes.Status204NoContent);
     }
 
     /// <summary>
@@ -161,6 +205,15 @@ public sealed class Invites(
         }
 
         await database.SaveChangesAsync();
+    }
+
+    private IQueryable<Invite> LiveIn(InvitePlace place, Guid placeId)
+    {
+        var now = time.GetUtcNow().UtcDateTime;
+        Expression<Func<Invite, bool>> inPlace = place == InvitePlace.Workspace
+            ? invite => invite.WorkspaceId == placeId
+            : invite => invite.BoardId == placeId;
+        return database.Invites.Where(inPlace).Where(invite => invite.ExpiresAt > now);
     }
 
     private async Task<bool> EmailsReachedAsync(DateTime now)

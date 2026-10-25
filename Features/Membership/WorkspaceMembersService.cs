@@ -8,6 +8,8 @@ public interface IWorkspaceMembersService
     Task<ApiResponse<AddedWorkspaceMemberDto>> AddAsync(Guid workspaceId, AddMemberWrite<WorkspaceRole> write);
     Task<ApiResponse<WorkspaceMemberDto>> UpdateAsync(Guid workspaceId, Guid memberId, UpdateMemberWrite<WorkspaceRole> write);
     Task<ApiResponse<bool>> RemoveAsync(Guid workspaceId, Guid memberId);
+    Task<ApiResponse<List<WorkspaceInviteDto>>> GetInvitesAsync(Guid workspaceId, MemberSearchDto searchDto);
+    Task<ApiResponse<bool>> RevokeInviteAsync(Guid workspaceId, Guid inviteId);
 }
 
 public class WorkspaceMembersService : IWorkspaceMembersService
@@ -225,6 +227,34 @@ public class WorkspaceMembersService : IWorkspaceMembersService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
         return ApiResponse<bool>.SuccessResponse(true, "Member removed successfully", StatusCodes.Status204NoContent);
+    }
+
+    public async Task<ApiResponse<List<WorkspaceInviteDto>>> GetInvitesAsync(Guid workspaceId, MemberSearchDto searchDto)
+    {
+        var access = await _readable.WorkspaceAsync(workspaceId, _actor.Id);
+        if (_readable.Denies(access, WorkspaceAction.Administer, workspaceId, _actor.Id, out ApiResponse<List<WorkspaceInviteDto>>? denied))
+        {
+            return denied;
+        }
+
+        return await _invites.ListAsync(InvitePlace.Workspace, workspaceId, searchDto, row => new WorkspaceInviteDto(
+            row.Invite.Id,
+            row.Invite.Email,
+            Enum.Parse<WorkspaceRole>(row.Invite.Role),
+            row.Inviter,
+            row.Invite.CreatedAt,
+            row.Invite.ExpiresAt));
+    }
+
+    public async Task<ApiResponse<bool>> RevokeInviteAsync(Guid workspaceId, Guid inviteId)
+    {
+        var access = await _readable.WorkspaceAsync(workspaceId, _actor.Id);
+        if (_readable.Denies(access, WorkspaceAction.Administer, workspaceId, _actor.Id, out ApiResponse<bool>? denied))
+        {
+            return denied;
+        }
+
+        return await _invites.RevokeAsync(InvitePlace.Workspace, workspaceId, inviteId);
     }
 
     private async Task<(WorkspaceMember Member, User User)?> MemberAsync(Guid workspaceId, Guid memberId)

@@ -15,6 +15,8 @@ public static class AppRoutes
     public const string UndoEmailChange = "/undo-email-change";
 
     public const string SignUp = "/sign-up";
+
+    public const string UnsubscribeInvites = "/unsubscribe-invites";
 }
 
 public sealed class AppLinks(IOptions<WebAppOptions> options)

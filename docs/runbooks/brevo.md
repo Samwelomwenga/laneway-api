@@ -73,5 +73,6 @@ Only a real deployment needs these steps. In the existing Brevo account:
 5. Once the API has a public URL, add a transactional webhook pointing at `https://<api host>/api/v1/webhooks/brevo`. Tick hard bounce, spam, blocked, and unsubscribed. Nothing else. Set its bearer to a token minted from the `prd` config.
 6. Set `WebApp:BaseUrl` and `Cors:AllowedOrigins` to the real web app origin.
 7. Check the plan's sending limit. 300 a day won't cover Production for long.
+8. Give the API a Data Protection key ring that survives a restart and that every instance shares. The unsubscribe link in an invite email is the address, protected with those keys. The API keeps them in `~/.aspnet/DataProtection-Keys` by default, so a container with no volume there makes new keys on every start, and every unsubscribe link already sent then answers 400 `invalidToken`.
 
 An event the webhook doesn't handle logs `WebhookEventIgnored`. If those show up, someone ticked an extra box in step 5.

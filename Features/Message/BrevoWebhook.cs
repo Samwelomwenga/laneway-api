@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace Laneway.Api;
 
@@ -68,37 +67,12 @@ public sealed class BrevoWebhook(
             return;
         }
 
-        var written = await SuppressAsync(Suppressions.Hash(email), kind, messageId, token);
+        var written = await Suppressions.AddAsync(
+            database, Suppressions.Hash(email), kind, messageId, time.GetUtcNow().UtcDateTime, token);
         _log.AddressSuppressed(name, delivery.Id, delivery.Type, alreadySuppressed: !written);
         if (written)
         {
             meter.Suppressed(kind);
-        }
-    }
-
-    private async Task<bool> SuppressAsync(byte[] hash, SuppressionKind kind, string messageId, CancellationToken token)
-    {
-        if (await database.Suppressions.AnyAsync(s => s.AddressHash == hash && s.Kind == kind, token))
-        {
-            return false;
-        }
-
-        database.Suppressions.Add(new Suppression
-        {
-            AddressHash = hash,
-            Kind = kind,
-            SuppressedAt = time.GetUtcNow().UtcDateTime,
-            MessageId = messageId
-        });
-        try
-        {
-            await database.SaveChangesAsync(token);
-            return true;
-        }
-        catch (DbUpdateException exception)
-            when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            return false;
         }
     }
 

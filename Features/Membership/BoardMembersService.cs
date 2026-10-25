@@ -8,6 +8,8 @@ public interface IBoardMembersService
     Task<ApiResponse<AddedBoardMemberDto>> AddAsync(Guid boardId, AddMemberWrite<BoardRole> write);
     Task<ApiResponse<BoardMemberDto>> UpdateAsync(Guid boardId, Guid memberId, UpdateMemberWrite<BoardRole> write);
     Task<ApiResponse<bool>> RemoveAsync(Guid boardId, Guid memberId);
+    Task<ApiResponse<List<BoardInviteDto>>> GetInvitesAsync(Guid boardId, MemberSearchDto searchDto);
+    Task<ApiResponse<bool>> RevokeInviteAsync(Guid boardId, Guid inviteId);
 }
 
 public class BoardMembersService : IBoardMembersService
@@ -210,6 +212,46 @@ public class BoardMembersService : IBoardMembersService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
         return ApiResponse<bool>.SuccessResponse(true, "Member removed successfully", StatusCodes.Status204NoContent);
+    }
+
+    public async Task<ApiResponse<List<BoardInviteDto>>> GetInvitesAsync(Guid boardId, MemberSearchDto searchDto)
+    {
+        if (await InviteDenialAsync<List<BoardInviteDto>>(boardId) is { } denied)
+        {
+            return denied;
+        }
+
+        return await _invites.ListAsync(InvitePlace.Board, boardId, searchDto, row => new BoardInviteDto(
+            row.Invite.Id,
+            row.Invite.Email,
+            Enum.Parse<BoardRole>(row.Invite.Role),
+            row.Inviter,
+            row.Invite.CreatedAt,
+            row.Invite.ExpiresAt));
+    }
+
+    public async Task<ApiResponse<bool>> RevokeInviteAsync(Guid boardId, Guid inviteId)
+    {
+        if (await InviteDenialAsync<bool>(boardId) is { } denied)
+        {
+            return denied;
+        }
+
+        return await _invites.RevokeAsync(InvitePlace.Board, boardId, inviteId);
+    }
+
+    private async Task<ApiResponse<T>?> InviteDenialAsync<T>(Guid boardId)
+    {
+        var userId = _actor.Id;
+        var access = await _readable.BoardAsync(boardId, userId);
+        if (_readable.ReadDenies(access, AccessTarget.Board, boardId, userId, out ApiResponse<T>? denied))
+        {
+            return denied;
+        }
+
+        return BoardRules.Refusal(access.Standing, BoardAction.AddMember) is { } refusal
+            ? _readable.Refused<T>(refusal, AccessTarget.Board, boardId, userId)
+            : null;
     }
 
     private Task<FoundMember?> MemberAsync(Guid boardId, Guid memberId) =>

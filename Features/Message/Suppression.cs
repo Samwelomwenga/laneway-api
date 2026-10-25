@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Laneway.Api;
 
@@ -26,6 +27,32 @@ public static class Suppressions
     {
         ArgumentNullException.ThrowIfNull(address);
         return SHA256.HashData(Encoding.UTF8.GetBytes(Emails.Normalize(address)));
+    }
+
+    /// <summary>
+    /// Writes a suppression unless the address already has one of this kind. Returns whether it wrote one.
+    /// </summary>
+    public static async Task<bool> AddAsync(
+        ApplicationDbContext database, byte[] hash, SuppressionKind kind, string messageId, DateTime at, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(database);
+
+        if (await database.Suppressions.AnyAsync(s => s.AddressHash == hash && s.Kind == kind, token))
+        {
+            return false;
+        }
+
+        database.Suppressions.Add(new Suppression { AddressHash = hash, Kind = kind, SuppressedAt = at, MessageId = messageId });
+        try
+        {
+            await database.SaveChangesAsync(token);
+            return true;
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            return false;
+        }
     }
 
     /// <summary>

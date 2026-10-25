@@ -121,6 +121,8 @@ A `Laneway.Message` meter counts each delivery once, when it ends. Locally, `dot
 | `laneway.message.deliveries` | `result`: `sent`, `failed`, `expired`, or `dropped`. `channel`: `email` |
 | `laneway.message.suppressions` | `event`: `hardBounce`, `spam`, `blocked`, or `unsubscribed`. It counts new suppressions only, not repeats. |
 
+The unsubscribe link in an invite email writes the same `unsubscribed` suppression a webhook event does, with `unsubscribe-link` in place of a Brevo `message-id`. It adds to `laneway.message.suppressions` and logs no event, since no delivery matches it.
+
 ## Unexpected errors
 
 `ApiExceptionHandler` logs each exception it turns into a 500 once, at Error, under the `Laneway.Api.ApiExceptionHandler` category as event 1, `UnexpectedError`. Event ids are unique within a category, so this id doesn't clash with `AccessTokenRejected`. The entry carries the exception and `traceId`, the request's `TraceIdentifier`. The 500 body returns the same `traceId` with a generic message, so a client can quote it and nothing else leaks. This meets ASVS 16.3.4 and 16.5.1.

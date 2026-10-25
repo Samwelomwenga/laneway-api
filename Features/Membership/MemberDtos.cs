@@ -59,6 +59,28 @@ public record AddedBoardMemberDto
     }
 }
 
+public record WorkspaceInviteDto
+(
+    Guid Id,
+    string Email,
+    WorkspaceRole Role,
+    MemberUserDto? InvitedBy,
+    DateTime CreatedAt,
+    DateTime ExpiresAt
+);
+
+public record BoardInviteDto
+(
+    Guid Id,
+    string Email,
+    BoardRole Role,
+    MemberUserDto? InvitedBy,
+    DateTime CreatedAt,
+    DateTime ExpiresAt
+);
+
+public record UnsubscribeInvitesDto(string? Token);
+
 [ModelBinder(typeof(SearchQueryBinder<MemberSearchDto>))]
 public record MemberSearchDto
 (

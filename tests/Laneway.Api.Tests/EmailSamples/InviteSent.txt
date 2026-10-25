@@ -6,4 +6,8 @@ https://app.laneway.example/sign-up#email=jane.doe%40gmail.com
 
 The invite lasts 30 days. If you don't know them, you can ignore this email.
 
+Don't want Laneway invites at this address? Unsubscribe and you won't get another.
+
+https://app.laneway.example/unsubscribe-invites#token=Zm9yLXRoZS1zYW1wbGUtb25seS1ub3QtYS1yZWFsLXRva2Vu
+
 You got this email because @ana-waweru entered this address on Laneway.

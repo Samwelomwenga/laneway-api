@@ -15,7 +15,7 @@ Every request except a CORS preflight falls under at least one written limit. Th
 | `signed-in` | every request with a valid token | `sub` | 300 per minute |
 | `anonymous` | every other request with no valid token | IP | 60 per minute |
 
-Each policy is a sliding window with 6 segments. The limiter runs after authentication, so a valid token decides between `signed-in` and `anonymous`. A request with a missing or bad token counts as `anonymous`, unless it goes to sign-in, sign-up, refresh, the username checker, resend verification, forgot password, or the Brevo webhook. Those seven count only under their own policy. Email verification, password reset, confirm email change, and undo email change have no policy of their own, so they count as `anonymous`. `password-check` and `add-member` count on top of `signed-in`. The two member routes share one `add-member` bucket.
+Each policy is a sliding window with 6 segments. The limiter runs after authentication, so a valid token decides between `signed-in` and `anonymous`. A request with a missing or bad token counts as `anonymous`, unless it goes to sign-in, sign-up, refresh, the username checker, resend verification, forgot password, or the Brevo webhook. Those seven count only under their own policy. Email verification, password reset, confirm email change, undo email change, and the invite unsubscribe have no policy of their own, so they count as `anonymous`. Each takes a 256-bit token or a Data Protection payload, so guessing is hopeless. `password-check` and `add-member` count on top of `signed-in`. The two member routes share one `add-member` bucket.
 
 The webhook's bearer is a webhook token, not an access token, so the webhook never counts under `signed-in`. Brevo retries a 429 at 10 minutes, 1 hour, 2 hours, and 8 hours. A 429 delays an event without losing it.
 
@@ -23,7 +23,7 @@ The limiter checks every policy a request falls under before it takes a permit f
 
 `email-request` covers the anonymous routes that can mail a stranger. Resend verification and forgot password share one bucket. The per-address cap sits behind it: no user gets more than 5 token emails in 24 hours, whatever IP asks. `VerifyEmail` and `ResetPassword` count together toward those 5. Change email sits behind `password-check`, but its confirm email goes to an address the account doesn't own yet, so the cap covers it too. It counts `ConfirmEmailChange` emails by the new address, whichever account asked, and a 6th in 24 hours sends nothing. A capped request answers exactly as it would have, and logs `MessageSkipped` with `addressCapped`.
 
-Adding a member by an email with no verified user sends an invite email. Each user sends at most 50 invite emails in 24 hours across every place, counted from `InviteSent` deliveries by inviter. The 51st answers 429 `tooManyRequests` and creates no invite. A repeat invite inside 24 hours sends no email, so it doesn't count and isn't refused.
+Adding a member by an email with no verified user sends an invite email. Each user sends at most 50 invite emails in 24 hours across every place, counted from `InviteSent` deliveries by inviter. The 51st answers 429 `tooManyRequests` and creates no invite. A repeat invite inside 24 hours sends no email, so it doesn't count and isn't refused. Listing and revoking a place's invites send nothing and count under `signed-in` only.
 
 Outside Development, plain HTTP counts before it gets its `httpsRequired` 400.
 

@@ -295,6 +295,119 @@ public class InviteTests : ApiTests
         Assert.False(await FromDatabaseAsync(database => database.Invites.AnyAsync()));
     }
 
+    [Fact]
+    public async Task A_workspace_lists_its_live_invites_and_its_members_list_shows_none()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var other = await CreateWorkspaceAsync("Platform");
+        var first = NewEmail();
+        var second = NewEmail();
+        var firstId = await InviteIdAsync(WorkspaceMembersPath(workspace.Id), first, role: "Admin");
+        Time.Advance(TimeSpan.FromMinutes(1));
+        var secondId = await InviteIdAsync(WorkspaceMembersPath(workspace.Id), second);
+        var expired = await InviteIdAsync(WorkspaceMembersPath(workspace.Id), NewEmail());
+        await MoveInviteBackAsync(expired, Invites.Lifetime);
+        await InviteIdAsync(WorkspaceMembersPath(other.Id), NewEmail());
+
+        using var response = await GetAsync(WorkspaceInvitesPath(workspace.Id));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var invites = (await response.ReadPage<WorkspaceInviteDto>()).Entries;
+        Assert.Equal(
+            [(firstId, first, WorkspaceRole.Admin), (secondId, second, WorkspaceRole.Normal)],
+            invites.Select(invite => (invite.Id, invite.Email, invite.Role)));
+        Assert.All(invites, invite => Assert.Equal(ActorId, invite.InvitedBy!.Id));
+        Assert.Equal(invites[1].CreatedAt + Invites.Lifetime, invites[1].ExpiresAt, TimeSpan.FromMilliseconds(1));
+        using var members = await GetAsync(WorkspaceMembersPath(workspace.Id));
+        Assert.Equal([ActorId], (await members.ReadPage<WorkspaceMemberDto>()).Entries.Select(member => member.User.Id));
+    }
+
+    [Fact]
+    public async Task Revoking_a_board_invite_deletes_it_and_an_expired_or_unknown_one_is_404()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var board = await CreateBoardAsync(workspace.Id, "Roadmap");
+        var other = await CreateBoardAsync(workspace.Id, "Retro");
+        var revoked = await InviteIdAsync(BoardMembersPath(board.Id), NewEmail());
+        var expired = await InviteIdAsync(BoardMembersPath(board.Id), NewEmail());
+        await MoveInviteBackAsync(expired, Invites.Lifetime);
+        var elsewhere = await InviteIdAsync(BoardMembersPath(other.Id), NewEmail());
+
+        using var revoke = await DeleteAsync($"{BoardInvitesPath(board.Id)}/{revoked}");
+        using var again = await DeleteAsync($"{BoardInvitesPath(board.Id)}/{revoked}");
+        using var late = await DeleteAsync($"{BoardInvitesPath(board.Id)}/{expired}");
+        using var wrongPlace = await DeleteAsync($"{BoardInvitesPath(board.Id)}/{elsewhere}");
+
+        Assert.Equal(
+            [HttpStatusCode.NoContent, HttpStatusCode.NotFound, HttpStatusCode.NotFound, HttpStatusCode.NotFound],
+            [revoke.StatusCode, again.StatusCode, late.StatusCode, wrongPlace.StatusCode]);
+        Assert.Equal(
+            new[] { expired, elsewhere }.Order(),
+            await FromDatabaseAsync(database => database.Invites.Select(i => i.Id).Order().ToListAsync()));
+        using var listed = await GetAsync(BoardInvitesPath(board.Id));
+        Assert.Empty((await listed.ReadPage<BoardInviteDto>()).Entries);
+        using var members = await GetAsync(BoardMembersPath(other.Id));
+        Assert.Equal([ActorId], (await members.ReadPage<BoardMemberDto>()).Entries.Select(member => member.User.Id));
+    }
+
+    [Fact]
+    public async Task The_sweeper_deletes_an_invite_30_days_after_its_last_resend()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var stale = await InviteIdAsync(WorkspaceMembersPath(workspace.Id), NewEmail());
+        var renewed = NewEmail();
+        var kept = await InviteIdAsync(WorkspaceMembersPath(workspace.Id), renewed);
+        var sweeper = Services.GetRequiredService<InviteSweeper>();
+
+        await MoveInviteBackAsync(stale, TimeSpan.FromDays(10));
+        await MoveInviteBackAsync(kept, TimeSpan.FromDays(10));
+        await InviteIdAsync(WorkspaceMembersPath(workspace.Id), renewed);
+        await MoveInviteBackAsync(stale, TimeSpan.FromDays(20) - TimeSpan.FromMinutes(1));
+        await MoveInviteBackAsync(kept, TimeSpan.FromDays(20) - TimeSpan.FromMinutes(1));
+        Assert.Equal(0, await sweeper.SweepAsync(CancellationToken.None));
+        await MoveInviteBackAsync(stale, TimeSpan.FromMinutes(2));
+        await MoveInviteBackAsync(kept, TimeSpan.FromMinutes(2));
+
+        Assert.Equal(1, await sweeper.SweepAsync(CancellationToken.None));
+        Assert.Equal([kept], await FromDatabaseAsync(database => database.Invites.Select(i => i.Id).ToListAsync()));
+    }
+
+    [Fact]
+    public async Task The_unsubscribe_link_drops_later_invites_and_they_still_read_invited()
+    {
+        var design = await CreateWorkspaceAsync("Design");
+        var platform = await CreateWorkspaceAsync("Platform");
+        var email = NewEmail();
+        await InviteIdAsync(WorkspaceMembersPath(design.Id), email);
+        var token = (await Brevo.AwaitEmailAsync(email, "InviteSent")).TokenFrom(AppRoutes.UnsubscribeInvites);
+
+        using var unsubscribe = await UnsubscribeAsync(token);
+        using var again = await UnsubscribeAsync(token);
+
+        Assert.Equal([HttpStatusCode.NoContent, HttpStatusCode.NoContent], [unsubscribe.StatusCode, again.StatusCode]);
+        var suppression = await FromDatabaseAsync(database => database.Suppressions.SingleAsync());
+        Assert.Equal(Suppressions.Hash(email), suppression.AddressHash);
+        Assert.Equal(SuppressionKind.Unsubscribed, suppression.Kind);
+        using var later = await PostAsync(WorkspaceMembersPath(platform.Id), new { email });
+        Assert.Equal(HttpStatusCode.Created, later.StatusCode);
+        Assert.Equal("Invited", (await later.ReadEnvelope<JsonElement>()).Data.Text("status"));
+        await AwaitDeliveryAsync(DeliveryStatus.Dropped);
+        Assert.Single(Brevo.Sends, send => send.To == email);
+    }
+
+    [Fact]
+    public async Task A_bad_unsubscribe_token_is_400_invalid_token()
+    {
+        using var response = await UnsubscribeAsync("not-a-protected-payload");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(ErrorCodes.InvalidToken, Assert.Single(await response.ReadErrors()).Code);
+        Assert.False(await FromDatabaseAsync(database => database.Suppressions.AnyAsync()));
+    }
+
+    private Task<HttpResponseMessage> UnsubscribeAsync(string token) =>
+        SendAnonymousAsync(HttpMethod.Post, "/api/v1/invites/unsubscribe", new { token });
+
     private async Task ChangeEmailAsync(TestUser user, string newEmail)
     {
         using (var change = await PostAsync(

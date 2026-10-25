@@ -52,7 +52,8 @@ public class EmailSampleTests
             "Ana\nWaweru-Kamau of the Long Valley Weavers Cooperative",
             "ana-waweru",
             InvitePlace.Board,
-            "Q4 <launch>\u202E\"plan\"\u0007")),
+            "Q4 <launch>\u202E\"plan\"\u0007")
+        { UnsubscribeToken = SampleToken }),
         ["PasswordChanged-Changed"] = Render(new PasswordChanged(
             Guid.Empty,
             PasswordChangeHow.Changed,
