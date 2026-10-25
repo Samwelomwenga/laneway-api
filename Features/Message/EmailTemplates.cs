@@ -15,7 +15,9 @@ public static class EmailTemplates
         [MessageType.ConfirmEmailChange] = (stored, secret, links) =>
             ConfirmEmailChangeEmail.Render(MessageBodies.In<ConfirmEmailChange>(stored) with { Token = secret! }, links),
         [MessageType.EmailChanged] = (stored, secret, links) =>
-            EmailChangedEmail.Render(MessageBodies.In<EmailChanged>(stored) with { Token = secret! }, links)
+            EmailChangedEmail.Render(MessageBodies.In<EmailChanged>(stored) with { Token = secret! }, links),
+        [MessageType.EmailChangeUndone] = (stored, _, _) =>
+            EmailChangeUndoneEmail.Render(MessageBodies.In<EmailChangeUndone>(stored))
     };
 
     public static bool Has(MessageType type) => Templates.ContainsKey(type);

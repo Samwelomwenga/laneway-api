@@ -22,6 +22,8 @@ public class AuthToken
 
     public static readonly TimeSpan UndoLifetime = TimeSpan.FromDays(7);
 
+    public const int UndoWrongPasswordLimit = 5;
+
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public AuthTokenKind Kind { get; set; }
@@ -31,6 +33,8 @@ public class AuthToken
 
     /// <summary>The address a change-email token moves to, or the one an undo token restores. Never on <see cref="User"/>.</summary>
     public string? Email { get; set; }
+
+    public int WrongPasswordCount { get; set; }
 
     public static (AuthToken Row, string Value) Issue(
         Guid userId, AuthTokenKind kind, TimeSpan lifetime, DateTime now, string? email = null)

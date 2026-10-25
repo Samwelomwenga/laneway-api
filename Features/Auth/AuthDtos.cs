@@ -84,6 +84,13 @@ public record ResetPasswordDto(string? Token, string? NewPassword)
 
 public record ConfirmEmailChangeDto(string? Token);
 
+public record UndoEmailChangeDto(string? Token, string? RecentPassword, string? NewPassword)
+{
+    public string? RecentPassword { get; init; } = Passwords.Normalize(RecentPassword);
+
+    public string? NewPassword { get; init; } = Passwords.Normalize(NewPassword);
+}
+
 public record UsernameCheckDto(string? Username);
 
 public record UsernameAvailabilityDto(bool Available);

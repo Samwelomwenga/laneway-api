@@ -20,6 +20,7 @@ public interface IAuthService
     Task<AuthReply<bool>> ChangePasswordAsync(Guid userId, Guid sessionId, ChangePasswordWrite write);
     Task<AuthReply<bool>> ChangeEmailAsync(Guid userId, Guid sessionId, ChangeEmailWrite write);
     Task<AuthReply<bool>> ConfirmEmailChangeAsync(string token, string? userAgent);
+    Task<AuthReply<bool>> UndoEmailChangeAsync(string token, string recentPassword, string newPassword);
     Task<AuthReply<bool>> DeleteUserAsync(Guid userId, Guid sessionId, DeleteUserWrite write);
 }
 
@@ -236,17 +237,9 @@ public sealed class AuthService(
             return InvalidLink();
         }
 
-        if (Passwords.Length(newPassword) < Passwords.MinimumLength)
+        if (await NewPasswordRefusedAsync(newPassword, user.Username, user.Email) is { } refused)
         {
-            return Invalid(new ApiError(
-                "newPassword",
-                ErrorCodes.TooShort,
-                $"'newPassword' must be at least {Passwords.MinimumLength} characters."));
-        }
-
-        if (await passwordPolicy.CheckAsync(newPassword, user.Username, user.Email, "newPassword") is { } refused)
-        {
-            return Invalid(refused);
+            return refused;
         }
 
         var newHash = passwords.Hash(newPassword);
@@ -282,6 +275,21 @@ public sealed class AuthService(
             .SetProperty(e => e.PasswordHash, newHash)
             .SetProperty(e => e.UpdatedAt, now)
             .SetProperty(e => e.UpdatedBy, userId));
+    }
+
+    private async Task<AuthReply<bool>?> NewPasswordRefusedAsync(string newPassword, string username, string email)
+    {
+        if (Passwords.Length(newPassword) < Passwords.MinimumLength)
+        {
+            return Invalid(new ApiError(
+                "newPassword",
+                ErrorCodes.TooShort,
+                $"'newPassword' must be at least {Passwords.MinimumLength} characters."));
+        }
+
+        return await passwordPolicy.CheckAsync(newPassword, username, email, "newPassword") is { } refused
+            ? Invalid(refused)
+            : null;
     }
 
     private static AuthReply<bool> InvalidLink() =>
@@ -326,8 +334,8 @@ public sealed class AuthService(
 
     private Task DeleteVerificationAsync(Guid userId) => DeleteTokensAsync(userId, AuthTokenKind.Verification);
 
-    private Task DeleteTokensAsync(Guid userId, AuthTokenKind kind) =>
-        database.AuthTokens.Where(t => t.UserId == userId && t.Kind == kind).ExecuteDeleteAsync();
+    private Task DeleteTokensAsync(Guid userId, params AuthTokenKind[] kinds) =>
+        database.AuthTokens.Where(t => t.UserId == userId && kinds.Contains(t.Kind)).ExecuteDeleteAsync();
 
     private void AddVerification(Guid userId, DateTime now)
     {
@@ -655,6 +663,121 @@ public sealed class AuthService(
 
         _log.EmailChanged(userId);
         return NoContent("Email changed", RefreshCookieChange.None);
+    }
+
+    public async Task<AuthReply<bool>> UndoEmailChangeAsync(string token, string recentPassword, string newPassword)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(recentPassword);
+        ArgumentNullException.ThrowIfNull(newPassword);
+
+        var hash = AuthToken.Hash(token);
+        var now = time.GetUtcNow().UtcDateTime;
+        var undo = await database.AuthTokens
+            .AsNoTracking()
+            .SingleOrDefaultAsync(t => t.TokenHash == hash && t.Kind == AuthTokenKind.Undo && t.ExpiresAt > now);
+        var user = undo is null
+            ? null
+            : await database.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == undo.UserId);
+        if (undo is null || user is null)
+        {
+            return InvalidLink();
+        }
+
+        if (!await ReserveGuessAsync(undo.Id, now))
+        {
+            return InvalidLink();
+        }
+
+        if (!await HadPasswordSinceAsync(user, undo.CreatedAt - PasswordHistoryEntry.RecentWindow, recentPassword))
+        {
+            return await WrongRecentPasswordAsync(user, undo.Id, now);
+        }
+
+        await database.AuthTokens
+            .Where(t => t.Id == undo.Id)
+            .ExecuteUpdateAsync(t => t.SetProperty(e => e.WrongPasswordCount, e => e.WrongPasswordCount - 1));
+        if (await NewPasswordRefusedAsync(newPassword, user.Username, undo.Email!) is { } refused)
+        {
+            return refused;
+        }
+
+        var newHash = passwords.Hash(newPassword);
+        var (userId, restored) = (user.Id, undo.Email!);
+        await using var transaction = await database.Database.BeginTransactionAsync();
+        if (!await database.TryLockUserAsync(userId))
+        {
+            return InvalidLink();
+        }
+
+        if (await VerifiedOwnerExistsAsync(userId, restored))
+        {
+            return EmailTaken(field: null);
+        }
+
+        if (await database.AuthTokens.Where(t => t.TokenHash == hash && t.ExpiresAt > now).ExecuteDeleteAsync() != 1)
+        {
+            return InvalidLink();
+        }
+
+        var replacedEmail = await database.Users.Where(u => u.Id == userId).Select(u => u.Email).SingleAsync();
+        await database.Users.Where(u => u.Id != userId && u.Email == restored && !u.Verified).ExecuteDeleteAsync();
+        try
+        {
+            await database.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(u => u
+                .SetProperty(e => e.Email, restored)
+                .SetProperty(e => e.FailedSignInCount, 0)
+                .SetProperty(e => e.LastFailedSignInAt, (DateTime?)null)
+                .SetProperty(e => e.SignInBlockedUntil, (DateTime?)null)
+                .SetProperty(e => e.UpdatedAt, now)
+                .SetProperty(e => e.UpdatedBy, userId));
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            return EmailTaken(field: null);
+        }
+
+        await ReplacePasswordAsync(userId, newHash, now);
+        await DeleteTokensAsync(userId, AuthTokenKind.Undo, AuthTokenKind.Reset, AuthTokenKind.ChangeEmail);
+        var ended = await EndAllAsync(userId, keep: null, SessionEndReason.EmailChangeUndone, now);
+        messages.Add(new EmailChangeUndone(replacedEmail, now, user.TimeZone));
+        await database.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        _log.EmailChangeUndone(userId);
+        LogEnded(userId, ended, SessionEndReason.EmailChangeUndone);
+        return NoContent("Email change undone", RefreshCookieChange.None);
+    }
+
+    private async Task<bool> ReserveGuessAsync(Guid undoId, DateTime now) =>
+        await database.AuthTokens
+            .Where(t => t.Id == undoId && t.ExpiresAt > now && t.WrongPasswordCount < AuthToken.UndoWrongPasswordLimit)
+            .ExecuteUpdateAsync(t => t.SetProperty(e => e.WrongPasswordCount, e => e.WrongPasswordCount + 1)) == 1;
+
+    private async Task<bool> HadPasswordSinceAsync(User user, DateTime since, string password)
+    {
+        if (passwords.Verify(user, password).Matched)
+        {
+            return true;
+        }
+
+        var replaced = await database.PasswordHistory
+            .Where(h => h.UserId == user.Id && h.ReplacedAt >= since)
+            .Select(h => h.PasswordHash)
+            .ToListAsync();
+        return replaced.Any(oldHash => passwords.Matches(oldHash, password));
+    }
+
+    private async Task<AuthReply<bool>> WrongRecentPasswordAsync(User user, Guid undoId, DateTime now)
+    {
+        var blocked = await CountFailureAsync(user, now) is not null;
+        await database.AuthTokens
+            .Where(t => t.Id == undoId && t.WrongPasswordCount >= AuthToken.UndoWrongPasswordLimit)
+            .ExecuteDeleteAsync();
+
+        _log.PasswordCheckFailed(user.Id, blocked);
+        meter.PasswordCheckFailed(PasswordCheckedEndpoint.UndoEmailChange, blocked);
+        return Invalid(new ApiError("recentPassword", ErrorCodes.WrongPassword, "'recentPassword' is wrong."));
     }
 
     private Task<bool> VerifiedOwnerExistsAsync(Guid userId, string email) =>

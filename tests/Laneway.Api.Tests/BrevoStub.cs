@@ -41,6 +41,14 @@ internal sealed class BrevoStub : HttpMessageHandler
         AwaitAsync(sends => sends.FirstOrDefault(send => send.To == to && send.Status == HttpStatusCode.Created),
             $"No email reached Brevo for {to} within 5 seconds.");
 
+    public Task<BrevoSend> AwaitEmailAsync(string to, string tag, int nth = 1) =>
+        AwaitAsync(
+            sends => sends
+                .Where(send => send.To == to && send.Status == HttpStatusCode.Created && send.Tags.Contains(tag))
+                .Skip(nth - 1)
+                .FirstOrDefault(),
+            $"No {tag} email number {nth} reached Brevo for {to} within 5 seconds.");
+
     public Task<IReadOnlyList<BrevoSend>> AwaitSendsAsync(int count) =>
         AwaitAsync(sends => sends.Count >= count ? sends : null,
             $"Brevo didn't see {count} sends within 5 seconds.");

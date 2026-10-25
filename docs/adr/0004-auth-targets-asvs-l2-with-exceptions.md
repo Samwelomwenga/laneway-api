@@ -18,12 +18,25 @@ The minimum password length is 8, which meets 6.2.1 at every level, so it isn't 
   - A new password must pass a top-100k common-password list (6.2.4), a context-word check (6.2.11), and a Have I Been Pwned range lookup (6.2.12).
 - What closes it: the MFA effort.
 
+### 6.3.4, every way to set a password is documented (L2)
+
+- The ways: change password with the current one, reset through a link sent to a verified address, and undo of an email change.
+- What Laneway doesn't do: follow the OWASP Forgot Password cheat sheet in two places. Notices carry no contact details, and Laneway has no support path.
+- Why: Laneway has no support team to send people to.
+- Mitigating controls:
+  - Undo needs the undo link from the old address and a recent password. A recent password is any the account had from 7 days before the change was confirmed until now.
+  - A wrong recent password counts toward the sign-in block. The 5th wrong one burns that link.
+  - The sign-in block never stops an undo, so an attacker can't lock the owner out of it. The `anonymous` limit by IP still covers the route.
+  - Undo no longer restores a superseded address on the link alone, since it asks for a recent password. Every undo link lives its full 7 days, so changing twice can't void the owner's link.
+  - The leftover risk is someone who reads the old mailbox and knows a recent password. That person could already have reset the password before the change.
+- What closes it: when MFA adds recovery codes, undo should accept one in place of a recent password.
+
 ### 6.3.8, enumeration (L3)
 
 6.3.8 is an L3 item, so it isn't strictly owed at L2. It stays listed because some answers still show whether an account exists.
 
 - Closed: sign-up by email. Past the username check, sign-up always answers 202 with no session. A new address, an unverified user's address, and a verified user's address all get the same reply, and the taken path still runs the password policy and the hash.
-- What Laneway doesn't do: hide whether a username is taken, or whether another user has an email in two places. Sign-up and the username checker answer 409 or `false` for a taken username. Change email, and its confirm link, answer 409 when a verified user has the new email. An unverified user's address doesn't count as taken. Adding a member by email answers 400 `notFound` when no verified user has the address.
+- What Laneway doesn't do: hide whether a username is taken, or whether another user has an email in two places. Sign-up and the username checker answer 409 or `false` for a taken username. Change email, and its confirm link, answer 409 when a verified user has the new email. The undo link answers 409 when a verified user took the old one since. An unverified user's address doesn't count as taken. Adding a member by email answers 400 `notFound` when no verified user has the address.
 - Why: usernames are public handles, so a taken one isn't a secret. Change email keeps its 409 because only a signed-in user who knows their password can ask.
 - Mitigating controls: the `sign-up` limit of 10 per hour per IP and the `username-check` limit of 30 per minute per IP cap username harvesting. The checker looks up usernames only, never emails. Change email needs an access token and the current password, and the `password-check` limit of 5 per minute by `sub` caps it. Adding a member needs an access token and the right to add members to a place, and the `add-member` limit of 20 per minute by `sub` caps it. Forgot password runs under the `email-request` limit of 10 per hour per IP. Sign-in resists enumeration with one 401 for an unknown user or a wrong password, and a dummy hash so the timing matches. The 403 for an unverified user only comes with the right password.
 - Closed: forgot password. It always answers 202 with the same body, for an unknown address, an unverified user, a suppressed address, a capped user, and a verified owner. The leftover gap is timing: a verified owner costs one token insert and one delivery insert. The user accepted that gap over padding every reply to match.

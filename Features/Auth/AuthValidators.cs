@@ -60,6 +60,16 @@ public sealed class ConfirmEmailChangeDtoValidator : AbstractValidator<ConfirmEm
     }
 }
 
+public sealed class UndoEmailChangeDtoValidator : AbstractValidator<UndoEmailChangeDto>
+{
+    public UndoEmailChangeDtoValidator()
+    {
+        RuleFor(x => x.Token).Required();
+        RuleFor(x => x.RecentPassword).Required().PasswordWithinMaximum();
+        RuleFor(x => x.NewPassword).Required().PasswordWithinMaximum();
+    }
+}
+
 public sealed class SignInDtoValidator : AbstractValidator<SignInDto>
 {
     public SignInDtoValidator()

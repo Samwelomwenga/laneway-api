@@ -93,6 +93,22 @@ public class AuthSweeperTests : ApiTests
         Assert.Empty(await TokenIdsAsync());
     }
 
+    [Fact]
+    public async Task A_password_history_row_goes_14_days_after_it_was_replaced()
+    {
+        var old = await SeedHistoryAsync();
+        Time.Advance(TimeSpan.FromDays(7));
+        var recent = await SeedHistoryAsync();
+
+        Time.Advance(TimeSpan.FromDays(7) - Minute);
+        await SweepAsync();
+        Assert.Contains(old, await HistoryIdsAsync());
+        Time.Advance(Minute);
+        await SweepAsync();
+
+        Assert.Equal([recent], await HistoryIdsAsync());
+    }
+
     private Task SweepAsync() =>
         Services.GetRequiredService<AuthSweeper>().SweepAsync(CancellationToken.None);
 
@@ -102,6 +118,20 @@ public class AuthSweeperTests : ApiTests
     private Task<Guid?> UserIdAsync(string email) =>
         FromDatabaseAsync(database =>
             database.Users.Where(u => u.Email == email).Select(u => (Guid?)u.Id).SingleOrDefaultAsync());
+
+    private Task<List<Guid>> HistoryIdsAsync() =>
+        FromDatabaseAsync(database => database.PasswordHistory.Select(h => h.Id).ToListAsync());
+
+    private async Task<Guid> SeedHistoryAsync()
+    {
+        var row = PasswordHistoryEntry.Of(ActorId, "replaced-hash", Time.GetUtcNow().UtcDateTime);
+        await FromDatabaseAsync(database =>
+        {
+            database.PasswordHistory.Add(row);
+            return database.SaveChangesAsync();
+        });
+        return row.Id;
+    }
 
     private async Task<Guid> SeedTokenAsync()
     {

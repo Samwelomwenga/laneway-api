@@ -152,6 +152,18 @@ public class AuthController : ApiControllerBase
             Writes.Required(confirmDto.Token, "token"), Request.Headers.UserAgent.ToString()));
     }
 
+    [HttpPost("undo-email-change")]
+    [AllowAnonymous]
+    public async Task<ActionResult> UndoEmailChange([FromBody] UndoEmailChangeDto undoDto)
+    {
+        ArgumentNullException.ThrowIfNull(undoDto);
+
+        return Reply(await _authService.UndoEmailChangeAsync(
+            Writes.Required(undoDto.Token, "token"),
+            Writes.Required(undoDto.RecentPassword, "recentPassword"),
+            Writes.Required(undoDto.NewPassword, "newPassword")));
+    }
+
     [HttpPost("delete-user")]
     [RateLimited(RateLimits.PasswordCheck)]
     [Authorize]

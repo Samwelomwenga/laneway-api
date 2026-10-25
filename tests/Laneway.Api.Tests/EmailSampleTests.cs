@@ -45,6 +45,7 @@ public class EmailSampleTests
             "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
             "Africa/Nairobi")
         { Token = SampleToken }),
+        ["EmailChangeUndone"] = Render(new EmailChangeUndone("jane.doe@gmail.com", At, "Africa/Nairobi")),
         ["PasswordChanged-Changed"] = Render(new PasswordChanged(
             Guid.Empty,
             PasswordChangeHow.Changed,

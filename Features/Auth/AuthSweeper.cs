@@ -49,6 +49,13 @@ public sealed class AuthSweeper : BackgroundService
             .Take(BatchSize)
             .ExecuteDeleteAsync(token));
 
+        var replacedBefore = now - PasswordHistoryEntry.KeptFor;
+        await InBatchesAsync(() => context.PasswordHistory
+            .Where(h => h.ReplacedAt <= replacedBefore)
+            .OrderBy(h => h.Id)
+            .Take(BatchSize)
+            .ExecuteDeleteAsync(token));
+
         // Postgres rechecks only the outer filter on a row a sign-up or verification changed while this waited.
         var signedUpBefore = now - UnverifiedLife;
         await InBatchesAsync(() => context.Users

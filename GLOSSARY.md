@@ -123,7 +123,7 @@ A user who is gone for good. The work they did stays, and their activity entries
 _Avoid_: Removed user, inactive user, disabled user
 
 **Session**:
-One stretch of a user being signed in on one device. It starts when the user signs in or uses their verification link. It ends when they sign out, sign out everywhere, or are deleted, when they change their password from another session, when their password is reset, or when it runs out. It also ends when the user ends it from their list of sessions, or when Laneway sees one of its old refresh tokens used again. A user can have several at once.
+One stretch of a user being signed in on one device. It starts when the user signs in or uses their verification link. It ends when they sign out, sign out everywhere, or are deleted, when they change their password from another session, when their password is reset or their email change is undone, or when it runs out. It also ends when the user ends it from their list of sessions, or when Laneway sees one of its old refresh tokens used again. A user can have several at once.
 _Avoid_: Login, token family
 
 **Password reset**:
@@ -134,8 +134,12 @@ _Avoid_: Password recovery
 Moving a user's sign-in address to a new one. The user asks with their password, and Laneway emails the new address a link that works for 24 hours. The address moves only when someone uses that link. Laneway then emails the old address with a link to undo the change for 7 days. A password reset cancels a pending email change, and a confirmed change voids any live reset link.
 _Avoid_: Email update, email swap
 
+**Undo email change**:
+Taking back an email change through the link sent to the old address. It needs a password the account had from 7 days before the change until now, and it sets a new one. It restores the old address, ends every session and any sign-in block, and voids every other undo link, any reset link, and any pending email change. Five wrong recent passwords burn the link.
+_Avoid_: Revert email, email rollback
+
 **Password history**:
-The hashes a user's password had before each change or reset, with when each was replaced. Laneway never shows it. It exists so undoing an email change can ask for a password the account used recently.
+The hashes a user's password had before each change, reset, or undo, with when each was replaced. Laneway never shows it. It exists so undoing an email change can ask for a password the account used recently. Laneway deletes each row 14 days after it was replaced.
 _Avoid_: Old passwords, previous passwords
 
 **Profile**:

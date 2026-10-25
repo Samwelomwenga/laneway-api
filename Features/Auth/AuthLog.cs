@@ -92,6 +92,10 @@ public static class AuthLog
         LoggerMessage.Define<Guid, Guid, bool>(
             LogLevel.Warning, PasswordCheckFailedId, "Password check failed: sub {sub}, sid {sid}, blocked {blocked}");
 
+    private static readonly Action<ILogger, Guid, bool, Exception?> PasswordCheckFailedWithoutSid =
+        LoggerMessage.Define<Guid, bool>(
+            LogLevel.Warning, PasswordCheckFailedId, "Password check failed: sub {sub}, blocked {blocked}");
+
     private static readonly EventId PasswordChangedId = new(14, "PasswordChanged");
 
     private static readonly Action<ILogger, Guid, Guid, Exception?> PasswordChangedEvent =
@@ -117,6 +121,11 @@ public static class AuthLog
 
     private static readonly Action<ILogger, string, Exception?> RateLimitedWithoutSub =
         LoggerMessage.Define<string>(LogLevel.Warning, RateLimitedId, "Rate limited: policy {policy}");
+
+    private static readonly EventId EmailChangeUndoneId = new(19, "EmailChangeUndone");
+
+    private static readonly Action<ILogger, Guid, Exception?> EmailChangeUndoneEvent =
+        LoggerMessage.Define<Guid>(LogLevel.Warning, EmailChangeUndoneId, "Email change undone: sub {sub}");
 
     private static readonly EventId MessageSkippedId = new(18, "MessageSkipped");
 
@@ -156,6 +165,9 @@ public static class AuthLog
     public static void PasswordCheckFailed(this ILogger logger, Guid userId, Guid sessionId, bool blocked) =>
         PasswordCheckFailedEvent(logger, userId, sessionId, blocked, null);
 
+    public static void PasswordCheckFailed(this ILogger logger, Guid userId, bool blocked) =>
+        PasswordCheckFailedWithoutSid(logger, userId, blocked, null);
+
     public static void PasswordChanged(this ILogger logger, Guid userId, Guid sessionId) =>
         PasswordChangedEvent(logger, userId, sessionId, null);
 
@@ -164,6 +176,9 @@ public static class AuthLog
 
     public static void EmailChanged(this ILogger logger, Guid userId) =>
         EmailChangedEvent(logger, userId, null);
+
+    public static void EmailChangeUndone(this ILogger logger, Guid userId) =>
+        EmailChangeUndoneEvent(logger, userId, null);
 
     public static void UserDeleted(this ILogger logger, Guid userId, Guid sessionId) =>
         UserDeletedEvent(logger, userId, sessionId, null);

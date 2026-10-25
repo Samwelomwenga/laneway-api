@@ -55,6 +55,7 @@ public partial class AnonymousAccessTests : ApiTests
                 "POST /api/v1/auth/reset-password",
                 "POST /api/v1/auth/sign-in",
                 "POST /api/v1/auth/sign-up",
+                "POST /api/v1/auth/undo-email-change",
                 "POST /api/v1/auth/verify-email",
                 "POST /api/v1/webhooks/brevo"
             ],

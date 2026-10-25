@@ -60,5 +60,6 @@ public enum SessionEndReason
     PasswordChanged,
     UserDeleted,
     TokenReused,
-    PasswordReset
+    PasswordReset,
+    EmailChangeUndone
 }

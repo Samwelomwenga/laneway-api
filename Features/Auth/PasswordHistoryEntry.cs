@@ -2,6 +2,10 @@ namespace Laneway.Api;
 
 public class PasswordHistoryEntry
 {
+    public static readonly TimeSpan RecentWindow = TimeSpan.FromDays(7);
+
+    public static readonly TimeSpan KeptFor = TimeSpan.FromDays(14);
+
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public required string PasswordHash { get; set; }

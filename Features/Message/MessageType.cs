@@ -6,7 +6,8 @@ public enum MessageType
     VerifyEmail,
     ResetPassword,
     ConfirmEmailChange,
-    EmailChanged
+    EmailChanged,
+    EmailChangeUndone
 }
 
 public enum MessageChannel
