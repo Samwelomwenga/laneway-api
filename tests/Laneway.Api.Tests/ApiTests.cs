@@ -201,6 +201,12 @@ public abstract class ApiTests : IAsyncLifetime
     protected Task<HttpResponseMessage> ResendVerificationAsync(string email) =>
         SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/resend-verification", new { email });
 
+    protected Task<HttpResponseMessage> ForgotPasswordAsync(string email) =>
+        SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/forgot-password", new { email });
+
+    protected Task<HttpResponseMessage> ResetPasswordAsync(string token, string newPassword) =>
+        SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/reset-password", new { token, newPassword });
+
     protected Task SuppressAsync(string email) =>
         FromDatabaseAsync(database =>
         {

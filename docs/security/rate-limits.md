@@ -8,20 +8,20 @@ Every request except a CORS preflight falls under at least one written limit. Th
 | `sign-up` | `POST /api/v1/auth/sign-up` | IP | 10 per hour |
 | `refresh` | `POST /api/v1/auth/refresh` | IP | 60 per minute |
 | `username-check` | `GET /api/v1/auth/username-available` | IP | 30 per minute |
-| `email-request` | `POST /api/v1/auth/resend-verification` | IP | 10 per hour |
+| `email-request` | `POST /api/v1/auth/resend-verification`, `POST /api/v1/auth/forgot-password` | IP | 10 per hour |
 | `password-check` | `change-password`, `change-email`, `delete-user` | `sub` | 5 per minute |
 | `add-member` | `POST /api/v1/workspaces/{id}/members`, `POST /api/v1/boards/{id}/members` | `sub` | 20 per minute |
 | `webhook` | `POST /api/v1/webhooks/brevo` | IP | 600 per minute |
 | `signed-in` | every request with a valid token | `sub` | 300 per minute |
 | `anonymous` | every other request with no valid token | IP | 60 per minute |
 
-Each policy is a sliding window with 6 segments. The limiter runs after authentication, so a valid token decides between `signed-in` and `anonymous`. A request with a missing or bad token counts as `anonymous`, unless it goes to sign-in, sign-up, refresh, the username checker, resend verification, or the Brevo webhook. Those six count only under their own policy. Email verification has no policy of its own, so it counts as `anonymous`. `password-check` and `add-member` count on top of `signed-in`. The two member routes share one `add-member` bucket.
+Each policy is a sliding window with 6 segments. The limiter runs after authentication, so a valid token decides between `signed-in` and `anonymous`. A request with a missing or bad token counts as `anonymous`, unless it goes to sign-in, sign-up, refresh, the username checker, resend verification, forgot password, or the Brevo webhook. Those seven count only under their own policy. Email verification, password reset, confirm email change, and undo email change have no policy of their own, so they count as `anonymous`. `password-check` and `add-member` count on top of `signed-in`. The two member routes share one `add-member` bucket.
 
 The webhook's bearer is a webhook token, not an access token, so the webhook never counts under `signed-in`. Brevo retries a 429 at 10 minutes, 1 hour, 2 hours, and 8 hours. A 429 delays an event without losing it.
 
 The limiter checks every policy a request falls under before it takes a permit from any of them. A refused request spends nothing, so a 429 from `password-check` leaves the caller's `signed-in` count alone.
 
-`email-request` covers the anonymous routes that can mail a stranger. Forgot password joins it later and shares its bucket. The per-address cap sits behind it: no user gets more than 5 token emails in 24 hours, whatever IP asks. A capped request answers exactly as it would have, and logs `MessageSkipped` with `addressCapped`.
+`email-request` covers the anonymous routes that can mail a stranger. Resend verification and forgot password share one bucket. The per-address cap sits behind it: no user gets more than 5 token emails in 24 hours, whatever IP asks. `VerifyEmail` and `ResetPassword` count together toward those 5. Change email sits behind `password-check`, but its confirm email goes to an address the account doesn't own yet, so the cap covers it too. It counts `ConfirmEmailChange` emails by the new address, whichever account asked, and a 6th in 24 hours sends nothing. A capped request answers exactly as it would have, and logs `MessageSkipped` with `addressCapped`.
 
 Outside Development, plain HTTP counts before it gets its `httpsRequired` 400.
 

@@ -24,12 +24,13 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | 10 | `SessionEnded` | Information | `sub`, `sid`, `endReason` |
 | 11 | `CsrfRejected` | Warning | `check` |
 | 12 | `SignInBlockStarted` | Warning | `sub`, `failureCount`, `blockedUntil` |
-| 13 | `PasswordCheckFailed` | Warning | `sub`, `sid`, `blocked` |
-| 14 | `PasswordChanged` | Information | `sub`, `sid` |
-| 15 | `EmailChanged` | Information | `sub`, `sid` |
+| 13 | `PasswordCheckFailed` | Warning | `sub`, `sid` when a session sent it, `blocked` |
+| 14 | `PasswordChanged` | Information | `sub`, and `sid` when a session made the change |
+| 15 | `EmailChanged` | Information | `sub` |
 | 16 | `UserDeleted` | Information | `sub`, `sid` |
 | 17 | `RateLimited` | Warning | `policy`, and `sub` when the policy counts by user |
 | 18 | `MessageSkipped` | Information, or Warning for `addressCapped` | `messageType`, `reason`, and `sub` when the address belongs to a user |
+| 19 | `EmailChangeUndone` | Warning | `sub` |
 
 `reason` is one of `malformed`, `expired`, `unknownKey`, `invalidSignature`, `invalidAlgorithm`, `invalidType`, `invalidIssuer`, `invalidAudience`, `sessionEnded`, or `invalid`.
 
@@ -37,17 +38,17 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 
 `RefreshSuperseded` is a refresh that lost a race inside the 10-second grace window. It ends nothing. `RefreshTokenReused` is a retired token back after that window, and a `SessionEnded` with `endReason` `TokenReused` follows it.
 
-`SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment. `endReason` is `SignedOut`, `SignedOutEverywhere`, `EndedFromSessionList`, `PasswordChanged`, `UserDeleted`, or `TokenReused`. Sign-out everywhere, change password, and delete user log one entry per session they end. Ending a session that already ended logs nothing.
+`SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment. `endReason` is `SignedOut`, `SignedOutEverywhere`, `EndedFromSessionList`, `PasswordChanged`, `UserDeleted`, `TokenReused`, `PasswordReset`, or `EmailChangeUndone`. Sign-out everywhere, change password, password reset, undo email change, and delete user log one entry per session they end. Ending a session that already ended logs nothing.
 
-`SignUp` logs when a sign-up creates an unverified user or takes over one. A sign-up whose address belongs to a verified user logs `MessageSkipped` instead. `AuthSweeper` runs hourly and logs nothing per row. It deletes expired token rows and hard-deletes users still unverified 7 days after their latest sign-up, in batches of 1,000. A failed sweep logs a plain Warning with no id. No session exists yet, so there is no `sid`. Using the verification link logs `SignInSucceeded` with the new session, and the counter tags it `succeeded`.
+`SignUp` logs when a sign-up creates an unverified user or takes over one. A sign-up whose address belongs to a verified user logs `MessageSkipped` instead. `AuthSweeper` runs hourly and logs nothing per row. It deletes expired token rows, deletes password history rows replaced more than 14 days ago, and hard-deletes users still unverified 7 days after their latest sign-up, in batches of 1,000. A failed sweep logs a plain Warning with no id. No session exists yet, so there is no `sid`. Using the verification link logs `SignInSucceeded` with the new session, and the counter tags it `succeeded`.
 
-`MessageSkipped` logs when sign-up or resend verification sends no email and still answers 202. `messageType` is `VerifyEmail`. `reason` is one of these:
+`MessageSkipped` logs when sign-up, resend verification, forgot password, or change email sends no email and still answers 202. `messageType` is `VerifyEmail` for the first two, `ResetPassword` for forgot password, and `ConfirmEmailChange` for change email. `reason` is one of these:
 
-- `unknownAccount`: no user has the address. Only resend logs it, and it has no `sub`.
-- `verified`: a verified user has the address.
-- `unverified`: the address belongs to an unverified user, for a message only verified users get. Nothing logs it yet. Forgot password will.
+- `unknownAccount`: no user has the address. Only resend and forgot password log it, and it has no `sub`.
+- `verified`: a verified user has the address, for `VerifyEmail`.
+- `unverified`: an unverified user has the address, for `ResetPassword`. Only verified users get a reset link.
 - `suppressed`: the address hard-bounced, marked mail as spam, or was blocked. Sign-up still creates or takes over the user.
-- `addressCapped`: the user already got 5 token emails in the last 24 hours. The request changed nothing. It logs at Warning, since that many to one address looks like mail-bombing.
+- `addressCapped`: the user already got 5 token emails in the last 24 hours. For change email, the new address already got 5 confirm emails in the last 24 hours, from any account. The request changed nothing. It logs at Warning, since that many to one address looks like mail-bombing.
 
 `CsrfRejected` is a sign-up, verification, sign-in, or refresh that failed a CSRF check. `check` names the first one that failed: `header` when `X-Laneway-Csrf: 1` is missing, `origin` when `Origin` isn't in `Cors:AllowedOrigins`, or `fetch-site` when `Sec-Fetch-Site` is `cross-site`. The 403 body is the same for all three.
 
@@ -55,9 +56,9 @@ An unverified user who sends the right password gets a 403 and logs `SignInFaile
 
 `SignInFailed` has `blocked: true` when the user was in a sign-in block, whatever password they sent. An unknown email always has `blocked: false`. `SignInBlockStarted` logs when a block starts, on every 5th wrong password since the count last reset. `failureCount` is the count that started the block, and `blockedUntil` is when it ends. Attempts during a block don't add to the count. A successful sign-in resets the count, and so do 12 hours with no wrong password.
 
-`PasswordCheckFailed` is a wrong password, or any password during a sign-in block, sent to change password, change email, or delete user. `sid` is the session that sent it. A wrong password there counts toward the sign-in block, so it can also log `SignInBlockStarted`. `blocked: true` means the request got a 429 because a block was running.
+`PasswordCheckFailed` is a wrong password, or any password during a sign-in block, sent to change password, change email, or delete user. `sid` is the session that sent it. A wrong password there counts toward the sign-in block, so it can also log `SignInBlockStarted`. `blocked: true` means the request got a 429 because a block was running. A wrong recent password sent to undo email change logs it with no `sid`, since no session sent it. It counts toward the sign-in block too. A running block never stops an undo, so there `blocked: true` only says a block was running.
 
-`PasswordChanged`, `EmailChanged`, and `UserDeleted` log the action itself, with the `sid` of the session that made it. `EmailChanged` never logs either email.
+`PasswordChanged` and `UserDeleted` log the action itself, with the `sid` of the session that made it. A password reset logs `PasswordChanged` with no `sid`, since a link made the change and no session did. `EmailChanged` logs when someone uses the confirm link, so it has no `sid` either. Asking for a change logs nothing, because nothing on the account changes yet. `EmailChanged` never logs either email. `EmailChangeUndone` logs when someone uses an undo link, with no `sid` and no email. It also covers the new password the undo sets, so no `PasswordChanged` logs. It logs at Warning, since an undo means someone the owner didn't trust changed the address.
 
 `RateLimited` logs a request that got a 429 from a rate limit. `policy` is any policy in [Rate limits](rate-limits.md), such as `sign-in`, `email-request`, or `anonymous`. Only `password-check` and `signed-in` count by user, so only they log `sub`. The limits are in [Rate limits](rate-limits.md).
 
@@ -136,7 +137,7 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 |---|---|
 | `laneway.auth.sign_in.attempts` | `result`: `succeeded`, `wrong_password`, `unknown_account`, `blocked`, or `unverified` |
 | `laneway.auth.sign_in.blocks` | none |
-| `laneway.auth.password_check.failures` | `endpoint`: `change_password`, `change_email`, or `delete_user`. `blocked`: `true` or `false` |
+| `laneway.auth.password_check.failures` | `endpoint`: `change_password`, `change_email`, `delete_user`, or `undo_email_change`. `blocked`: `true` or `false` |
 | `laneway.auth.breached_check.unavailable` | none |
 | `laneway.auth.refresh` | `result`: `rotated`, `superseded`, `reused`, or `rejected` |
 | `laneway.auth.csrf.rejections` | `check`: `header`, `origin`, or `fetch_site` |

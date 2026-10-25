@@ -19,6 +19,19 @@ public static class MessageFacts
         return $"{local.ToString("d MMMM yyyy 'at' HH:mm", CultureInfo.InvariantCulture)} {name}";
     }
 
+    /// <summary>Masks an address as "j•••@g•••.com". A one-character local part shows as "•••".</summary>
+    public static string Mask(string address)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+
+        var at = address.LastIndexOf('@');
+        var (local, domain) = (address[..at], address[(at + 1)..]);
+        var label = domain.IndexOf('.', StringComparison.Ordinal) is var dot and >= 0 ? dot : domain.Length;
+        var maskedLocal = local.Length == 1 ? "•••" : $"{local[0]}•••";
+
+        return $"{maskedLocal}@{domain[0]}•••{domain[label..]}";
+    }
+
     /// <summary>Names the browser and the system, as ("Firefox", "Linux"), or the unknown wording for each.</summary>
     public static (string Browser, string System) Browser(string userAgent)
     {

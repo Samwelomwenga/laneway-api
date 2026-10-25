@@ -43,6 +43,9 @@ public sealed class Passwords
         };
     }
 
+    public bool Matches(string passwordHash, string password) =>
+        _hasher.VerifyHashedPassword(null!, passwordHash, password) != PasswordVerificationResult.Failed;
+
     public void VerifyDummy(string password) => _hasher.VerifyHashedPassword(null!, _dummyHash, password);
 }
 

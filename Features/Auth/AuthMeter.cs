@@ -71,6 +71,7 @@ public sealed class AuthMeter
                 PasswordCheckedEndpoint.ChangePassword => "change_password",
                 PasswordCheckedEndpoint.ChangeEmail => "change_email",
                 PasswordCheckedEndpoint.DeleteUser => "delete_user",
+                PasswordCheckedEndpoint.UndoEmailChange => "undo_email_change",
                 _ => throw new ArgumentOutOfRangeException(nameof(endpoint), endpoint, null)
             }),
             new KeyValuePair<string, object?>("blocked", blocked));
@@ -113,7 +114,8 @@ public enum PasswordCheckedEndpoint
 {
     ChangePassword,
     ChangeEmail,
-    DeleteUser
+    DeleteUser,
+    UndoEmailChange
 }
 
 public enum RefreshResult

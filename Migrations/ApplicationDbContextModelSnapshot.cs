@@ -222,6 +222,9 @@ namespace Laneway.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Email")
+                        .HasColumnType("varchar(255)");
+
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -235,6 +238,9 @@ namespace Laneway.Api.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("WrongPasswordCount")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -715,6 +721,29 @@ namespace Laneway.Api.Migrations
                     b.HasIndex("BoardId", "Position");
 
                     b.ToTable("Lists");
+                });
+
+            modelBuilder.Entity("Laneway.Api.PasswordHistoryEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime>("ReplacedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "ReplacedAt");
+
+                    b.ToTable("PasswordHistory");
                 });
 
             modelBuilder.Entity("Laneway.Api.PendingObjectDelete", b =>
@@ -1246,6 +1275,15 @@ namespace Laneway.Api.Migrations
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Laneway.Api.PasswordHistoryEntry", b =>
+                {
+                    b.HasOne("Laneway.Api.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Laneway.Api.RefreshToken", b =>

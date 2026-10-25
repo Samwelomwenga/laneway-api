@@ -11,6 +11,8 @@ public class EmailSampleTests
     private static readonly AppLinks Links =
         new(Options.Create(new WebAppOptions { BaseUrl = "https://app.laneway.example" }));
 
+    private const string SampleToken = "Zm9yLXRoZS1zYW1wbGUtb25seS1ub3QtYS1yZWFsLXRva2Vu";
+
     private static readonly DateTime At = new(2026, 10, 20, 11, 5, 0, DateTimeKind.Utc);
 
     public static TheoryData<string> Samples => [.. Rendered().Keys];
@@ -35,13 +37,25 @@ public class EmailSampleTests
 
     private static Dictionary<string, (MessageType Type, EmailBody Body)> Rendered() => new(StringComparer.Ordinal)
     {
+        ["ConfirmEmailChange"] = Render(new ConfirmEmailChange("ana-waweru", "jane.doe@gmail.com") { Token = SampleToken }),
+        ["EmailChanged"] = Render(new EmailChanged(
+            "ana@example.com",
+            "jane.doe@gmail.com",
+            At,
+            "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
+            "Africa/Nairobi")
+        { Token = SampleToken }),
+        ["EmailChangeUndone"] = Render(new EmailChangeUndone("jane.doe@gmail.com", At, "Africa/Nairobi")),
         ["PasswordChanged-Changed"] = Render(new PasswordChanged(
             Guid.Empty,
             PasswordChangeHow.Changed,
             At,
             "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
             "Africa/Nairobi")),
-        ["VerifyEmail"] = Render(new VerifyEmail(Guid.Empty) { Token = "Zm9yLXRoZS1zYW1wbGUtb25seS1ub3QtYS1yZWFsLXRva2Vu" })
+        ["PasswordChanged-Reset"] = Render(new PasswordChanged(
+            Guid.Empty, PasswordChangeHow.Reset, At, UserAgent: null, "Africa/Nairobi")),
+        ["ResetPassword"] = Render(new ResetPassword(Guid.Empty, "ana-waweru") { Token = SampleToken }),
+        ["VerifyEmail"] = Render(new VerifyEmail(Guid.Empty) { Token = SampleToken })
     };
 
     private static (MessageType, EmailBody) Render(IMessage message) =>

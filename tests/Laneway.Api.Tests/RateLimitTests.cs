@@ -48,6 +48,16 @@ public class RateLimitTests : ApiTests
     }
 
     [Fact]
+    public async Task Forgot_password_shares_the_email_request_limit()
+    {
+        await SendTimesAsync(10, () => ForgotPasswordAsync(NewEmail()));
+
+        using var response = await ResendVerificationAsync(NewEmail());
+
+        await AssertTooManyRequestsAsync(response, "600");
+    }
+
+    [Fact]
     public async Task The_31st_username_check_in_a_minute_from_one_ip_gets_a_429()
     {
         await SendTimesAsync(30, () => SendAnonymousAsync(HttpMethod.Get, "/api/v1/auth/username-available?username=ana", null));
@@ -267,7 +277,7 @@ public class RateLimitTests : ApiTests
         using var otherUser = await ChangeEmailAsync(other);
         using var sameUser = await ChangeEmailAsync(ActorUser);
 
-        Assert.Equal(HttpStatusCode.NoContent, otherUser.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, otherUser.StatusCode);
         Assert.Equal(HttpStatusCode.TooManyRequests, sameUser.StatusCode);
     }
 

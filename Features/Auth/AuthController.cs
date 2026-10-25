@@ -48,6 +48,26 @@ public class AuthController : ApiControllerBase
         return ToActionResult(await _authService.ResendVerificationAsync(Writes.Required(resendDto.Email, "email")));
     }
 
+    [HttpPost("forgot-password")]
+    [RateLimited(RateLimits.EmailRequest)]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<object?>>> ForgotPassword([FromBody] ForgotPasswordDto forgotDto)
+    {
+        ArgumentNullException.ThrowIfNull(forgotDto);
+
+        return ToActionResult(await _authService.ForgotPasswordAsync(Writes.Required(forgotDto.Email, "email")));
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    public async Task<ActionResult> ResetPassword([FromBody] ResetPasswordDto resetDto)
+    {
+        ArgumentNullException.ThrowIfNull(resetDto);
+
+        return Reply(await _authService.ResetPasswordAsync(
+            Writes.Required(resetDto.Token, "token"), Writes.Required(resetDto.NewPassword, "newPassword")));
+    }
+
     [HttpGet("username-available")]
     [RateLimited(RateLimits.UsernameCheck)]
     [AllowAnonymous]
@@ -120,6 +140,28 @@ public class AuthController : ApiControllerBase
     public async Task<ActionResult> ChangeEmail([FromBody] ChangeEmailDto changeEmailDto)
     {
         return Reply(await _authService.ChangeEmailAsync(_actor.Id, _actor.SessionId, ChangeEmailWrite.Of(changeEmailDto)));
+    }
+
+    [HttpPost("confirm-email-change")]
+    [AllowAnonymous]
+    public async Task<ActionResult> ConfirmEmailChange([FromBody] ConfirmEmailChangeDto confirmDto)
+    {
+        ArgumentNullException.ThrowIfNull(confirmDto);
+
+        return Reply(await _authService.ConfirmEmailChangeAsync(
+            Writes.Required(confirmDto.Token, "token"), Request.Headers.UserAgent.ToString()));
+    }
+
+    [HttpPost("undo-email-change")]
+    [AllowAnonymous]
+    public async Task<ActionResult> UndoEmailChange([FromBody] UndoEmailChangeDto undoDto)
+    {
+        ArgumentNullException.ThrowIfNull(undoDto);
+
+        return Reply(await _authService.UndoEmailChangeAsync(
+            Writes.Required(undoDto.Token, "token"),
+            Writes.Required(undoDto.RecentPassword, "recentPassword"),
+            Writes.Required(undoDto.NewPassword, "newPassword")));
     }
 
     [HttpPost("delete-user")]

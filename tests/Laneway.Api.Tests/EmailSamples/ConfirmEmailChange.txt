@@ -1,0 +1,9 @@
+Laneway
+
+The Laneway account @ana-waweru asked to use this address for signing in.
+
+https://app.laneway.example/confirm-email-change#token=Zm9yLXRoZS1zYW1wbGUtb25seS1ub3QtYS1yZWFsLXRva2Vu
+
+The link works for 24 hours. If you didn't ask for this, ignore this email and nothing changes.
+
+You got this email because it belongs to a Laneway account.
