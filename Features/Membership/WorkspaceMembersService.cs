@@ -5,7 +5,7 @@ namespace Laneway.Api;
 public interface IWorkspaceMembersService
 {
     Task<ApiResponse<List<WorkspaceMemberDto>>> GetAllAsync(Guid workspaceId, MemberSearchDto searchDto);
-    Task<ApiResponse<WorkspaceMemberDto>> AddAsync(Guid workspaceId, AddMemberWrite<WorkspaceRole> write);
+    Task<ApiResponse<AddedWorkspaceMemberDto>> AddAsync(Guid workspaceId, AddMemberWrite<WorkspaceRole> write);
     Task<ApiResponse<WorkspaceMemberDto>> UpdateAsync(Guid workspaceId, Guid memberId, UpdateMemberWrite<WorkspaceRole> write);
     Task<ApiResponse<bool>> RemoveAsync(Guid workspaceId, Guid memberId);
 }
@@ -16,13 +16,16 @@ public class WorkspaceMembersService : IWorkspaceMembersService
     private readonly Actor _actor;
     private readonly Readable _readable;
     private readonly ActivityWriter _activity;
+    private readonly Invites _invites;
 
-    public WorkspaceMembersService(ApplicationDbContext context, Actor actor, Readable readable, ActivityWriter activity)
+    public WorkspaceMembersService(
+        ApplicationDbContext context, Actor actor, Readable readable, ActivityWriter activity, Invites invites)
     {
         _context = context;
         _actor = actor;
         _readable = readable;
         _activity = activity;
+        _invites = invites;
     }
 
     public async Task<ApiResponse<List<WorkspaceMemberDto>>> GetAllAsync(Guid workspaceId, MemberSearchDto searchDto)
@@ -56,13 +59,13 @@ public class WorkspaceMembersService : IWorkspaceMembersService
             message: "Members retrieved successfully");
     }
 
-    public async Task<ApiResponse<WorkspaceMemberDto>> AddAsync(Guid workspaceId, AddMemberWrite<WorkspaceRole> write)
+    public async Task<ApiResponse<AddedWorkspaceMemberDto>> AddAsync(Guid workspaceId, AddMemberWrite<WorkspaceRole> write)
     {
         ArgumentNullException.ThrowIfNull(write);
 
         var userId = _actor.Id;
         var access = await _readable.WorkspaceAsync(workspaceId, userId);
-        if (_readable.Denies(access, WorkspaceAction.Administer, workspaceId, userId, out ApiResponse<WorkspaceMemberDto>? denied))
+        if (_readable.Denies(access, WorkspaceAction.Administer, workspaceId, userId, out ApiResponse<AddedWorkspaceMemberDto>? denied))
         {
             return denied;
         }
@@ -70,12 +73,18 @@ public class WorkspaceMembersService : IWorkspaceMembersService
         var user = await _context.FindUserAsync(write.User);
         if (user is null)
         {
-            return Members.UnknownUser<WorkspaceMemberDto>(write.User);
+            return write.User.InvitableEmail is { } email
+                ? await _invites.InviteAsync(
+                    new InviteTarget(InvitePlace.Workspace, workspaceId, access.Target.Name),
+                    email,
+                    write.Role.ToString(),
+                    invite => AddedWorkspaceMemberDto.Invited(invite, write.Role))
+                : Members.UnknownUser<AddedWorkspaceMemberDto>(write.User);
         }
 
         if (await _context.WorkspaceMembers.AnyAsync(member => member.WorkspaceId == workspaceId && member.UserId == user.Id))
         {
-            return Members.AlreadyMember<WorkspaceMemberDto>("workspace");
+            return Members.AlreadyMember<AddedWorkspaceMemberDto>("workspace");
         }
 
         var member = new WorkspaceMember
@@ -95,8 +104,8 @@ public class WorkspaceMembersService : IWorkspaceMembersService
             actor => new AddMemberData<WorkspaceRole>(actor, workspace, null, MemberRef.Of(user), member.Role));
         await _context.SaveChangesAsync();
 
-        return ApiResponse<WorkspaceMemberDto>.SuccessResponse(
-            new WorkspaceMemberDto(Members.UserOf(user), member.Role, member.Status),
+        return ApiResponse<AddedWorkspaceMemberDto>.SuccessResponse(
+            new AddedWorkspaceMemberDto(Members.UserOf(user), member.Role, member.Status, null, null),
             "Member added successfully",
             StatusCodes.Status201Created);
     }

@@ -106,6 +106,7 @@ builder.Services.AddScoped<ICopyJobRunner, ListCopyRunner>();
 builder.Services.AddScoped<ICopyJobRunner, BoardCopyRunner>();
 builder.Services.AddScoped<IWorkSpaceService, WorkSpaceService>();
 builder.Services.AddScoped<IWorkspaceMembersService, WorkspaceMembersService>();
+builder.Services.AddScoped<Invites>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IAuthService, AuthService>();

@@ -7,7 +7,8 @@ public enum MessageType
     ResetPassword,
     ConfirmEmailChange,
     EmailChanged,
-    EmailChangeUndone
+    EmailChangeUndone,
+    InviteSent
 }
 
 public enum MessageChannel

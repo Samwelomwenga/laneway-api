@@ -5,7 +5,7 @@ namespace Laneway.Api;
 public interface IBoardMembersService
 {
     Task<ApiResponse<List<BoardMemberDto>>> GetAllAsync(Guid boardId, MemberSearchDto searchDto);
-    Task<ApiResponse<BoardMemberDto>> AddAsync(Guid boardId, AddMemberWrite<BoardRole> write);
+    Task<ApiResponse<AddedBoardMemberDto>> AddAsync(Guid boardId, AddMemberWrite<BoardRole> write);
     Task<ApiResponse<BoardMemberDto>> UpdateAsync(Guid boardId, Guid memberId, UpdateMemberWrite<BoardRole> write);
     Task<ApiResponse<bool>> RemoveAsync(Guid boardId, Guid memberId);
 }
@@ -17,15 +17,22 @@ public class BoardMembersService : IBoardMembersService
     private readonly Readable _readable;
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
+    private readonly Invites _invites;
 
     public BoardMembersService(
-        ApplicationDbContext context, Actor actor, Readable readable, ActivityWriter activity, ActivityTree tree)
+        ApplicationDbContext context,
+        Actor actor,
+        Readable readable,
+        ActivityWriter activity,
+        ActivityTree tree,
+        Invites invites)
     {
         _context = context;
         _actor = actor;
         _readable = readable;
         _activity = activity;
         _tree = tree;
+        _invites = invites;
     }
 
     public async Task<ApiResponse<List<BoardMemberDto>>> GetAllAsync(Guid boardId, MemberSearchDto searchDto)
@@ -62,31 +69,37 @@ public class BoardMembersService : IBoardMembersService
             message: "Members retrieved successfully");
     }
 
-    public async Task<ApiResponse<BoardMemberDto>> AddAsync(Guid boardId, AddMemberWrite<BoardRole> write)
+    public async Task<ApiResponse<AddedBoardMemberDto>> AddAsync(Guid boardId, AddMemberWrite<BoardRole> write)
     {
         ArgumentNullException.ThrowIfNull(write);
 
         var userId = _actor.Id;
         var access = await _readable.BoardAsync(boardId, userId);
-        if (_readable.ReadDenies(access, AccessTarget.Board, boardId, userId, out ApiResponse<BoardMemberDto>? denied))
+        if (_readable.ReadDenies(access, AccessTarget.Board, boardId, userId, out ApiResponse<AddedBoardMemberDto>? denied))
         {
             return denied;
         }
 
         if (AddRefusal(access.Standing, write) is { } refusal)
         {
-            return _readable.Refused<BoardMemberDto>(refusal, AccessTarget.Board, boardId, userId);
+            return _readable.Refused<AddedBoardMemberDto>(refusal, AccessTarget.Board, boardId, userId);
         }
 
         var user = await _context.FindUserAsync(write.User);
         if (user is null)
         {
-            return Members.UnknownUser<BoardMemberDto>(write.User);
+            return write.User.InvitableEmail is { } email
+                ? await _invites.InviteAsync(
+                    new InviteTarget(InvitePlace.Board, boardId, access.Target.Name),
+                    email,
+                    write.Role.ToString(),
+                    invite => AddedBoardMemberDto.Invited(invite, write.Role))
+                : Members.UnknownUser<AddedBoardMemberDto>(write.User);
         }
 
         if (await _context.BoardMembers.AnyAsync(member => member.BoardId == boardId && member.UserId == user.Id))
         {
-            return Members.AlreadyMember<BoardMemberDto>("board");
+            return Members.AlreadyMember<AddedBoardMemberDto>("board");
         }
 
         var board = access.Target;
@@ -109,8 +122,8 @@ public class BoardMembersService : IBoardMembersService
 
         var isGuest = !await _context.WorkspaceMembers.AnyAsync(inWorkspace =>
             inWorkspace.WorkspaceId == board.WorkspaceId && inWorkspace.UserId == user.Id);
-        return ApiResponse<BoardMemberDto>.SuccessResponse(
-            new BoardMemberDto(Members.UserOf(user), member.Role, member.Status, isGuest),
+        return ApiResponse<AddedBoardMemberDto>.SuccessResponse(
+            new AddedBoardMemberDto(Members.UserOf(user), member.Role, member.Status, isGuest, null, null),
             "Member added successfully",
             StatusCodes.Status201Created);
     }

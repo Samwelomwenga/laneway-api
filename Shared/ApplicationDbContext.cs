@@ -14,6 +14,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<WorkspaceMember> WorkspaceMembers { get; set; }
     public DbSet<BoardMember> BoardMembers { get; set; }
     public DbSet<FormerReader> FormerReaders { get; set; }
+    public DbSet<Invite> Invites { get; set; }
     public DbSet<List> Lists { get; set; }
     public DbSet<Card> Cards { get; set; }
     public DbSet<Label> Labels { get; set; }
@@ -210,6 +211,31 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(m => new { m.BoardId, m.UserId }).IsUnique();
             entity.HasIndex(m => m.UserId);
             ActorKeys(entity);
+        });
+
+        modelBuilder.Entity<Invite>(entity =>
+        {
+            entity.Property(i => i.Email).HasColumnType($"varchar({FieldLimits.UserEmail})");
+            entity.Property(i => i.Role).HasColumnType("varchar(20)");
+            entity.Property(i => i.CreatedAt).HasColumnType("timestamp with time zone");
+            entity.Property(i => i.ExpiresAt).HasColumnType("timestamp with time zone");
+            entity.Property(i => i.EmailedAt).HasColumnType("timestamp with time zone");
+            entity.HasOne<WorkSpace>()
+                .WithMany()
+                .HasForeignKey(i => i.WorkspaceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Board>()
+                .WithMany()
+                .HasForeignKey(i => i.BoardId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(i => i.InvitedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(i => new { i.WorkspaceId, i.Email }).IsUnique();
+            entity.HasIndex(i => new { i.BoardId, i.Email }).IsUnique();
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_Invites_OnePlace", "(\"WorkspaceId\" IS NULL) <> (\"BoardId\" IS NULL)"));
         });
 
         modelBuilder.Entity<FormerReader>(entity =>

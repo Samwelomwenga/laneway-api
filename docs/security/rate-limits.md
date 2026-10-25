@@ -23,6 +23,8 @@ The limiter checks every policy a request falls under before it takes a permit f
 
 `email-request` covers the anonymous routes that can mail a stranger. Resend verification and forgot password share one bucket. The per-address cap sits behind it: no user gets more than 5 token emails in 24 hours, whatever IP asks. `VerifyEmail` and `ResetPassword` count together toward those 5. Change email sits behind `password-check`, but its confirm email goes to an address the account doesn't own yet, so the cap covers it too. It counts `ConfirmEmailChange` emails by the new address, whichever account asked, and a 6th in 24 hours sends nothing. A capped request answers exactly as it would have, and logs `MessageSkipped` with `addressCapped`.
 
+Adding a member by an email with no verified user sends an invite email. Each user sends at most 50 invite emails in 24 hours across every place, counted from `InviteSent` deliveries by inviter. The 51st answers 429 `tooManyRequests` and creates no invite. A repeat invite inside 24 hours sends no email, so it doesn't count and isn't refused.
+
 Outside Development, plain HTTP counts before it gets its `httpsRequired` 400.
 
 ## CORS preflights

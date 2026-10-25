@@ -1,12 +1,15 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using MyCSharp.HttpUserAgentParser;
 using MyCSharp.HttpUserAgentParser.Providers;
 using TimeZoneNames;
 
 namespace Laneway.Api;
 
-public static class MessageFacts
+public static partial class MessageFacts
 {
+    private const int ClipLength = 50;
+
     private static readonly HttpUserAgentParserCachedProvider UserAgents = new();
 
     /// <summary>Formats a UTC time in the named zone, as "20 October 2026 at 14:05 East Africa Time".</summary>
@@ -32,6 +35,21 @@ public static class MessageFacts
         return $"{maskedLocal}@{domain[0]}•••{domain[label..]}";
     }
 
+    /// <summary>Turns runs of control, line break, and bidi characters into one space and cuts to 50 characters with "…".</summary>
+    public static string Clip(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        var kept = LineBreaksAndControls().Replace(text, " ").Trim();
+        if (kept.Length <= ClipLength)
+        {
+            return kept;
+        }
+
+        var cut = char.IsHighSurrogate(kept[ClipLength - 2]) ? ClipLength - 2 : ClipLength - 1;
+        return $"{kept[..cut]}…";
+    }
+
     /// <summary>Names the browser and the system, as ("Firefox", "Linux"), or the unknown wording for each.</summary>
     public static (string Browser, string System) Browser(string userAgent)
     {
@@ -55,4 +73,7 @@ public static class MessageFacts
 
         return (browser, system);
     }
+
+    [GeneratedRegex(@"[\p{Cc}\u2028\u2029\u200e\u200f\u202a-\u202e\u2066-\u2069]+")]
+    private static partial Regex LineBreaksAndControls();
 }

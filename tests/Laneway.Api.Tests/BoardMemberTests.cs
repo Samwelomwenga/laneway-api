@@ -99,12 +99,12 @@ public class BoardMemberTests : ApiTests
             Assert.Equal(HttpStatusCode.NoContent, gone.StatusCode);
         }
 
-        using var missing = await PostAsync(BoardMembersPath(board.Id), new { email = "nobody@example.com" });
+        using var missing = await PostAsync(BoardMembersPath(board.Id), new { username = "nobody" });
         using var removed = await PostAsync(BoardMembersPath(board.Id), new { userId = deleted.Id });
 
         Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
         var error = Assert.Single(await missing.ReadErrors());
-        Assert.Equal(("email", ErrorCodes.NotFound), (error.Field, error.Code));
+        Assert.Equal(("username", ErrorCodes.NotFound), (error.Field, error.Code));
         Assert.Equal(HttpStatusCode.BadRequest, removed.StatusCode);
         error = Assert.Single(await removed.ReadErrors());
         Assert.Equal(("userId", ErrorCodes.NotFound), (error.Field, error.Code));

@@ -11,6 +11,7 @@ Every link Laneway puts in an email points at a page in the web app. This file l
 | `/reset-password` | `token` | `POST /api/v1/auth/reset-password {token, newPassword}` | `ResetPassword` |
 | `/confirm-email-change` | `token` | `POST /api/v1/auth/confirm-email-change {token}` | `ConfirmEmailChange` |
 | `/undo-email-change` | `token` | `POST /api/v1/auth/undo-email-change {token, recentPassword, newPassword}` | `EmailChanged` |
+| `/sign-up` | `email` | `POST /api/v1/auth/sign-up` | `InviteSent` |
 
 ## Rules for pages with a token
 
@@ -26,3 +27,7 @@ Every link Laneway puts in an email points at a page in the web app. This file l
 ## The forgot password page
 
 The page takes an email and always gets a 202, whether or not an account uses that address. It shows the same "check your email" message every time.
+
+## The sign-up page from an invite
+
+An invite links to `/sign-up#email=…`, with the invited address in the fragment. The page fills the email field from it and clears the fragment with `history.replaceState`. The person can still edit the field. Only the invited address joins the place, once its verification link is used.
