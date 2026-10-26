@@ -92,6 +92,10 @@ public sealed partial class DenialDrainer : BackgroundService
     private static partial void AccessDenied(
         ILogger logger, Guid sub, AccessTarget targetType, Guid targetId, int status, string code);
 
+    [LoggerMessage(EventId = 2, EventName = "DenialCheckFailed", Level = LogLevel.Warning,
+        Message = "A denial couldn't be checked, and went unlogged.")]
+    private static partial void DenialCheckFailed(ILogger logger, Exception exception);
+
     private readonly DenialLog _denials;
     private readonly IServiceScopeFactory _scopes;
     private readonly ILogger _logger;
@@ -115,7 +119,7 @@ public sealed partial class DenialDrainer : BackgroundService
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _logger.LogWarning(exception, "A denial couldn't be checked, and went unlogged.");
+                DenialCheckFailed(_logger, exception);
             }
         }
     }

@@ -50,6 +50,14 @@ public static partial class MessageLog
         Message = "Webhook event ignored: event {event}")]
     public static partial void WebhookEventIgnored(this ILogger logger, string @event);
 
+    [LoggerMessage(EventId = 10, EventName = "DeliveryPollFailed", Level = LogLevel.Warning,
+        Message = "A delivery poll failed. The next poll retries it.")]
+    public static partial void DeliveryPollFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 11, EventName = "DeliverySendThrew", Level = LogLevel.Error,
+        Message = "A delivery send threw. The claim's lease runs out and the next poll retries it.")]
+    public static partial void DeliverySendThrew(this ILogger logger, Exception exception);
+
     public static void DeliveryFailed(this ILogger logger, string reason, int? status, string? code)
     {
         if (status is 401 or 402 or 403)

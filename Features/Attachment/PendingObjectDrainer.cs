@@ -2,8 +2,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Laneway.Api;
 
-public sealed class PendingObjectDrainer : BackgroundService
+public sealed partial class PendingObjectDrainer : BackgroundService
 {
+    [LoggerMessage(EventId = 1, EventName = "ObjectsAlreadyGone", Level = LogLevel.Information,
+        Message = "{Missing} of {Batch} pending object deletes had no object left, and count as gone.")]
+    private static partial void ObjectsAlreadyGone(ILogger logger, int missing, int batch);
+
+    [LoggerMessage(EventId = 2, EventName = "DrainFailed", Level = LogLevel.Warning,
+        Message = "A batch of pending object deletes failed. The next drain retries it.")]
+    private static partial void DrainFailed(ILogger logger, Exception exception);
+
     private const int BatchSize = 100;
 
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
@@ -41,9 +49,7 @@ public sealed class PendingObjectDrainer : BackgroundService
                 var removed = await _storage.RemoveAsync(batch.ConvertAll(pending => pending.ObjectKey));
                 if (removed < batch.Count)
                 {
-                    _logger.LogInformation(
-                        "{Missing} of {Batch} pending object deletes had no object left, and count as gone.",
-                        batch.Count - removed, batch.Count);
+                    ObjectsAlreadyGone(_logger, batch.Count - removed, batch.Count);
                 }
 
                 context.PendingObjectDeletes.RemoveRange(batch);
@@ -57,7 +63,7 @@ public sealed class PendingObjectDrainer : BackgroundService
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            _logger.LogWarning(exception, "A batch of pending object deletes failed. The next drain retries it.");
+            DrainFailed(_logger, exception);
         }
     }
 

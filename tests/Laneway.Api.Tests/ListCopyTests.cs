@@ -535,6 +535,8 @@ public class ListCopyTests : ApiTests
         var error = Assert.Single(failed.Errors!);
         Assert.Null(error.Field);
         Assert.Equal(ErrorCodes.InternalError, error.Code);
+        Assert.Contains(Logs(), log => log.Category == "Laneway.Api.CopyJobClaims"
+            && log.Id is { Id: 1, Name: "CopyJobGaveUp" } && log.GetStructuredStateValue("JobId") == job.ToString());
     }
 
     [Fact]

@@ -2,8 +2,12 @@ namespace Laneway.Api;
 
 public sealed record ObjectCopy(string FromKey, string ToKey);
 
-public sealed class ObjectCopies
+public sealed partial class ObjectCopies
 {
+    [LoggerMessage(EventId = 1, EventName = "CleanupFailed", Level = LogLevel.Warning,
+        Message = "Could not remove {Count} objects after a failed copy. The outbox will retry them.")]
+    private static partial void CleanupFailed(ILogger logger, int count, Exception exception);
+
     private const int BatchSize = 10;
 
     private static readonly TimeSpan CopyGrace = TimeSpan.FromHours(1);
@@ -88,8 +92,7 @@ public sealed class ObjectCopies
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception,
-                "Could not remove {Count} objects after a failed copy. The outbox will retry them.", keys.Count);
+            CleanupFailed(_logger, keys.Count, exception);
         }
     }
 

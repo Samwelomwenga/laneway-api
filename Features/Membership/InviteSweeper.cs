@@ -2,8 +2,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Laneway.Api;
 
-public sealed class InviteSweeper : BackgroundService
+public sealed partial class InviteSweeper : BackgroundService
 {
+    [LoggerMessage(EventId = 1, EventName = "SweepFailed", Level = LogLevel.Warning,
+        Message = "An invite sweep failed. The next sweep retries it.")]
+    private static partial void SweepFailed(ILogger logger, Exception exception);
+
     public const int BatchSize = 1000;
 
     private static readonly TimeSpan Interval = TimeSpan.FromHours(1);
@@ -30,7 +34,7 @@ public sealed class InviteSweeper : BackgroundService
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _logger.LogWarning(exception, "An invite sweep failed. The next sweep retries it.");
+                SweepFailed(_logger, exception);
             }
         }
     }

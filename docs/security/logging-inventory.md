@@ -40,7 +40,7 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 
 `SessionEnded` logs when an action ends a session. A session that runs out logs nothing, because nothing happens at that moment. `endReason` is `SignedOut`, `SignedOutEverywhere`, `EndedFromSessionList`, `PasswordChanged`, `UserDeleted`, `TokenReused`, `PasswordReset`, or `EmailChangeUndone`. Sign-out everywhere, change password, password reset, undo email change, and delete user log one entry per session they end. Ending a session that already ended logs nothing.
 
-`SignUp` logs when a sign-up creates an unverified user or takes over one. A sign-up whose address belongs to a verified user logs `MessageSkipped` instead. `AuthSweeper` runs hourly and logs nothing per row. It deletes expired token rows, deletes password history rows replaced more than 14 days ago, and hard-deletes users still unverified 7 days after their latest sign-up, in batches of 1,000. A failed sweep logs a plain Warning with no id. No session exists yet, so there is no `sid`. Using the verification link logs `SignInSucceeded` with the new session, and the counter tags it `succeeded`.
+`SignUp` logs when a sign-up creates an unverified user or takes over one. A sign-up whose address belongs to a verified user logs `MessageSkipped` instead. `AuthSweeper` runs hourly and logs nothing per row. It deletes expired token rows, deletes password history rows replaced more than 14 days ago, and hard-deletes users still unverified 7 days after their latest sign-up, in batches of 1,000. A failed sweep logs `SweepFailed`, listed under [Background jobs and cleanup](#background-jobs-and-cleanup). No session exists yet, so there is no `sid`. Using the verification link logs `SignInSucceeded` with the new session, and the counter tags it `succeeded`.
 
 `MessageSkipped` logs when sign-up, resend verification, forgot password, or change email sends no email and still answers 202. `messageType` is `VerifyEmail` for the first two, `ResetPassword` for forgot password, and `ConfirmEmailChange` for change email. `reason` is one of these:
 
@@ -71,10 +71,11 @@ Denials log under the `Laneway.Authorization` category, which meets ASVS 16.3.2.
 | Id | Event | Level | Fields |
 |---|---|---|---|
 | 1 | `AccessDenied` | Warning | `sub`, `targetType`, `targetId`, `status`, `code` |
+| 2 | `DenialCheckFailed` | Warning | the exception from the existence check |
 
 `targetType` names the denied object: `Workspace`, `Board`, `List`, `Card`, `Label`, `Checklist`, `CheckItem`, `Attachment`, `Comment`, or `CopyJob`. `status` is 404 when the caller couldn't read a route object, and `code` is then `notFound`. `status` is 400 with `code` `notFound` when the id came from a body or filter field the caller couldn't read, such as a move's `boardId`, an anchor, or an activity `cardId` filter. `status` is 403 when they could read the object but their role forbids the action, and `code` is the 403 code, such as `readOnlyRole`, `requiresWorkspaceAdmin`, or `notAuthor`. A copy job is readable only by the user who started it.
 
-The service puts each denial on a bounded channel and answers at once, so a hiding 404 is as fast as a missing one. `DenialDrainer` reads the channel in the background. For a 404 or a 400 it checks whether the object exists, and drops the entry when it doesn't. A random id is a miss, not a denial. So every logged `targetId` names a real object.
+The service puts each denial on a bounded channel and answers at once, so a hiding 404 is as fast as a missing one. `DenialDrainer` reads the channel in the background. For a 404 or a 400 it checks whether the object exists, and drops the entry when it doesn't. A random id is a miss, not a denial. So every logged `targetId` names a real object. When the check itself throws, the drainer logs `DenialCheckFailed` and the denial goes unlogged.
 
 The channel holds 1024 entries. When it's full, `DenialLog` drops the denial and counts it on the `Laneway.Authorization` meter.
 
@@ -97,6 +98,8 @@ Deliveries log under the `Laneway.Message` category. Features never learn how a 
 | 7 | `AddressSuppressed` | Information | `event`, `deliveryId`, `messageType`, `alreadySuppressed` |
 | 8 | `WebhookEventUnmatched` | Warning | `event`, `reason` |
 | 9 | `WebhookEventIgnored` | Information | `event` |
+| 10 | `DeliveryPollFailed` | Warning | the exception |
+| 11 | `DeliverySendThrew` | Error | the exception |
 
 `DeliveryRetrying` has `reason` `rateLimited`, `serverError`, `timeout`, or `networkError`. A 429 is `rateLimited` and a 5xx is `serverError`. Each Brevo call times out after 10 seconds. Attempts run at 0, 30 seconds, 2 minutes, and 10 minutes after the one before, all with the same idempotency key.
 
@@ -106,7 +109,7 @@ Deliveries log under the `Laneway.Message` category. Features never learn how a 
 
 `DeliveryDropped` has `reason` `userDeleted`, `noAddress`, `unsubscribed`, or `suppressed`. `userDeleted` covers a user who was deleted, or whose id matches no user row. `noAddress` is a delivery with nowhere to go on its channel. `unsubscribed` is an opt-out message to an address that unsubscribed. `suppressed` is any message to an address that hard bounced, complained of spam, or was blocked, and `suppressedBy` says which: `hardBounce`, `spam`, or `blocked`.
 
-Before it calls Brevo, the worker checks `SendBy`, then the user, then the address, then an unsubscribe, then the other suppressions, and logs only the first that applies. A sent, failed, or dropped delivery clears its secret column. A send that throws anything other than a Brevo answer, a timeout, or a network error logs at Error with the exception and no event id. The claim's 2-minute lease runs out and a later poll tries again. A failed poll logs a plain Warning.
+Before it calls Brevo, the worker checks `SendBy`, then the user, then the address, then an unsubscribe, then the other suppressions, and logs only the first that applies. A sent, failed, or dropped delivery clears its secret column. A send that throws anything other than a Brevo answer, a timeout, or a network error logs `DeliverySendThrew`. The claim's 2-minute lease runs out and a later poll tries again. A failed poll logs `DeliveryPollFailed`.
 
 `DeliverySweep` deletes delivery rows 30 days after they were created, hourly, in batches of 1,000.
 
@@ -122,6 +125,27 @@ A `Laneway.Message` meter counts each delivery once, when it ends. Locally, `dot
 | `laneway.message.suppressions` | `event`: `hardBounce`, `spam`, `blocked`, or `unsubscribed`. It counts new suppressions only, not repeats. |
 
 The unsubscribe link in an invite email writes the same `unsubscribed` suppression a webhook event does, with `unsubscribe-link` in place of a Brevo `message-id`. It adds to `laneway.message.suppressions` and logs no event, since no delivery matches it.
+
+## Background jobs and cleanup
+
+Sweepers, drainers, copy jobs, and attachment cleanup log under their class name in the `Laneway.Api` namespace, such as `Laneway.Api.AuthSweeper`. Each category numbers its own events from 1. None of them carries a `sub`, an address, or a token.
+
+| Category | Id | Event | Level | Fields |
+|---|---|---|---|---|
+| `Laneway.Api.AuthSweeper` | 1 | `SweepFailed` | Warning | the exception |
+| `Laneway.Api.SessionSweeper` | 1 | `SweepFailed` | Warning | the exception |
+| `Laneway.Api.InviteSweeper` | 1 | `SweepFailed` | Warning | the exception |
+| `Laneway.Api.PendingObjectDrainer` | 1 | `ObjectsAlreadyGone` | Information | `Missing`, `Batch` |
+| `Laneway.Api.PendingObjectDrainer` | 2 | `DrainFailed` | Warning | the exception |
+| `Laneway.Api.ObjectCopies` | 1 | `CleanupFailed` | Warning | `Count`, and the exception |
+| `Laneway.Api.AttachmentService` | 1 | `CleanupFailed` | Warning | `ObjectKey`, and the exception |
+| `Laneway.Api.CopyJobWorker` | 1 | `PollFailed` | Warning | the exception |
+| `Laneway.Api.CopyJobWorker` | 2 | `CopyJobThrew` | Error | `JobId`, `Attempt`, and the exception |
+| `Laneway.Api.CopyJobClaims` | 1 | `CopyJobGaveUp` | Error | `JobId`, `Attempts` |
+| `Laneway.Api.ListCopyRunner` | 1 | `CopyBodyUnreadable` | Error | `JobId`, and the exception |
+| `Laneway.Api.BoardCopyRunner` | 1 | `CopyBodyUnreadable` | Error | `JobId`, and the exception |
+
+A failed sweep, drain, or poll keeps the batches it already finished, and the next run picks up what is left. `ObjectsAlreadyGone` counts pending deletes whose object was already gone from storage. The drainer treats them as done. Both `CleanupFailed` events leave the objects to the pending delete outbox. The `AttachmentService` one fires during the request, after a failed create. `CopyJobThrew` fails the job once it threw on its last attempt. `CopyJobGaveUp` is a job claimed again after its last attempt, which fails with `internalError`. `CopyBodyUnreadable` is a stored copy body missing a field the runner needs, which also fails the job with `internalError`.
 
 ## Unexpected errors
 
