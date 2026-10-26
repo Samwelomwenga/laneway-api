@@ -90,15 +90,55 @@ public abstract class ApiTests : IAsyncLifetime
         _noRedirects?.Dispose();
         _https?.Dispose();
         _hostClients.ForEach(client => client.Dispose());
-        if (_factory is not null)
+        List<string> unlisted = [];
+        try
         {
-            await _factory.DisposeAsync();
+            if (_factory is not null)
+            {
+                unlisted = await StopAndListUnlistedInInventoryAsync(_factory);
+            }
+        }
+        finally
+        {
+            if (_databaseId is { } databaseId)
+            {
+                await _stack.DropDatabaseAsync(databaseId);
+            }
         }
 
-        if (_databaseId is { } databaseId)
+        Assert.Empty(unlisted);
+    }
+
+    private static async Task<List<string>> StopAndListUnlistedInInventoryAsync(ApiFactory factory)
+    {
+        factory.Services.GetRequiredService<MeterProvider>().ForceFlush();
+        await factory.DisposeAsync();
+
+        var logs = factory.ShippedLogs.Select(log =>
         {
-            await _stack.DropDatabaseAsync(databaseId);
-        }
+            var keys = (log.Attributes ?? []).Select(pair => pair.Key).ToList();
+            log.ForEachScope(
+                (scope, scopeKeys) =>
+                {
+                    foreach (var pair in scope)
+                    {
+                        scopeKeys.Add(pair.Key);
+                    }
+                },
+                keys);
+            return new ShippedLog(log.CategoryName ?? string.Empty, log.LogLevel, log.EventId.Name, keys);
+        });
+        var counters = factory.ShippedMetrics.Snapshot().SelectMany(metric => metric.MetricPoints.Select(point =>
+        {
+            var keys = new List<string>();
+            foreach (var tag in point.Tags)
+            {
+                keys.Add(tag.Key);
+            }
+
+            return new ShippedCounter(metric.MeterName, metric.Name, keys);
+        }));
+        return LoggingInventory.Documented.Violations(logs, counters);
     }
 
     protected Task<HttpResponseMessage> PostAsync(string path, object body, TestUser? @as = null) =>
