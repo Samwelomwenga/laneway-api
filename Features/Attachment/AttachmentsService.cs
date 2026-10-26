@@ -13,8 +13,12 @@ public interface IAttachmentService
     Task<ApiResponse<string>> GetContentUrlAsync(Guid id);
 }
 
-public class AttachmentService : IAttachmentService
+public partial class AttachmentService : IAttachmentService
 {
+    [LoggerMessage(EventId = 1, EventName = "CleanupFailed", Level = LogLevel.Warning,
+        Message = "Could not remove {ObjectKey} after a failed create. The outbox will retry it.")]
+    private static partial void CleanupFailed(ILogger logger, string objectKey, Exception exception);
+
     private const int DownloadSeconds = 300;
 
     private static readonly TimeSpan UploadGrace = TimeSpan.FromHours(1);
@@ -330,8 +334,7 @@ public class AttachmentService : IAttachmentService
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception,
-                "Could not remove {ObjectKey} after a failed create. The outbox will retry it.", objectKey);
+            CleanupFailed(_logger, objectKey, exception);
         }
     }
 

@@ -83,15 +83,18 @@ public sealed class DenialLog
     }
 }
 
-public sealed class DenialDrainer : BackgroundService
+public sealed partial class DenialDrainer : BackgroundService
 {
     public const string Category = "Laneway.Authorization";
 
-    private static readonly Action<ILogger, Guid, AccessTarget, Guid, int, string, Exception?> AccessDenied =
-        LoggerMessage.Define<Guid, AccessTarget, Guid, int, string>(
-            LogLevel.Warning,
-            new EventId(1, "AccessDenied"),
-            "Access denied: sub {sub}, targetType {targetType}, targetId {targetId}, status {status}, code {code}");
+    [LoggerMessage(EventId = 1, EventName = "AccessDenied", Level = LogLevel.Warning,
+        Message = "Access denied: sub {sub}, targetType {targetType}, targetId {targetId}, status {status}, code {code}")]
+    private static partial void AccessDenied(
+        ILogger logger, Guid sub, AccessTarget targetType, Guid targetId, int status, string code);
+
+    [LoggerMessage(EventId = 2, EventName = "DenialCheckFailed", Level = LogLevel.Warning,
+        Message = "A denial couldn't be checked, and went unlogged.")]
+    private static partial void DenialCheckFailed(ILogger logger, Exception exception);
 
     private readonly DenialLog _denials;
     private readonly IServiceScopeFactory _scopes;
@@ -116,7 +119,7 @@ public sealed class DenialDrainer : BackgroundService
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _logger.LogWarning(exception, "A denial couldn't be checked, and went unlogged.");
+                DenialCheckFailed(_logger, exception);
             }
         }
     }
@@ -134,8 +137,7 @@ public sealed class DenialDrainer : BackgroundService
             denial.Target,
             denial.TargetId,
             denial.Status,
-            denial.Code ?? ErrorCodes.NotFound,
-            null);
+            denial.Code ?? ErrorCodes.NotFound);
     }
 
     private async Task<bool> ExistsAsync(Denial denial, CancellationToken token)

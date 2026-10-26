@@ -53,6 +53,8 @@ public class StoredCopyBodyTests : ApiTests
 
         Assert.Null(failed.ResultId);
         Assert.Equal(ErrorCodes.InternalError, Assert.Single(failed.Errors!).Code);
+        Assert.Contains(Logs(), log => log.Category == "Laneway.Api.ListCopyRunner"
+            && log.Id is { Id: 1, Name: "CopyBodyUnreadable" } && log.GetStructuredStateValue("JobId") == jobId.ToString());
     }
 
     [Fact]
@@ -67,6 +69,8 @@ public class StoredCopyBodyTests : ApiTests
 
         Assert.Null(failed.ResultId);
         Assert.Equal(ErrorCodes.InternalError, Assert.Single(failed.Errors!).Code);
+        Assert.Contains(Logs(), log => log.Category == "Laneway.Api.BoardCopyRunner"
+            && log.Id is { Id: 1, Name: "CopyBodyUnreadable" } && log.GetStructuredStateValue("JobId") == jobId.ToString());
     }
 
     private async Task<Guid> QueueStoredAsync(CopyJobKind kind, Guid sourceId, string request)

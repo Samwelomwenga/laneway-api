@@ -1,214 +1,139 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Laneway.Api;
 
-public static class AuthLog
+[SuppressMessage("Usage", "SYSLIB1025", Justification = "Variants of one event share its name.")]
+public static partial class AuthLog
 {
     public const string Category = "Laneway.Auth";
 
-    private static readonly EventId AccessTokenRejectedId = new(1, "AccessTokenRejected");
+    [LoggerMessage(EventId = 1, EventName = "AccessTokenRejected", Level = LogLevel.Information,
+        Message = "Access token rejected: {reason}, kid {kid}")]
+    private static partial void RejectedWithKid(ILogger logger, string reason, string kid);
 
-    private static readonly Action<ILogger, string, string, Exception?> RejectedWithKid =
-        LoggerMessage.Define<string, string>(
-            LogLevel.Information, AccessTokenRejectedId, "Access token rejected: {reason}, kid {kid}");
+    [LoggerMessage(EventId = 1, EventName = "AccessTokenRejected", Level = LogLevel.Information,
+        Message = "Access token rejected: {reason}, kidKnown {kidKnown}")]
+    private static partial void RejectedWithoutKid(ILogger logger, string reason, bool kidKnown);
 
-    private static readonly Action<ILogger, string, bool, Exception?> RejectedWithoutKid =
-        LoggerMessage.Define<string, bool>(
-            LogLevel.Information, AccessTokenRejectedId, "Access token rejected: {reason}, kidKnown {kidKnown}");
+    [LoggerMessage(EventId = 2, EventName = "SignUp", Level = LogLevel.Information, Message = "Signed up: sub {sub}")]
+    public static partial void SignUp(this ILogger logger, Guid sub);
 
-    private static readonly EventId SignUpId = new(2, "SignUp");
+    [LoggerMessage(EventId = 3, EventName = "SignInSucceeded", Level = LogLevel.Information,
+        Message = "Signed in: sub {sub}, sid {sid}")]
+    public static partial void SignInSucceeded(this ILogger logger, Guid sub, Guid sid);
 
-    private static readonly EventId SignInSucceededId = new(3, "SignInSucceeded");
+    [LoggerMessage(EventId = 4, EventName = "SignInFailed", Level = LogLevel.Warning,
+        Message = "Sign-in failed: sub {sub}, blocked {blocked}")]
+    private static partial void SignInFailedWithSub(ILogger logger, Guid sub, bool blocked);
 
-    private static readonly EventId SignInFailedId = new(4, "SignInFailed");
+    [LoggerMessage(EventId = 4, EventName = "SignInFailed", Level = LogLevel.Warning,
+        Message = "Sign-in failed: accountFound {accountFound}, blocked {blocked}")]
+    private static partial void SignInFailedWithoutAccount(ILogger logger, bool accountFound, bool blocked);
 
-    private static readonly EventId BreachedCheckUnavailableId = new(5, "BreachedCheckUnavailable");
+    [LoggerMessage(EventId = 5, EventName = "BreachedCheckUnavailable", Level = LogLevel.Warning,
+        Message = "Breached password check unavailable, password accepted")]
+    public static partial void BreachedCheckUnavailable(this ILogger logger, Exception exception);
 
-    private static readonly Action<ILogger, Exception?> BreachedCheckUnavailableEvent =
-        LoggerMessage.Define(
-            LogLevel.Warning, BreachedCheckUnavailableId, "Breached password check unavailable, password accepted");
+    [LoggerMessage(EventId = 6, EventName = "SessionRefreshed", Level = LogLevel.Information,
+        Message = "Session refreshed: sub {sub}, sid {sid}, refreshTokenId {refreshTokenId}")]
+    public static partial void SessionRefreshed(this ILogger logger, Guid sub, Guid sid, Guid refreshTokenId);
 
-    private static readonly Action<ILogger, Guid, Exception?> SignUpEvent =
-        LoggerMessage.Define<Guid>(LogLevel.Information, SignUpId, "Signed up: sub {sub}");
+    [LoggerMessage(EventId = 7, EventName = "RefreshSuperseded", Level = LogLevel.Information,
+        Message = "Refresh superseded: sub {sub}, sid {sid}")]
+    public static partial void RefreshSuperseded(this ILogger logger, Guid sub, Guid sid);
 
-    private static readonly Action<ILogger, Guid, Guid, Exception?> SignInSucceededEvent =
-        LoggerMessage.Define<Guid, Guid>(LogLevel.Information, SignInSucceededId, "Signed in: sub {sub}, sid {sid}");
+    [LoggerMessage(EventId = 8, EventName = "RefreshTokenReused", Level = LogLevel.Warning,
+        Message = "Refresh token reused: sub {sub}, sid {sid}, refreshTokenId {refreshTokenId}")]
+    public static partial void RefreshTokenReused(this ILogger logger, Guid sub, Guid sid, Guid refreshTokenId);
 
-    private static readonly Action<ILogger, Guid, bool, Exception?> SignInFailedWithSub =
-        LoggerMessage.Define<Guid, bool>(
-            LogLevel.Warning, SignInFailedId, "Sign-in failed: sub {sub}, blocked {blocked}");
+    [LoggerMessage(EventId = 9, EventName = "RefreshRejected", Level = LogLevel.Information,
+        Message = "Refresh rejected: {reason}, sid {sid}")]
+    private static partial void RefreshRejectedWithSid(ILogger logger, string reason, Guid sid);
 
-    private static readonly Action<ILogger, bool, bool, Exception?> SignInFailedWithoutAccount =
-        LoggerMessage.Define<bool, bool>(
-            LogLevel.Warning, SignInFailedId, "Sign-in failed: accountFound {accountFound}, blocked {blocked}");
+    [LoggerMessage(EventId = 9, EventName = "RefreshRejected", Level = LogLevel.Information,
+        Message = "Refresh rejected: {reason}")]
+    private static partial void RefreshRejectedWithoutSid(ILogger logger, string reason);
 
-    private static readonly EventId SessionRefreshedId = new(6, "SessionRefreshed");
+    [LoggerMessage(EventId = 10, EventName = "SessionEnded", Level = LogLevel.Information,
+        Message = "Session ended: sub {sub}, sid {sid}, endReason {endReason}")]
+    public static partial void SessionEnded(this ILogger logger, Guid sub, Guid sid, SessionEndReason endReason);
 
-    private static readonly EventId RefreshSupersededId = new(7, "RefreshSuperseded");
+    [LoggerMessage(EventId = 11, EventName = "CsrfRejected", Level = LogLevel.Warning, Message = "CSRF check failed: {check}")]
+    private static partial void CsrfRejectedEvent(ILogger logger, string check);
 
-    private static readonly EventId RefreshTokenReusedId = new(8, "RefreshTokenReused");
+    [LoggerMessage(EventId = 12, EventName = "SignInBlockStarted", Level = LogLevel.Warning,
+        Message = "Sign-in block started: sub {sub}, failureCount {failureCount}, blockedUntil {blockedUntil}")]
+    public static partial void SignInBlockStarted(this ILogger logger, Guid sub, int failureCount, DateTime blockedUntil);
 
-    private static readonly EventId RefreshRejectedId = new(9, "RefreshRejected");
+    [LoggerMessage(EventId = 13, EventName = "PasswordCheckFailed", Level = LogLevel.Warning,
+        Message = "Password check failed: sub {sub}, sid {sid}, blocked {blocked}")]
+    public static partial void PasswordCheckFailed(this ILogger logger, Guid sub, Guid sid, bool blocked);
 
-    private static readonly EventId SessionEndedId = new(10, "SessionEnded");
+    [LoggerMessage(EventId = 13, EventName = "PasswordCheckFailed", Level = LogLevel.Warning,
+        Message = "Password check failed: sub {sub}, blocked {blocked}")]
+    public static partial void PasswordCheckFailed(this ILogger logger, Guid sub, bool blocked);
 
-    private static readonly Action<ILogger, Guid, Guid, Guid, Exception?> SessionRefreshedEvent =
-        LoggerMessage.Define<Guid, Guid, Guid>(
-            LogLevel.Information, SessionRefreshedId, "Session refreshed: sub {sub}, sid {sid}, refreshTokenId {refreshTokenId}");
+    [LoggerMessage(EventId = 14, EventName = "PasswordChanged", Level = LogLevel.Information,
+        Message = "Password changed: sub {sub}, sid {sid}")]
+    public static partial void PasswordChanged(this ILogger logger, Guid sub, Guid sid);
 
-    private static readonly Action<ILogger, Guid, Guid, Exception?> RefreshSupersededEvent =
-        LoggerMessage.Define<Guid, Guid>(
-            LogLevel.Information, RefreshSupersededId, "Refresh superseded: sub {sub}, sid {sid}");
+    [LoggerMessage(EventId = 14, EventName = "PasswordChanged", Level = LogLevel.Information,
+        Message = "Password reset: sub {sub}")]
+    public static partial void PasswordReset(this ILogger logger, Guid sub);
 
-    private static readonly Action<ILogger, Guid, Guid, Guid, Exception?> RefreshTokenReusedEvent =
-        LoggerMessage.Define<Guid, Guid, Guid>(
-            LogLevel.Warning, RefreshTokenReusedId, "Refresh token reused: sub {sub}, sid {sid}, refreshTokenId {refreshTokenId}");
+    [LoggerMessage(EventId = 15, EventName = "EmailChanged", Level = LogLevel.Information, Message = "Email changed: sub {sub}")]
+    public static partial void EmailChanged(this ILogger logger, Guid sub);
 
-    private static readonly Action<ILogger, string, Guid, Exception?> RefreshRejectedWithSid =
-        LoggerMessage.Define<string, Guid>(
-            LogLevel.Information, RefreshRejectedId, "Refresh rejected: {reason}, sid {sid}");
+    [LoggerMessage(EventId = 16, EventName = "UserDeleted", Level = LogLevel.Information,
+        Message = "User deleted: sub {sub}, sid {sid}")]
+    public static partial void UserDeleted(this ILogger logger, Guid sub, Guid sid);
 
-    private static readonly Action<ILogger, string, Exception?> RefreshRejectedWithoutSid =
-        LoggerMessage.Define<string>(LogLevel.Information, RefreshRejectedId, "Refresh rejected: {reason}");
+    [LoggerMessage(EventId = 17, EventName = "RateLimited", Level = LogLevel.Warning,
+        Message = "Rate limited: policy {policy}, sub {sub}")]
+    private static partial void RateLimitedWithSub(ILogger logger, string policy, Guid sub);
 
-    private static readonly Action<ILogger, Guid, Guid, SessionEndReason, Exception?> SessionEndedEvent =
-        LoggerMessage.Define<Guid, Guid, SessionEndReason>(
-            LogLevel.Information, SessionEndedId, "Session ended: sub {sub}, sid {sid}, endReason {endReason}");
+    [LoggerMessage(EventId = 17, EventName = "RateLimited", Level = LogLevel.Warning, Message = "Rate limited: policy {policy}")]
+    private static partial void RateLimitedWithoutSub(ILogger logger, string policy);
 
-    private static readonly EventId CsrfRejectedId = new(11, "CsrfRejected");
+    [LoggerMessage(EventId = 18, EventName = "MessageSkipped", Level = LogLevel.Information,
+        Message = "Message skipped: {messageType}, {reason}, sub {sub}")]
+    private static partial void MessageSkippedWithSub(ILogger logger, MessageType messageType, string reason, Guid sub);
 
-    private static readonly Action<ILogger, string, Exception?> CsrfRejectedEvent =
-        LoggerMessage.Define<string>(LogLevel.Warning, CsrfRejectedId, "CSRF check failed: {check}");
+    [LoggerMessage(EventId = 18, EventName = "MessageSkipped", Level = LogLevel.Information,
+        Message = "Message skipped: {messageType}, {reason}")]
+    private static partial void MessageSkippedWithoutSub(ILogger logger, MessageType messageType, string reason);
 
-    private static readonly EventId SignInBlockStartedId = new(12, "SignInBlockStarted");
+    [LoggerMessage(EventId = 18, EventName = "MessageSkipped", Level = LogLevel.Warning,
+        Message = "Message skipped: {messageType}, {reason}, sub {sub}")]
+    private static partial void MessageSkippedAsWarning(ILogger logger, MessageType messageType, string reason, Guid sub);
 
-    private static readonly Action<ILogger, Guid, int, DateTime, Exception?> SignInBlockStartedEvent =
-        LoggerMessage.Define<Guid, int, DateTime>(
-            LogLevel.Warning,
-            SignInBlockStartedId,
-            "Sign-in block started: sub {sub}, failureCount {failureCount}, blockedUntil {blockedUntil}");
-
-    private static readonly EventId PasswordCheckFailedId = new(13, "PasswordCheckFailed");
-
-    private static readonly Action<ILogger, Guid, Guid, bool, Exception?> PasswordCheckFailedEvent =
-        LoggerMessage.Define<Guid, Guid, bool>(
-            LogLevel.Warning, PasswordCheckFailedId, "Password check failed: sub {sub}, sid {sid}, blocked {blocked}");
-
-    private static readonly Action<ILogger, Guid, bool, Exception?> PasswordCheckFailedWithoutSid =
-        LoggerMessage.Define<Guid, bool>(
-            LogLevel.Warning, PasswordCheckFailedId, "Password check failed: sub {sub}, blocked {blocked}");
-
-    private static readonly EventId PasswordChangedId = new(14, "PasswordChanged");
-
-    private static readonly Action<ILogger, Guid, Guid, Exception?> PasswordChangedEvent =
-        LoggerMessage.Define<Guid, Guid>(LogLevel.Information, PasswordChangedId, "Password changed: sub {sub}, sid {sid}");
-
-    private static readonly Action<ILogger, Guid, Exception?> PasswordResetEvent =
-        LoggerMessage.Define<Guid>(LogLevel.Information, PasswordChangedId, "Password reset: sub {sub}");
-
-    private static readonly EventId EmailChangedId = new(15, "EmailChanged");
-
-    private static readonly Action<ILogger, Guid, Exception?> EmailChangedEvent =
-        LoggerMessage.Define<Guid>(LogLevel.Information, EmailChangedId, "Email changed: sub {sub}");
-
-    private static readonly EventId UserDeletedId = new(16, "UserDeleted");
-
-    private static readonly Action<ILogger, Guid, Guid, Exception?> UserDeletedEvent =
-        LoggerMessage.Define<Guid, Guid>(LogLevel.Information, UserDeletedId, "User deleted: sub {sub}, sid {sid}");
-
-    private static readonly EventId RateLimitedId = new(17, "RateLimited");
-
-    private static readonly Action<ILogger, string, Guid, Exception?> RateLimitedWithSub =
-        LoggerMessage.Define<string, Guid>(LogLevel.Warning, RateLimitedId, "Rate limited: policy {policy}, sub {sub}");
-
-    private static readonly Action<ILogger, string, Exception?> RateLimitedWithoutSub =
-        LoggerMessage.Define<string>(LogLevel.Warning, RateLimitedId, "Rate limited: policy {policy}");
-
-    private static readonly EventId EmailChangeUndoneId = new(19, "EmailChangeUndone");
-
-    private static readonly Action<ILogger, Guid, Exception?> EmailChangeUndoneEvent =
-        LoggerMessage.Define<Guid>(LogLevel.Warning, EmailChangeUndoneId, "Email change undone: sub {sub}");
-
-    private static readonly EventId MessageSkippedId = new(18, "MessageSkipped");
-
-    private static readonly Action<ILogger, MessageType, string, Guid, Exception?> MessageSkippedWithSub =
-        LoggerMessage.Define<MessageType, string, Guid>(
-            LogLevel.Information, MessageSkippedId, "Message skipped: {messageType}, {reason}, sub {sub}");
-
-    private static readonly Action<ILogger, MessageType, string, Exception?> MessageSkippedWithoutSub =
-        LoggerMessage.Define<MessageType, string>(
-            LogLevel.Information, MessageSkippedId, "Message skipped: {messageType}, {reason}");
-
-    private static readonly Action<ILogger, MessageType, string, Guid, Exception?> MessageSkippedAsWarning =
-        LoggerMessage.Define<MessageType, string, Guid>(
-            LogLevel.Warning, MessageSkippedId, "Message skipped: {messageType}, {reason}, sub {sub}");
-
-    public static void SignUp(this ILogger logger, Guid userId) =>
-        SignUpEvent(logger, userId, null);
-
-    public static void SignInSucceeded(this ILogger logger, Guid userId, Guid sessionId) =>
-        SignInSucceededEvent(logger, userId, sessionId, null);
+    [LoggerMessage(EventId = 19, EventName = "EmailChangeUndone", Level = LogLevel.Warning,
+        Message = "Email change undone: sub {sub}")]
+    public static partial void EmailChangeUndone(this ILogger logger, Guid sub);
 
     public static void SignInFailed(this ILogger logger, Guid? userId, bool blocked)
     {
         if (userId is { } sub)
         {
-            SignInFailedWithSub(logger, sub, blocked, null);
+            SignInFailedWithSub(logger, sub, blocked);
         }
         else
         {
-            SignInFailedWithoutAccount(logger, false, blocked, null);
+            SignInFailedWithoutAccount(logger, false, blocked);
         }
     }
-
-    public static void SignInBlockStarted(this ILogger logger, Guid userId, int failureCount, DateTime blockedUntil) =>
-        SignInBlockStartedEvent(logger, userId, failureCount, blockedUntil, null);
-
-    public static void PasswordCheckFailed(this ILogger logger, Guid userId, Guid sessionId, bool blocked) =>
-        PasswordCheckFailedEvent(logger, userId, sessionId, blocked, null);
-
-    public static void PasswordCheckFailed(this ILogger logger, Guid userId, bool blocked) =>
-        PasswordCheckFailedWithoutSid(logger, userId, blocked, null);
-
-    public static void PasswordChanged(this ILogger logger, Guid userId, Guid sessionId) =>
-        PasswordChangedEvent(logger, userId, sessionId, null);
-
-    public static void PasswordReset(this ILogger logger, Guid userId) =>
-        PasswordResetEvent(logger, userId, null);
-
-    public static void EmailChanged(this ILogger logger, Guid userId) =>
-        EmailChangedEvent(logger, userId, null);
-
-    public static void EmailChangeUndone(this ILogger logger, Guid userId) =>
-        EmailChangeUndoneEvent(logger, userId, null);
-
-    public static void UserDeleted(this ILogger logger, Guid userId, Guid sessionId) =>
-        UserDeletedEvent(logger, userId, sessionId, null);
-
-    public static void BreachedCheckUnavailable(this ILogger logger, Exception exception) =>
-        BreachedCheckUnavailableEvent(logger, exception);
-
-    public static void SessionRefreshed(this ILogger logger, Guid userId, Guid sessionId, Guid refreshTokenId) =>
-        SessionRefreshedEvent(logger, userId, sessionId, refreshTokenId, null);
-
-    public static void RefreshSuperseded(this ILogger logger, Guid userId, Guid sessionId) =>
-        RefreshSupersededEvent(logger, userId, sessionId, null);
-
-    public static void RefreshTokenReused(this ILogger logger, Guid userId, Guid sessionId, Guid refreshTokenId) =>
-        RefreshTokenReusedEvent(logger, userId, sessionId, refreshTokenId, null);
 
     public static void RefreshRejected(this ILogger logger, string reason, Guid? sessionId)
     {
         if (sessionId is { } sid)
         {
-            RefreshRejectedWithSid(logger, reason, sid, null);
+            RefreshRejectedWithSid(logger, reason, sid);
         }
         else
         {
-            RefreshRejectedWithoutSid(logger, reason, null);
+            RefreshRejectedWithoutSid(logger, reason);
         }
     }
-
-    public static void SessionEnded(this ILogger logger, Guid userId, Guid sessionId, SessionEndReason reason) =>
-        SessionEndedEvent(logger, userId, sessionId, reason, null);
 
     public static void CsrfRejected(this ILogger logger, FailedCsrfCheck check) =>
         CsrfRejectedEvent(logger, check switch
@@ -217,17 +142,17 @@ public static class AuthLog
             FailedCsrfCheck.Origin => "origin",
             FailedCsrfCheck.FetchSite => "fetch-site",
             _ => throw new ArgumentOutOfRangeException(nameof(check), check, null)
-        }, null);
+        });
 
     public static void RateLimited(this ILogger logger, string policy, Guid? userId)
     {
         if (userId is { } sub)
         {
-            RateLimitedWithSub(logger, policy, sub, null);
+            RateLimitedWithSub(logger, policy, sub);
         }
         else
         {
-            RateLimitedWithoutSub(logger, policy, null);
+            RateLimitedWithoutSub(logger, policy);
         }
     }
 
@@ -235,15 +160,15 @@ public static class AuthLog
     {
         if (userId is not { } sub)
         {
-            MessageSkippedWithoutSub(logger, type, reason, null);
+            MessageSkippedWithoutSub(logger, type, reason);
         }
         else if (reason == MessageSkip.AddressCapped)
         {
-            MessageSkippedAsWarning(logger, type, reason, sub, null);
+            MessageSkippedAsWarning(logger, type, reason, sub);
         }
         else
         {
-            MessageSkippedWithSub(logger, type, reason, sub, null);
+            MessageSkippedWithSub(logger, type, reason, sub);
         }
     }
 
@@ -251,11 +176,11 @@ public static class AuthLog
     {
         if (knownKid is null)
         {
-            RejectedWithoutKid(logger, reason, false, null);
+            RejectedWithoutKid(logger, reason, false);
         }
         else
         {
-            RejectedWithKid(logger, reason, knownKid, null);
+            RejectedWithKid(logger, reason, knownKid);
         }
     }
 }

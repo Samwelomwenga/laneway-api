@@ -2,8 +2,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Laneway.Api;
 
-public sealed class BoardCopyRunner : ICopyJobRunner
+public sealed partial class BoardCopyRunner : ICopyJobRunner
 {
+    [LoggerMessage(EventId = 1, EventName = "CopyBodyUnreadable", Level = LogLevel.Error,
+        Message = "Copy job {JobId} stored a body this runner can't read.")]
+    private static partial void CopyBodyUnreadable(ILogger logger, Guid jobId, Exception exception);
+
     private readonly ApplicationDbContext _context;
     private readonly Actor _actor;
     private readonly BoardSnapshots _snapshots;
@@ -46,7 +50,7 @@ public sealed class BoardCopyRunner : ICopyJobRunner
         }
         catch (MissingWriteFieldException missing)
         {
-            _logger.LogError(missing, "Copy job {JobId} stored a body this runner can't read.", job.Id);
+            CopyBodyUnreadable(_logger, job.Id, missing);
             return CopyRunResult.Refused([CopyJobEnd.InternalError]);
         }
 

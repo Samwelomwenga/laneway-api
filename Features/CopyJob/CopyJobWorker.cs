@@ -2,8 +2,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Laneway.Api;
 
-public sealed class CopyJobWorker : BackgroundService
+public sealed partial class CopyJobWorker : BackgroundService
 {
+    [LoggerMessage(EventId = 1, EventName = "PollFailed", Level = LogLevel.Warning,
+        Message = "A copy job poll failed. The next poll retries it.")]
+    private static partial void PollFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 2, EventName = "CopyJobThrew", Level = LogLevel.Error,
+        Message = "Copy job {JobId} threw on attempt {Attempt}.")]
+    private static partial void CopyJobThrew(ILogger logger, Guid jobId, int attempt, Exception exception);
+
     private const int MaxJobs = 2;
 
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
@@ -46,7 +54,7 @@ public sealed class CopyJobWorker : BackgroundService
             }
             catch (Exception exception)
             {
-                _logger.LogWarning(exception, "A copy job poll failed. The next poll retries it.");
+                PollFailed(_logger, exception);
             }
         }
 
@@ -79,8 +87,7 @@ public sealed class CopyJobWorker : BackgroundService
         }
         catch (Exception exception)
         {
-            _logger.LogError(
-                exception, "Copy job {JobId} threw on attempt {Attempt}.", claim.Job.Id, claim.Attempt);
+            CopyJobThrew(_logger, claim.Job.Id, claim.Attempt, exception);
             if (claim.Attempt >= CopyJobClaims.MaxAttempts)
             {
                 await FailAsync(claim.Job.Id, [CopyJobEnd.InternalError], CancellationToken.None);

@@ -64,7 +64,7 @@ public sealed class DeliveryWorker : BackgroundService
             }
             catch (Exception exception)
             {
-                _log.LogWarning(exception, "A delivery poll failed. The next poll retries it.");
+                _log.DeliveryPollFailed(exception);
             }
         }
 
@@ -160,7 +160,7 @@ public sealed class DeliveryWorker : BackgroundService
         }
         catch (Exception exception)
         {
-            _log.LogError(exception, "A delivery send threw. The claim's lease runs out and the next poll retries it.");
+            _log.DeliverySendThrew(exception);
         }
     }
 

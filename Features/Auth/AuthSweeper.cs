@@ -2,8 +2,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Laneway.Api;
 
-public sealed class AuthSweeper : BackgroundService
+public sealed partial class AuthSweeper : BackgroundService
 {
+    [LoggerMessage(EventId = 1, EventName = "SweepFailed", Level = LogLevel.Warning,
+        Message = "An auth sweep failed. The next sweep retries it.")]
+    private static partial void SweepFailed(ILogger logger, Exception exception);
+
     public const int BatchSize = 1000;
 
     public static readonly TimeSpan UnverifiedLife = TimeSpan.FromDays(7);
@@ -32,7 +36,7 @@ public sealed class AuthSweeper : BackgroundService
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _logger.LogWarning(exception, "An auth sweep failed. The next sweep retries it.");
+                SweepFailed(_logger, exception);
             }
         }
     }

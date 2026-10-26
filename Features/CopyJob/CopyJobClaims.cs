@@ -25,8 +25,12 @@ public sealed class CopyJobClaim : IAsyncDisposable
     }
 }
 
-public sealed class CopyJobClaims
+public sealed partial class CopyJobClaims
 {
+    [LoggerMessage(EventId = 1, EventName = "CopyJobGaveUp", Level = LogLevel.Error,
+        Message = "Copy job {JobId} gave up after {Attempts} attempts.")]
+    private static partial void CopyJobGaveUp(ILogger logger, Guid jobId, int attempts);
+
     public const int MaxAttempts = 3;
 
     private const int Candidates = 20;
@@ -101,7 +105,7 @@ public sealed class CopyJobClaims
 
         if (job.Attempts >= MaxAttempts)
         {
-            _logger.LogError("Copy job {JobId} gave up after {Attempts} attempts.", job.Id, job.Attempts);
+            CopyJobGaveUp(_logger, job.Id, job.Attempts);
             CopyJobEnd.Fail(job, [CopyJobEnd.InternalError]);
             await context.SaveChangesAsync(token);
             return null;
