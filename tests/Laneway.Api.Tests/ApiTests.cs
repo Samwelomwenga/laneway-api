@@ -471,6 +471,10 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected static string BoardMembersPath(Guid boardId) => $"/api/v1/boards/{boardId}/members";
 
+    protected static string WorkspaceInvitesPath(Guid workspaceId) => $"/api/v1/workspaces/{workspaceId}/invites";
+
+    protected static string BoardInvitesPath(Guid boardId) => $"/api/v1/boards/{boardId}/invites";
+
     protected async Task<TestUser> AddBoardMemberAsync(Guid boardId, BoardRole role)
     {
         var user = await CreateUserAsync();

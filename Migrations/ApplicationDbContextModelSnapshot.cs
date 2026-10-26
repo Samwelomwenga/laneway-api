@@ -639,6 +639,54 @@ namespace Laneway.Api.Migrations
                     b.ToTable("FormerReaders");
                 });
 
+            modelBuilder.Entity("Laneway.Api.Invite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BoardId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("EmailedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InvitedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<Guid?>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvitedBy");
+
+                    b.HasIndex("BoardId", "Email")
+                        .IsUnique();
+
+                    b.HasIndex("WorkspaceId", "Email")
+                        .IsUnique();
+
+                    b.ToTable("Invites", t =>
+                        {
+                            t.HasCheckConstraint("CK_Invites_OnePlace", "(\"WorkspaceId\" IS NULL) <> (\"BoardId\" IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Laneway.Api.Label", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1235,6 +1283,25 @@ namespace Laneway.Api.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Laneway.Api.Invite", b =>
+                {
+                    b.HasOne("Laneway.Api.Board", null)
+                        .WithMany()
+                        .HasForeignKey("BoardId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Laneway.Api.User", null)
+                        .WithMany()
+                        .HasForeignKey("InvitedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Laneway.Api.WorkSpace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("Laneway.Api.Label", b =>

@@ -17,7 +17,9 @@ public static class EmailTemplates
         [MessageType.EmailChanged] = (stored, secret, links) =>
             EmailChangedEmail.Render(MessageBodies.In<EmailChanged>(stored) with { Token = secret! }, links),
         [MessageType.EmailChangeUndone] = (stored, _, _) =>
-            EmailChangeUndoneEmail.Render(MessageBodies.In<EmailChangeUndone>(stored))
+            EmailChangeUndoneEmail.Render(MessageBodies.In<EmailChangeUndone>(stored)),
+        [MessageType.InviteSent] = (stored, secret, links) =>
+            InviteSentEmail.Render(MessageBodies.In<InviteSent>(stored) with { UnsubscribeToken = secret! }, links)
     };
 
     public static bool Has(MessageType type) => Templates.ContainsKey(type);

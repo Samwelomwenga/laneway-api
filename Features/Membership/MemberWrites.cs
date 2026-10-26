@@ -11,6 +11,8 @@ public sealed record UserLookup(Guid? UserId, string? Username, string? Email)
     public string Field => UserId is not null ? "userId" : Username is not null ? "username" : "email";
 
     public string Value => UserId?.ToString() ?? Username ?? Email ?? string.Empty;
+
+    public string? InvitableEmail => UserId is null && Username is null ? Email : null;
 }
 
 public sealed record AddMemberWrite<TRole>(UserLookup User, TRole Role) where TRole : struct, Enum;

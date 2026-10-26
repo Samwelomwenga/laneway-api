@@ -46,6 +46,14 @@ public class EmailSampleTests
             "Africa/Nairobi")
         { Token = SampleToken }),
         ["EmailChangeUndone"] = Render(new EmailChangeUndone("jane.doe@gmail.com", At, "Africa/Nairobi")),
+        ["InviteSent"] = Render(new InviteSent(
+            "jane.doe@gmail.com",
+            Guid.Empty,
+            "Ana\nWaweru-Kamau of the Long Valley Weavers Cooperative",
+            "ana-waweru",
+            InvitePlace.Board,
+            "Q4 <launch>\u202E\"plan\"\u0007")
+        { UnsubscribeToken = SampleToken }),
         ["PasswordChanged-Changed"] = Render(new PasswordChanged(
             Guid.Empty,
             PasswordChangeHow.Changed,

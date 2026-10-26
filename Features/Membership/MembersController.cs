@@ -23,7 +23,7 @@ public class MembersController : ApiControllerBase
 
     [HttpPost("/api/v1/workspaces/{workspaceId}/members")]
     [RateLimited(RateLimits.AddMember)]
-    public async Task<ActionResult<ApiResponse<WorkspaceMemberDto>>> AddWorkspaceMember(
+    public async Task<ActionResult<ApiResponse<AddedWorkspaceMemberDto>>> AddWorkspaceMember(
         Guid workspaceId, [FromBody] AddWorkspaceMemberDto addWorkspaceMemberDto)
     {
         return ToActionResult(await _workspaceMembers.AddAsync(workspaceId, MemberWrites.Of(addWorkspaceMemberDto)));
@@ -52,7 +52,7 @@ public class MembersController : ApiControllerBase
 
     [HttpPost("/api/v1/boards/{boardId}/members")]
     [RateLimited(RateLimits.AddMember)]
-    public async Task<ActionResult<ApiResponse<BoardMemberDto>>> AddBoardMember(
+    public async Task<ActionResult<ApiResponse<AddedBoardMemberDto>>> AddBoardMember(
         Guid boardId, [FromBody] AddBoardMemberDto addBoardMemberDto)
     {
         return ToActionResult(await _boardMembers.AddAsync(boardId, MemberWrites.Of(addBoardMemberDto)));

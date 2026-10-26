@@ -13,12 +13,18 @@ public static class AppRoutes
     public const string ConfirmEmailChange = "/confirm-email-change";
 
     public const string UndoEmailChange = "/undo-email-change";
+
+    public const string SignUp = "/sign-up";
+
+    public const string UnsubscribeInvites = "/unsubscribe-invites";
 }
 
 public sealed class AppLinks(IOptions<WebAppOptions> options)
 {
     public Uri To(string route) => new($"{options.Value.BaseUrl}{route}");
 
-    public Uri To(string route, string token) =>
-        new($"{options.Value.BaseUrl}{route}#token={Uri.EscapeDataString(token)}");
+    public Uri To(string route, string token) => To(route, "token", token);
+
+    public Uri To(string route, string name, string value) =>
+        new($"{options.Value.BaseUrl}{route}#{name}={Uri.EscapeDataString(value)}");
 }

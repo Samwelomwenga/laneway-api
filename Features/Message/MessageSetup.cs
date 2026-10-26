@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 
 namespace Laneway.Api;
@@ -18,6 +19,8 @@ public static class MessageSetup
         services.AddScoped<Messages>();
         services.AddScoped<DeliverySweep>();
         services.AddScoped<BrevoWebhook>();
+        services.AddDataProtection().SetApplicationName("Laneway.Api");
+        services.AddScoped<InviteUnsubscribes>();
         services.AddSingleton<BrevoWebhookTokens>();
         services.AddHttpClient<IEmailProvider, BrevoEmail>(BrevoEmail.Configure).RemoveAllLoggers();
         services.AddHostedService<DeliveryWorker>();

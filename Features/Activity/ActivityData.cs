@@ -2,7 +2,14 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace Laneway.Api;
 
-public sealed record ActorRef(Guid Id, string Username, string FirstName, string LastName);
+public sealed record ActorRef(Guid Id, string Username, string FirstName, string LastName)
+{
+    public static ActorRef Of(User user)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        return new ActorRef(user.Id, user.Username, user.FirstName, user.LastName);
+    }
+}
 
 public sealed record WorkspaceRef(Guid Id, string Name)
 {

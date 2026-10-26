@@ -26,6 +26,61 @@ public record BoardMemberDto
     bool IsGuest
 );
 
+public record AddedWorkspaceMemberDto
+(
+    MemberUserDto? User,
+    WorkspaceRole Role,
+    MemberStatus Status,
+    string? Email,
+    Guid? InviteId
+)
+{
+    public static AddedWorkspaceMemberDto Invited(Invite invite, WorkspaceRole role)
+    {
+        ArgumentNullException.ThrowIfNull(invite);
+        return new AddedWorkspaceMemberDto(null, role, MemberStatus.Invited, invite.Email, invite.Id);
+    }
+}
+
+public record AddedBoardMemberDto
+(
+    MemberUserDto? User,
+    BoardRole Role,
+    MemberStatus Status,
+    bool? IsGuest,
+    string? Email,
+    Guid? InviteId
+)
+{
+    public static AddedBoardMemberDto Invited(Invite invite, BoardRole role)
+    {
+        ArgumentNullException.ThrowIfNull(invite);
+        return new AddedBoardMemberDto(null, role, MemberStatus.Invited, null, invite.Email, invite.Id);
+    }
+}
+
+public record WorkspaceInviteDto
+(
+    Guid Id,
+    string Email,
+    WorkspaceRole Role,
+    MemberUserDto? InvitedBy,
+    DateTime CreatedAt,
+    DateTime ExpiresAt
+);
+
+public record BoardInviteDto
+(
+    Guid Id,
+    string Email,
+    BoardRole Role,
+    MemberUserDto? InvitedBy,
+    DateTime CreatedAt,
+    DateTime ExpiresAt
+);
+
+public record UnsubscribeInvitesDto(string? Token);
+
 [ModelBinder(typeof(SearchQueryBinder<MemberSearchDto>))]
 public record MemberSearchDto
 (

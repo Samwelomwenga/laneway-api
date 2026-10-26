@@ -298,7 +298,7 @@ public class SignUpVerificationTests : ApiTests
     }
 
     [Fact]
-    public async Task Member_lookup_finds_verified_users_only()
+    public async Task Member_lookup_by_id_or_username_finds_verified_users_only()
     {
         var email = NewEmail();
         using var signUp = await SignUpAsync(SignUpBody(email, username: "unverified"));
@@ -308,8 +308,7 @@ public class SignUpVerificationTests : ApiTests
         foreach (var (field, body) in new (string, object)[]
         {
             ("userId", new { userId }),
-            ("username", new { username = "unverified" }),
-            ("email", new { email })
+            ("username", new { username = "unverified" })
         })
         {
             using var response = await PostAsync(WorkspaceMembersPath(workspace.Id), body);

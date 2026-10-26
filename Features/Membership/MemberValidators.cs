@@ -51,3 +51,11 @@ internal static class MemberRules
     private static int Named(INamesAUser request) =>
         (request.UserId is null ? 0 : 1) + (request.Username is null ? 0 : 1) + (request.Email is null ? 0 : 1);
 }
+
+public sealed class UnsubscribeInvitesDtoValidator : AbstractValidator<UnsubscribeInvitesDto>
+{
+    public UnsubscribeInvitesDtoValidator()
+    {
+        RuleFor(x => x.Token).Required();
+    }
+}

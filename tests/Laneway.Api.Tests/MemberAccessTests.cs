@@ -50,6 +50,27 @@ public class MemberAccessTests : AccessMatrix
             DeleteAsync($"{BoardMembersPath(place.BoardId)}/{ActorId}", caller));
 
     [Fact]
+    public Task GET_a_workspaces_invites() =>
+        RunWorkspaceRowAsync(Act.AdministerWorkspace, 200, (place, caller) =>
+            GetAsync(WorkspaceInvitesPath(place.WorkspaceId), caller));
+
+    [Fact]
+    public Task DELETE_a_workspace_invite() =>
+        RunWorkspaceRowAsync(Act.AdministerWorkspace, 204, async (place, caller) =>
+            await DeleteAsync(
+                $"{WorkspaceInvitesPath(place.WorkspaceId)}/{await SeedInviteAsync(place.WorkspaceId, null)}", caller));
+
+    [Fact]
+    public Task GET_a_boards_invites() =>
+        RunBoardRowAsync(Act.AdministerBoard, 200, (place, caller) =>
+            GetAsync(BoardInvitesPath(place.BoardId), caller));
+
+    [Fact]
+    public Task DELETE_a_board_invite() =>
+        RunBoardRowAsync(Act.AdministerBoard, 204, async (place, caller) =>
+            await DeleteAsync($"{BoardInvitesPath(place.BoardId)}/{await SeedInviteAsync(null, place.BoardId)}", caller));
+
+    [Fact]
     public Task GET_a_boards_settings() =>
         RunBoardRowAsync(Act.ReadBoard, 200, (place, caller) =>
             GetAsync($"/api/v1/boards/{place.BoardId}/settings", caller));
@@ -59,4 +80,27 @@ public class MemberAccessTests : AccessMatrix
         RunBoardRowAsync(Act.AdministerBoard, 200, (place, caller) =>
             PutAsync($"/api/v1/boards/{place.BoardId}/settings",
                 new { commenting = "Disabled", addingMembers = "Members", selfJoin = false, visibility = "Public" }, caller));
+
+    private async Task<Guid> SeedInviteAsync(Guid? workspaceId, Guid? boardId)
+    {
+        var now = Time.GetUtcNow().UtcDateTime;
+        var invite = new Invite
+        {
+            Id = Guid.NewGuid(),
+            WorkspaceId = workspaceId,
+            BoardId = boardId,
+            Email = NewEmail(),
+            Role = "Normal",
+            InvitedBy = ActorId,
+            CreatedAt = now,
+            ExpiresAt = now + Invites.Lifetime,
+            EmailedAt = now
+        };
+        await FromDatabaseAsync(database =>
+        {
+            database.Invites.Add(invite);
+            return database.SaveChangesAsync();
+        });
+        return invite.Id;
+    }
 }

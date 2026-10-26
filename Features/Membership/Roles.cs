@@ -15,5 +15,6 @@ public enum BoardRole
 
 public enum MemberStatus
 {
-    Active
+    Active,
+    Invited
 }
