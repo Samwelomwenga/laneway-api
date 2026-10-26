@@ -16,10 +16,12 @@ public static class TelemetryPipeline
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.Logging.ClearProviders();
+        builder.Services.AddHttpContextAccessor();
         builder.Services.AddSerilog(
             (services, logger) => logger
                 .ReadFrom.Configuration(services.GetRequiredService<IConfiguration>())
-                .Enrich.With<RequestScopeScrub>(),
+                .Enrich.With<RequestScopeScrub>()
+                .Enrich.With(new AuthClientIp(services.GetRequiredService<IHttpContextAccessor>())),
             preserveStaticLogger: true,
             writeToProviders: true);
 

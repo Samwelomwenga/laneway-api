@@ -7,11 +7,13 @@ public sealed class Readable
 {
     private readonly ApplicationDbContext _context;
     private readonly DenialLog _denials;
+    private readonly IHttpContextAccessor _requests;
 
-    public Readable(ApplicationDbContext context, DenialLog denials)
+    public Readable(ApplicationDbContext context, DenialLog denials, IHttpContextAccessor requests)
     {
         _context = context;
         _denials = denials;
+        _requests = requests;
     }
 
     public IQueryable<WorkSpace> Workspaces(Guid userId) =>
@@ -159,7 +161,7 @@ public sealed class Readable
 
     public ApiResponse<T> NotFound<T>(AccessTarget target, Guid id, Guid userId)
     {
-        _denials.Add(new Denial(userId, target, id, null));
+        Deny(new Denial(userId, target, id, null));
         return ApiResponse<T>.ErrorResponse($"{AccessTargets.Name(target)} not found", StatusCodes.Status404NotFound);
     }
 
@@ -176,14 +178,14 @@ public sealed class Readable
     }
 
     public void HiddenField(AccessTarget target, Guid id, Guid userId) =>
-        _denials.Add(new Denial(userId, target, id, null, FromField: true));
+        Deny(new Denial(userId, target, id, null, FromField: true));
 
     public ApiResponse<T> Refused<T>(
         Refusal refusal, AccessTarget target, Guid id, Guid userId, string? field = null)
     {
         ArgumentNullException.ThrowIfNull(refusal);
 
-        _denials.Add(new Denial(userId, target, id, refusal.Code));
+        Deny(new Denial(userId, target, id, refusal.Code));
         return ApiResponse<T>.ErrorResponse(
             refusal.Message,
             StatusCodes.Status403Forbidden,
@@ -304,6 +306,9 @@ public sealed class Readable
             : new Found<T, BoardStanding>(
                 found.Target, BoardStanding.Of(found.Board, found.BoardRole, found.WorkspaceRole));
     }
+
+    private void Deny(Denial denial) =>
+        _denials.Add(denial with { ClientIp = ClientIp.Of(_requests.HttpContext) });
 
     private sealed class OnBoard<T>
     {

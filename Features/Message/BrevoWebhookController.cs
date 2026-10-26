@@ -22,7 +22,7 @@ public class BrevoWebhookController(BrevoWebhookTokens tokens, BrevoWebhook webh
     {
         if (await tokens.RejectionAsync(Request.Headers.Authorization.ToString()) is { } reason)
         {
-            _log.WebhookRejected(reason);
+            _log.WebhookRejected(reason, ClientIp.Of(HttpContext));
             Response.Headers.WWWAuthenticate = "Bearer";
             return Unauthorized();
         }

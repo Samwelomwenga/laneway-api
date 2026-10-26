@@ -35,7 +35,11 @@ public static partial class MessageLog
     private static partial void DeliverySuppressedEvent(ILogger logger, string reason, string suppressedBy);
 
     [LoggerMessage(EventId = 6, EventName = "WebhookRejected", Level = LogLevel.Warning, Message = "Webhook rejected: reason {reason}")]
-    public static partial void WebhookRejected(this ILogger logger, string reason);
+    private static partial void WebhookRejectedWithoutIp(ILogger logger, string reason);
+
+    [LoggerMessage(EventId = 6, EventName = "WebhookRejected", Level = LogLevel.Warning,
+        Message = "Webhook rejected: reason {reason}, clientIp {clientIp}")]
+    private static partial void WebhookRejectedWithIp(ILogger logger, string reason, string clientIp);
 
     [LoggerMessage(EventId = 7, EventName = "AddressSuppressed", Level = LogLevel.Information,
         Message = "Address suppressed: event {event}, deliveryId {deliveryId}, messageType {messageType}, alreadySuppressed {alreadySuppressed}")]
@@ -67,6 +71,18 @@ public static partial class MessageLog
         else
         {
             DeliveryFailedWarning(logger, reason, status, code);
+        }
+    }
+
+    public static void WebhookRejected(this ILogger logger, string reason, string? clientIp)
+    {
+        if (clientIp is null)
+        {
+            WebhookRejectedWithoutIp(logger, reason);
+        }
+        else
+        {
+            WebhookRejectedWithIp(logger, reason, clientIp);
         }
     }
 

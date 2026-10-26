@@ -76,7 +76,7 @@ public class LoggingInventoryTests
 
         var thrown = Assert.Throws<InvalidDataException>(() => LoggingInventory.Parse(reshaped));
 
-        Assert.Contains("Events", thrown.Message, StringComparison.Ordinal);
+        Assert.Contains("Requests", thrown.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -108,10 +108,9 @@ public static class RateLimits
     }
 
     // One line usually gets a whole IPv6 /64, so counting each address would hand a client billions of buckets.
-    private static string IpKey(HttpContext context) => context.Connection.RemoteIpAddress switch
+    private static string IpKey(HttpContext context) => ClientIp.AddressOf(context) switch
     {
         null => NoIp,
-        { IsIPv4MappedToIPv6: true } address => address.MapToIPv4().ToString(),
         { AddressFamily: AddressFamily.InterNetworkV6 } address => Prefix64(address),
         var address => address.ToString()
     };

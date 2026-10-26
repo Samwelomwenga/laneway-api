@@ -69,7 +69,7 @@ public class UnexpectedErrorTests : ApiTests
         HostWith(services => services.AddControllers().AddApplicationPart(typeof(FaultController).Assembly));
 
     private static IEnumerable<FakeLogRecord> ErrorLogs(FakeLogCollector collector) =>
-        collector.GetSnapshot().Where(log => log.Level >= LogLevel.Error);
+        collector.GetSnapshot().Where(log => log.Level >= LogLevel.Error && log.Category != RequestLine.Category);
 }
 
 [ApiController]

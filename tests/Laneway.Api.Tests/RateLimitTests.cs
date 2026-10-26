@@ -254,6 +254,8 @@ public class RateLimitTests : ApiTests
         using var response = await SignInAsync("::ffff:198.51.100.1");
 
         Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+        var limited = Assert.Single(Logs(), log => log.Id.Name == "RateLimited");
+        Assert.Equal("198.51.100.1", limited.GetStructuredStateValue(ClientIp.Field));
     }
 
     [Fact]

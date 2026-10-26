@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +29,8 @@ public static class AccessTargets
     };
 }
 
-public sealed record Denial(Guid ActorId, AccessTarget Target, Guid TargetId, string? Code, bool FromField = false)
+public sealed record Denial(
+    Guid ActorId, AccessTarget Target, Guid TargetId, string? Code, bool FromField = false, string? ClientIp = null)
 {
     public bool IsHidingNotFound => Code is null;
 
@@ -83,6 +85,7 @@ public sealed class DenialLog
     }
 }
 
+[SuppressMessage("Usage", "SYSLIB1025", Justification = "Variants of one event share its name.")]
 public sealed partial class DenialDrainer : BackgroundService
 {
     public const string Category = "Laneway.Authorization";
@@ -91,6 +94,11 @@ public sealed partial class DenialDrainer : BackgroundService
         Message = "Access denied: sub {sub}, targetType {targetType}, targetId {targetId}, status {status}, code {code}")]
     private static partial void AccessDenied(
         ILogger logger, Guid sub, AccessTarget targetType, Guid targetId, int status, string code);
+
+    [LoggerMessage(EventId = 1, EventName = "AccessDenied", Level = LogLevel.Warning,
+        Message = "Access denied: sub {sub}, targetType {targetType}, targetId {targetId}, status {status}, code {code}, clientIp {clientIp}")]
+    private static partial void AccessDenied(
+        ILogger logger, Guid sub, AccessTarget targetType, Guid targetId, int status, string code, string clientIp);
 
     [LoggerMessage(EventId = 2, EventName = "DenialCheckFailed", Level = LogLevel.Warning,
         Message = "A denial couldn't be checked, and went unlogged.")]
@@ -131,13 +139,15 @@ public sealed partial class DenialDrainer : BackgroundService
             return;
         }
 
-        AccessDenied(
-            _logger,
-            denial.ActorId,
-            denial.Target,
-            denial.TargetId,
-            denial.Status,
-            denial.Code ?? ErrorCodes.NotFound);
+        var code = denial.Code ?? ErrorCodes.NotFound;
+        if (denial.ClientIp is { } clientIp)
+        {
+            AccessDenied(_logger, denial.ActorId, denial.Target, denial.TargetId, denial.Status, code, clientIp);
+        }
+        else
+        {
+            AccessDenied(_logger, denial.ActorId, denial.Target, denial.TargetId, denial.Status, code);
+        }
     }
 
     private async Task<bool> ExistsAsync(Denial denial, CancellationToken token)
