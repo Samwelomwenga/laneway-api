@@ -13,6 +13,8 @@ namespace Laneway.Api.Tests;
 [Collection(ApiCollection.Name)]
 public class UnexpectedErrorTests : ApiTests
 {
+    private const string ExceptionHandlerMiddleware = "Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware";
+
     public UnexpectedErrorTests(TestStack stack) : base(stack)
     {
     }
@@ -34,6 +36,18 @@ public class UnexpectedErrorTests : ApiTests
         var error = Assert.Single(ErrorLogs(collector));
         Assert.Equal(body.TraceId, error.GetStructuredStateValue("traceId"));
         Assert.Equal(FaultController.Detail, Assert.IsType<InvalidOperationException>(error.Exception).Message);
+    }
+
+    [Fact]
+    public async Task The_exception_handler_middleware_stays_muted()
+    {
+        var (client, collector) = WithFaults();
+
+        using var response = await client.GetAsync(new Uri("/api/v1/faults/unexpected", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.DoesNotContain(collector.GetSnapshot(), log => log.Category == ExceptionHandlerMiddleware);
+        Assert.DoesNotContain(ShippedLogs, log => log.CategoryName == ExceptionHandlerMiddleware);
     }
 
     [Theory]

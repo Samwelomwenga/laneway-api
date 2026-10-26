@@ -1,9 +1,23 @@
+using System.Globalization;
 using System.Text.Json;
 using Scalar.AspNetCore;
 using Laneway.Api;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
+using Serilog.Debugging;
+using Serilog.Events;
+
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console(formatProvider: CultureInfo.InvariantCulture, standardErrorFromLevel: LogEventLevel.Verbose)
+    .CreateBootstrapLogger();
+SelfLog.Enable(Console.Error);
+AppDomain.CurrentDomain.UnhandledException += (_, unhandled) =>
+{
+    Log.Fatal(unhandled.ExceptionObject as Exception, "The API stopped on an unhandled exception");
+    Log.CloseAndFlush();
+};
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,16 +27,7 @@ if (args is [BrevoWebhookTokens.MintCommand])
     return;
 }
 
-builder.Logging.AddJsonConsole(options =>
-{
-    options.IncludeScopes = true;
-    options.UseUtcTimestamp = true;
-    options.TimestampFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
-});
-
-// .NET 9's ExceptionHandlerMiddleware logs every exception before ApiExceptionHandler sees it, and has no
-// SuppressDiagnosticsCallback until .NET 10.
-builder.Logging.AddFilter("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware", LogLevel.None);
+builder.AddTelemetry();
 
 builder.Services.AddControllers(options =>
     {
@@ -138,6 +143,12 @@ builder.Services.AddDbContext<ApplicationDbContext>((services, options) => optio
 
 
 var app = builder.Build();
+if (!app.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(app.Configuration[TelemetryPipeline.OtlpEndpoint]))
+{
+    Log.Warning("{Variable} isn't set, so no logs, traces, or metrics ship", TelemetryPipeline.OtlpEndpoint);
+}
+
+await Log.CloseAndFlushAsync();
 app.Services.GetRequiredService<AuthMeter>();
 app.Services.GetRequiredService<Passwords>();
 

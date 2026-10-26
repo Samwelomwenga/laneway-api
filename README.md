@@ -6,6 +6,27 @@ CI runs no tests, so run `dotnet test` before you push. The suite needs Docker f
 
 [docs/ci.md](docs/ci.md) lists each check and how to fix it.
 
+## Telemetry
+
+The API ships logs, traces, and metrics over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, and ships nothing when it isn't. Only startup failures and Serilog's own errors go to stderr. Locally, it ships to the Aspire Dashboard:
+
+```sh
+docker run --rm -d --name aspire-dashboard \
+  -p 127.0.0.1:18888:18888 -p 127.0.0.1:4317:18889 \
+  -e ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true \
+  mcr.microsoft.com/dotnet/aspire-dashboard:13.6
+```
+
+Then run the API with these variables, from Doppler's `dev` config or your shell, and open http://localhost:18888:
+
+```sh
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+OTEL_SERVICE_NAME=laneway-api
+OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=local
+```
+
+Service name, environment, and host come only from `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. Log levels live under `Serilog:MinimumLevel` in `appsettings.json`. Serilog ignores `Logging:LogLevel`. [ADR 0011](docs/adr/0011-serilog-in-front-of-the-otel-sdk.md) explains the pipeline.
+
 ## Email
 
 The app won't start without `BREVO__APIKEY`, `BREVO__SENDEREMAIL`, and `BREVO__WEBHOOKSIGNINGKEY` in Doppler. Local runs send real mail through the shared dev Brevo account. Tests swap Brevo for a stub and never reach it.

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
@@ -14,6 +15,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.IdentityModel.JsonWebTokens;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -43,6 +46,16 @@ public abstract class ApiTests : IAsyncLifetime
     internal PwnedPasswordsStub PwnedPasswords => Factory.PwnedPasswords;
 
     internal BrevoStub Brevo => Factory.Brevo;
+
+    internal Shipped<LogRecord> ShippedLogs => Factory.ShippedLogs;
+
+    internal Shipped<Activity> ShippedSpans => Factory.ShippedSpans;
+
+    internal IReadOnlyList<MetricSnapshot> ShippedMetrics()
+    {
+        Services.GetRequiredService<MeterProvider>().ForceFlush();
+        return Factory.ShippedMetrics.Snapshot();
+    }
 
     internal Task<BrevoSend> AwaitEmailAsync(string to) => Brevo.AwaitEmailAsync(to);
 

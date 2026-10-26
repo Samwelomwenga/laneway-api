@@ -4,7 +4,7 @@ What Laneway logs about auth and unexpected errors, and what it never logs. This
 
 ## Sink
 
-Every environment writes JSON to the console, with UTC ISO 8601 timestamps. The JSON writer escapes newlines and quotes in every value, so a field can't forge a second entry. Retention is 30 days, the longest a session lives, and the deploy enforces it.
+The API ships logs over OTLP, with traces and metrics, through one exporter. Only startup failures and Serilog's own errors go to stderr. OTLP carries each field as its own attribute, so a value can't forge a second entry. Retention is 30 days, the longest a session lives, and the deploy enforces it.
 
 ## Events
 
