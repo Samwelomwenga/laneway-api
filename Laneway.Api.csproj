@@ -3,6 +3,7 @@
     <PropertyGroup>
         <RootNamespace>Laneway.Api</RootNamespace>
         <UserSecretsId>0e838897-61eb-4e95-aa86-b5dad1c4e8e2</UserSecretsId>
+        <WarningsAsErrors>$(WarningsAsErrors);RS0030</WarningsAsErrors>
     </PropertyGroup>
 
     <ItemGroup>
@@ -14,6 +15,10 @@
 
     <ItemGroup>
         <EmbeddedResource Include="Features/Auth/CommonPasswords/common-passwords.txt" LogicalName="Laneway.Api.CommonPasswords.txt" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <AdditionalFiles Include="BannedSymbols.txt" />
     </ItemGroup>
 
     <ItemGroup>
@@ -32,9 +37,18 @@
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
           <PrivateAssets>all</PrivateAssets>
         </PackageReference>
+        <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers">
+          <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
         <PackageReference Include="Newtonsoft.Json" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+        <PackageReference Include="Npgsql.OpenTelemetry" />
+        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
         <PackageReference Include="Scalar.AspNetCore" />
+        <PackageReference Include="Serilog.AspNetCore" />
         <PackageReference Include="Supabase.Storage" />
         <PackageReference Include="TimeZoneNames" />
     </ItemGroup>

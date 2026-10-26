@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -7,6 +8,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 
 namespace Laneway.Api.Tests;
 
@@ -40,6 +44,12 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
 
     public BrevoStub Brevo { get; } = new();
 
+    public Shipped<LogRecord> ShippedLogs { get; } = new();
+
+    public Shipped<Activity> ShippedSpans { get; } = new();
+
+    public Shipped<MetricSnapshot> ShippedMetrics { get; } = new();
+
     public HttpClient CreateApiClient()
     {
         var client = CreateClient();
@@ -60,6 +70,7 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
 
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:DefaultConnection", _connectionString);
+        builder.UseSetting(TelemetryPipeline.OtlpEndpoint, string.Empty);
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>(StringComparer.Ordinal)
             {
@@ -77,6 +88,9 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
         {
             services.Insert(0, ServiceDescriptor.Transient<IStartupFilter, ClientIpFromHeader>());
             services.AddSingleton<TimeProvider>(Time);
+            services.ConfigureOpenTelemetryLoggerProvider(logging => logging.AddInMemoryExporter(ShippedLogs));
+            services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddInMemoryExporter(ShippedSpans));
+            services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddInMemoryExporter(ShippedMetrics));
             services.AddHttpClient<BreachedPasswords>()
                 .ConfigurePrimaryHttpMessageHandler(() => PwnedPasswords)
                 .SetHandlerLifetime(Timeout.InfiniteTimeSpan);

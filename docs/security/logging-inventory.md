@@ -4,7 +4,23 @@ What Laneway logs about auth and unexpected errors, and what it never logs. This
 
 ## Sink
 
-Every environment writes JSON to the console, with UTC ISO 8601 timestamps. The JSON writer escapes newlines and quotes in every value, so a field can't forge a second entry. Retention is 30 days, the longest a session lives, and the deploy enforces it.
+The API ships logs over OTLP, with traces and metrics, through one exporter. Only startup failures and Serilog's own errors go to stderr. OTLP carries each field as its own attribute, so a value can't forge a second entry. Retention is 30 days, the longest a session lives, and the deploy enforces it.
+
+## Fields on every entry
+
+The record itself holds the time, the level, the category, the event id and name, the message template, the trace id and span id, and the exception when there is one. OTLP sends them as record fields, not attributes. OTLP calls the category the scope name. The stable key for an event is the scope name plus `EventName`, since ids repeat across categories. OpenTelemetry's experimental `OTEL_DOTNET_EXPERIMENTAL_LOGS_EMIT_EVENT_LOG_ATTRIBUTES` flag, which copies the id and name into attributes, stays off.
+
+Serilog copies the category and the event into attributes too. ASP.NET Core adds the endpoint and the connection inside a request. So any entry may carry these besides its own fields:
+
+| Field | Carries |
+|---|---|
+| `SourceContext` | the category |
+| `EventId` | the event id and name |
+| `ActionId` | the endpoint's id |
+| `ActionName` | the endpoint's method name |
+| `ConnectionId` | Kestrel's id for the connection |
+
+Framework categories start with `Microsoft.` or `System.`. This file doesn't list their entries at Warning and above. It doesn't list framework meters either.
 
 ## Events
 
@@ -149,7 +165,13 @@ A failed sweep, drain, or poll keeps the batches it already finished, and the ne
 
 ## Unexpected errors
 
-`ApiExceptionHandler` logs each exception it turns into a 500 once, at Error, under the `Laneway.Api.ApiExceptionHandler` category as event 1, `UnexpectedError`. Event ids are unique within a category, so this id doesn't clash with `AccessTokenRejected`. The entry carries the exception and `traceId`, the request's `TraceIdentifier`. The 500 body returns the same `traceId` with a generic message, so a client can quote it and nothing else leaks. This meets ASVS 16.3.4 and 16.5.1.
+`ApiExceptionHandler` logs each exception it turns into a 500 once, at Error, under the `Laneway.Api.ApiExceptionHandler` category as event 1, `UnexpectedError`. Event ids are unique within a category, so this id doesn't clash with `AccessTokenRejected`.
+
+| Id | Event | Level | Fields |
+|---|---|---|---|
+| 1 | `UnexpectedError` | Error | `traceId`, and the exception |
+
+`traceId` is the request's `TraceIdentifier`. The 500 body returns the same `traceId` with a generic message, so a client can quote it and nothing else leaks. This meets ASVS 16.3.4 and 16.5.1.
 
 `ApiExceptionHandler` doesn't log the foreign-key 400 or the unique-violation 409. They're expected outcomes.
 
@@ -178,13 +200,32 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 - A refresh token, or its hash.
 - Any part of an access token. A `kid` is a key name, not part of the secret, and follows the rule below.
 - A client IP address or user agent.
-- The Pwned Passwords request URI. It ends in the first 5 hex characters of the password's SHA-1, so the `BreachedPasswords` client has its HttpClient request logs turned off.
+- The Pwned Passwords request URI. It ends in the first 5 hex characters of the password's SHA-1, so the `BreachedPasswords` client has its HttpClient request logs turned off. Its span ships `url.full` as `https://api.pwnedpasswords.com/range/{prefix}`.
+- The raw request path. `http.route` names the endpoint instead.
+- The query string.
+- Request or response headers.
+- A request or response body.
+- Postgres error detail. It quotes row values.
+- The database connection string.
 - An email address in any form, raw, hashed, or masked, including a delivery's recipient.
 - A message token, a link built from one, or any rendered subject or body.
 - The Brevo API key, or the Brevo webhook token.
 - Brevo's error `message`. It's free text and may quote the address.
 - A webhook payload's `email`, `message-id`, `reason`, `subject`, `tags`, `X-Mailin-custom`, `sending_ip`, `user_agent`, or `link`. They're from outside, and a bounce reason often quotes the address. A matched event logs our own `deliveryId` instead of the `message-id`.
 - The Brevo request body. The `BrevoEmail` client has its HttpClient request logs turned off.
+
+## Enforcement
+
+Every environment runs the same pipeline, so Development ships what production ships.
+
+- `CanaryTests` plants a password, a typed email, a user agent, both tokens, and a path segment across the main flows. It fails if any of them reaches an exported log, span, or metric.
+- The allowlist check runs as every API test ends. It fails the test when a log or a `Laneway.*` counter ships a category, event, field, or tag this file doesn't list. It reads this file's tables, so a reshaped table fails the run with the section's name.
+- `SpanScrub` keeps the user agent, the connection string, the raw path, the query string, and exception text off spans. It drops `user_agent.original`, Npgsql's `db.connection_string`, the server span's `url.path` and `url.query`, and every status description. It rewrites the Pwned Passwords `url.full` to its template. When a span has an `exception` event and no `error.type`, it copies the event's `exception.type` into `error.type`.
+- `RequestScopeScrub` keeps the raw path off log events by dropping ASP.NET Core's `RequestPath` and `RequestId` scope fields. `ConnectionId` stays.
+- The `Include Error Detail` check stops the app at startup when `ConnectionStrings:DefaultConnection` sets it. That keeps Postgres's DETAIL field, which quotes row values, out of errors.
+- `BannedSymbols.txt` keeps unparameterized SQL and EF's parameter values out of spans and logs. It fails the API build on `FromSqlRaw`, `ExecuteSqlRaw`, `ExecuteSqlRawAsync`, `SqlQueryRaw`, and `EnableSensitiveDataLogging`, since spans keep `db.statement`. The test project may use raw SQL.
+
+Our instrumentation never calls `RecordException`. Npgsql 9 still adds an `exception` event to a failed database span, with Postgres's primary message and a stack trace. No setting or processor can remove it. The `Include Error Detail` check keeps Postgres's DETAIL field out of that message. A primary message can still quote an input value, such as `invalid input syntax for type uuid`. Npgsql sends typed parameters, so that error is rare.
 
 ## Request values
 

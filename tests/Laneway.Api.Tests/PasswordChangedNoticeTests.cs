@@ -65,13 +65,11 @@ public class PasswordChangedNoticeTests : ApiTests
         Assert.Equal(MessageLog.Category, sent.Category);
         Assert.Equal(LogLevel.Information, sent.Level);
         Assert.Equal(delivery.ProviderMessageId, sent.GetStructuredStateValue("providerMessageId"));
-        var scope = sent.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(pairs => pairs)
-            .ToDictionary(pair => pair.Key, pair => pair.Value?.ToString(), StringComparer.Ordinal);
-        Assert.Equal(delivery.Id.ToString(), scope["deliveryId"]);
-        Assert.Equal("PasswordChanged", scope["messageType"]);
-        Assert.Equal("Email", scope["channel"]);
-        Assert.Equal("1", scope["attempt"]);
-        Assert.Equal(ActorId.ToString(), scope["sub"]);
+        Assert.Equal(delivery.Id.ToString(), sent.GetStructuredStateValue("deliveryId"));
+        Assert.Equal("PasswordChanged", sent.GetStructuredStateValue("messageType"));
+        Assert.Equal("Email", sent.GetStructuredStateValue("channel"));
+        Assert.Equal("1", sent.GetStructuredStateValue("attempt"));
+        Assert.Equal(ActorId.ToString(), sent.GetStructuredStateValue("sub"));
         Assert.DoesNotContain(
             Logs(), log => log.Message.Contains(ActorUser.User.Email, StringComparison.OrdinalIgnoreCase));
     }
