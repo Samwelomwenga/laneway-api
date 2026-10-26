@@ -5,6 +5,7 @@ using Laneway.Api;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Serilog;
 using Serilog.Debugging;
 using Serilog.Events;
@@ -135,6 +136,12 @@ if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
         $"ConnectionStrings:DefaultConnection is missing. Run the app through `doppler run --` or set the CONNECTIONSTRINGS__DEFAULTCONNECTION environment variable.");
+}
+
+if (new NpgsqlConnectionStringBuilder(connectionString).IncludeErrorDetail)
+{
+    throw new InvalidOperationException(
+        "ConnectionStrings:DefaultConnection sets Include Error Detail, which puts row values into Postgres errors and from there into logs and spans. Remove it.");
 }
 
 builder.Services.AddDbContext<ApplicationDbContext>((services, options) => options

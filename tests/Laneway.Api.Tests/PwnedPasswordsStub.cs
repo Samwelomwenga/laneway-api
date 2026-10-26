@@ -1,13 +1,14 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
-using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace Laneway.Api.Tests;
 
-internal sealed class PwnedPasswordsStub : HttpMessageHandler
+internal sealed class PwnedPasswordsStub : DelegatingHandler
 {
+    public PwnedPasswordsStub() => InnerHandler = LoopbackTls.Handler(Answer);
+
     private readonly ConcurrentDictionary<string, byte> _breached = new(StringComparer.Ordinal);
 
     private readonly ConcurrentQueue<PwnedRequest> _requests = new();
@@ -44,15 +45,17 @@ internal sealed class PwnedPasswordsStub : HttpMessageHandler
             throw failure;
         }
 
-        var prefix = request.RequestUri!.Segments[^1];
+        return await base.SendAsync(request, cancellationToken);
+    }
+
+    private string Answer(string path)
+    {
+        var prefix = path[(path.LastIndexOf('/') + 1)..];
         var lines = _breached.Keys
             .Where(hash => hash.StartsWith(prefix, StringComparison.Ordinal))
             .Select(hash => $"{hash[5..]}:3")
             .Append($"{new string('0', 35)}:0");
-        return new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(string.Join("\r\n", lines))
-        };
+        return string.Join("\r\n", lines);
     }
 }
 

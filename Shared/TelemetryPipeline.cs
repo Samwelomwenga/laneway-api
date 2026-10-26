@@ -17,7 +17,9 @@ public static class TelemetryPipeline
 
         builder.Logging.ClearProviders();
         builder.Services.AddSerilog(
-            (services, logger) => logger.ReadFrom.Configuration(services.GetRequiredService<IConfiguration>()),
+            (services, logger) => logger
+                .ReadFrom.Configuration(services.GetRequiredService<IConfiguration>())
+                .Enrich.With<RequestScopeScrub>(),
             preserveStaticLogger: true,
             writeToProviders: true);
 
@@ -26,7 +28,8 @@ public static class TelemetryPipeline
             .WithTracing(tracing => tracing
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddNpgsql())
+                .AddNpgsql()
+                .AddProcessor<SpanScrub>())
             .WithMetrics(metrics => metrics
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()

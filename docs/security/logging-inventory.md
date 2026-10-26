@@ -178,13 +178,27 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 - A refresh token, or its hash.
 - Any part of an access token. A `kid` is a key name, not part of the secret, and follows the rule below.
 - A client IP address or user agent.
-- The Pwned Passwords request URI. It ends in the first 5 hex characters of the password's SHA-1, so the `BreachedPasswords` client has its HttpClient request logs turned off.
+- The Pwned Passwords request URI. It ends in the first 5 hex characters of the password's SHA-1, so the `BreachedPasswords` client has its HttpClient request logs turned off. Its span ships `url.full` as `https://api.pwnedpasswords.com/range/{prefix}`.
+- The raw request path.
+- Postgres error detail. It quotes row values.
+- The database connection string.
 - An email address in any form, raw, hashed, or masked, including a delivery's recipient.
 - A message token, a link built from one, or any rendered subject or body.
 - The Brevo API key, or the Brevo webhook token.
 - Brevo's error `message`. It's free text and may quote the address.
 - A webhook payload's `email`, `message-id`, `reason`, `subject`, `tags`, `X-Mailin-custom`, `sending_ip`, `user_agent`, or `link`. They're from outside, and a bounce reason often quotes the address. A matched event logs our own `deliveryId` instead of the `message-id`.
 - The Brevo request body. The `BrevoEmail` client has its HttpClient request logs turned off.
+
+## Enforcement
+
+Every environment runs the same pipeline, so Development ships what production ships.
+
+- `SpanScrub` runs on every span as it ends. It drops `user_agent.original`, Npgsql's `db.connection_string`, and the server span's `url.path` and `url.query`. `http.route` names the endpoint instead. It rewrites the Pwned Passwords `url.full` to its template.
+- `SpanScrub` also drops every span's status description. When a span has an `exception` event and no `error.type`, it copies the event's `exception.type` into `error.type`.
+- Our instrumentation never calls `RecordException`. Npgsql 9 still adds an `exception` event to a failed database span, with Postgres's primary message and a stack trace. No setting or processor can remove it. The `Include Error Detail` check below keeps Postgres's DETAIL field out of that message. A primary message can still quote an input value, such as `invalid input syntax for type uuid`. Npgsql sends typed parameters, so that error is rare.
+- `RequestScopeScrub` drops ASP.NET Core's `RequestPath` and `RequestId` scope fields from every log event. `ConnectionId` stays.
+- The app refuses to start when `ConnectionStrings:DefaultConnection` sets `Include Error Detail`.
+- `BannedSymbols.txt` fails the API build on `FromSqlRaw`, `ExecuteSqlRaw`, `ExecuteSqlRawAsync`, `SqlQueryRaw`, and `EnableSensitiveDataLogging`. Spans keep `db.statement`, so SQL must stay parameterized. The test project may use raw SQL.
 
 ## Request values
 
