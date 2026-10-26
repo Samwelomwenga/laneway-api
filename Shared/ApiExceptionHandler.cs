@@ -4,11 +4,11 @@ using Npgsql;
 
 namespace Laneway.Api;
 
-public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : IExceptionHandler
+public sealed partial class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : IExceptionHandler
 {
-    private static readonly Action<ILogger, string, Exception?> UnexpectedError =
-        LoggerMessage.Define<string>(
-            LogLevel.Error, new EventId(1, "UnexpectedError"), "Unexpected error, traceId {traceId}");
+    [LoggerMessage(EventId = 1, EventName = "UnexpectedError", Level = LogLevel.Error,
+        Message = "Unexpected error, traceId {traceId}")]
+    private static partial void UnexpectedError(ILogger logger, string traceId, Exception exception);
 
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
