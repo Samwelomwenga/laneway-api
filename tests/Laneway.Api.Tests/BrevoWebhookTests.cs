@@ -255,8 +255,21 @@ public class BrevoWebhookTests : ApiTests
         Assert.Equal(MessageLog.Category, rejected.Category);
         Assert.Equal(LogLevel.Warning, rejected.Level);
         Assert.Equal(reason == "noNotBefore" ? "malformed" : reason, rejected.GetStructuredStateValue("reason"));
+        Assert.Null(rejected.GetStructuredStateValue(ClientIp.Field));
         Assert.DoesNotContain(Logs(), log => log.Id.Name == "AccessTokenRejected");
         Assert.Equal(0, await FromDatabaseAsync(database => database.Suppressions.CountAsync()));
+    }
+
+    [Fact]
+    public async Task A_rejected_webhook_logs_the_address_that_sent_it()
+    {
+        var send = await SendNoticeAsync();
+
+        using var response = await PostEventAsync(Event("hard_bounce", send.To, send.MessageId), null, "203.0.113.9");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var rejected = Assert.Single(Logs(), log => log.Id.Name == "WebhookRejected");
+        Assert.Equal("203.0.113.9", rejected.GetStructuredStateValue(ClientIp.Field));
     }
 
     [Fact]
@@ -343,12 +356,17 @@ public class BrevoWebhookTests : ApiTests
 
     private Task<HttpResponseMessage> PostEventAsync(object payload) => PostEventAsync(payload, WebhookToken());
 
-    private async Task<HttpResponseMessage> PostEventAsync(object payload, string? bearer)
+    private async Task<HttpResponseMessage> PostEventAsync(object payload, string? bearer, string? clientIp = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, Path)
         {
             Content = payload as HttpContent ?? JsonContent.Create(payload)
         };
+        if (clientIp is not null)
+        {
+            request.Headers.Add(ApiFactory.ClientIpHeader, clientIp);
+        }
+
         if (bearer is not null)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearer);

@@ -30,4 +30,5 @@ public class CopyJob
     public Guid CreatedBy { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
+    public string? Traceparent { get; set; }
 }

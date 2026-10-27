@@ -1,6 +1,6 @@
 # Logging inventory
 
-What Laneway logs about auth and unexpected errors, and what it never logs. This meets ASVS 16.1.1. A change that adds an auth event or counter updates this file in the same diff.
+What Laneway logs about requests, auth, and unexpected errors, and what it never logs. This meets ASVS 16.1.1. A change that adds an event, a field, or a counter updates this file in the same diff.
 
 ## Sink
 
@@ -22,9 +22,48 @@ Serilog copies the category and the event into attributes too. ASP.NET Core adds
 
 Framework categories start with `Microsoft.` or `System.`. This file doesn't list their entries at Warning and above. It doesn't list framework meters either.
 
+## Requests
+
+Each request logs one line when it ends, under the `Laneway.Request` category. `UseSerilogRequestLogging` writes it with its own message template, so Serilog's default, which quotes the raw path, never runs.
+
+| Id | Event | Level | Fields |
+|---|---|---|---|
+| 1 | `RequestCompleted` | Error for a 5xx or an unhandled exception, Warning over 1 second, otherwise Information | `RequestMethod`, `route`, `StatusCode`, `Elapsed`, `clientIp` when the request has an address, and `sub` and `sid` when a valid access token signed it in |
+
+`RequestMethod` is `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `TRACE`, or `CONNECT`, and `other` for anything else. `route` is the endpoint's route template, such as `api/v1/WorkSpaces/{id}`, or `unmatched` when no endpoint matched. A 500 keeps the route of the endpoint that threw. `Elapsed` is in milliseconds. A token that fails, or names an ended session, leaves `sub` and `sid` off.
+
+A 4xx logs at Information. A 404 or 405 gets no event of its own, so this line is its only record.
+
+## The client IP
+
+`clientIp` is the address `ForwardedHeadersMiddleware` resolves, the same one the rate limiter counts. `X-Forwarded-For` counts only when the caller is in `ForwardedHeaders:KnownProxies` or `ForwardedHeaders:KnownNetworks`. With neither set, the socket address stands. The field holds the full address. The rate limiter cuts an IPv6 address to its /64 for its own buckets, and the log doesn't. An IPv4 address mapped into IPv6 logs as plain IPv4. A request with no remote address leaves the field off.
+
+The purpose is network and information security, which GDPR recital 49 names as a legitimate interest. It lets a reviewer trace an attack back to its source. An erasure request doesn't reach logs, and retention removes the address.
+
+It appears on these entries only:
+
+- `RequestCompleted`.
+- Every `Laneway.Auth` event logged inside a request, `RateLimited` and `CsrfRejected` included.
+- `AccessDenied`. The `Denial` record carries it, since `DenialDrainer` logs on another thread.
+- `WebhookRejected`.
+
+Delivery events, sweeps, `UnexpectedError`, and the other webhook events never carry it. No counter tags by it.
+
+## Correlation
+
+Every entry logged inside a request carries the request's W3C trace id, and so do its spans. `UseTraceIdentifier` runs first in the pipeline and sets `HttpContext.TraceIdentifier` to that trace id. The 500 body, `UnexpectedError`, and a ProblemDetails body all quote it as `traceId`. ProblemDetails would otherwise quote the whole `traceparent`.
+
+Each request starts a fresh root trace. The API ignores an inbound `traceparent`, `tracestate`, and `baggage`, so a client can't pick its trace id or join someone else's trace. It sends none of them on any outbound HttpClient either, so Brevo and Pwned Passwords learn nothing about our traces. Their client spans still ship. `TraceBoundary` does both by setting the runtime's propagator and OpenTelemetry's to ones that read and write nothing.
+
+`AccessDenied` logs after the response, on `DenialDrainer`'s thread. The `Denial` record carries the request's trace context, and the drainer restores it for the log call only. The entry has the request's trace id and a span id that names no shipped span. The drainer's existence check runs before that, outside the request trace.
+
+Deliveries and copy jobs store their origin's `traceparent`, which is the span that added the row. `DeliveryWorker` starts a `DeliveryAttempt` span under the `Laneway.Message` source for each send attempt, and `CopyJobWorker` starts a `CopyJobAttempt` span under `Laneway.CopyJob`. Each attempt is its own root trace with a link to that origin, so a retry hours later doesn't stretch the request's trace. A row added outside a request has no `traceparent`, and its span has no link. Brevo webhooks are requests with their own traces and no link to a delivery.
+
+Timed workers make a span only when a poll finds work. `DeliverySweep` and `CopyJobSweep` start a root span under their worker's source. `AuthSweeper`, `SessionSweeper`, `InviteSweeper`, and `PendingObjectDrainer` start one under `Laneway.Worker`. The sampler drops any database or HTTP client span with no parent, so an empty poll ships nothing. Its log entries, such as a failed poll, carry no trace id, and the category names the worker.
+
 ## Events
 
-Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Every entry also carries the route and the time.
+Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Every entry also carries the route and the time, and `clientIp` inside a request with an address.
 
 | Id | Event | Level | Fields |
 |---|---|---|---|
@@ -86,7 +125,7 @@ Denials log under the `Laneway.Authorization` category, which meets ASVS 16.3.2.
 
 | Id | Event | Level | Fields |
 |---|---|---|---|
-| 1 | `AccessDenied` | Warning | `sub`, `targetType`, `targetId`, `status`, `code` |
+| 1 | `AccessDenied` | Warning | `sub`, `targetType`, `targetId`, `status`, `code`, and `clientIp` when the request had an address |
 | 2 | `DenialCheckFailed` | Warning | the exception from the existence check |
 
 `targetType` names the denied object: `Workspace`, `Board`, `List`, `Card`, `Label`, `Checklist`, `CheckItem`, `Attachment`, `Comment`, or `CopyJob`. `status` is 404 when the caller couldn't read a route object, and `code` is then `notFound`. `status` is 400 with `code` `notFound` when the id came from a body or filter field the caller couldn't read, such as a move's `boardId`, an anchor, or an activity `cardId` filter. `status` is 403 when they could read the object but their role forbids the action, and `code` is the 403 code, such as `readOnlyRole`, `requiresWorkspaceAdmin`, or `notAuthor`. A copy job is readable only by the user who started it.
@@ -110,7 +149,7 @@ Deliveries log under the `Laneway.Message` category. Features never learn how a 
 | 3 | `DeliveryFailed` | Warning, or Error when `status` is 401, 402, or 403 | `reason`, `status` when Brevo answered, and `code` when Brevo sent a known one |
 | 4 | `DeliveryExpired` | Warning | `sendBy` |
 | 5 | `DeliveryDropped` | Information | `reason`, and `suppressedBy` when `reason` is `suppressed` |
-| 6 | `WebhookRejected` | Warning | `reason` |
+| 6 | `WebhookRejected` | Warning | `reason`, and `clientIp` when the request has an address |
 | 7 | `AddressSuppressed` | Information | `event`, `deliveryId`, `messageType`, `alreadySuppressed` |
 | 8 | `WebhookEventUnmatched` | Warning | `event`, `reason` |
 | 9 | `WebhookEventIgnored` | Information | `event` |
@@ -171,7 +210,7 @@ A failed sweep, drain, or poll keeps the batches it already finished, and the ne
 |---|---|---|---|
 | 1 | `UnexpectedError` | Error | `traceId`, and the exception |
 
-`traceId` is the request's `TraceIdentifier`. The 500 body returns the same `traceId` with a generic message, so a client can quote it and nothing else leaks. This meets ASVS 16.3.4 and 16.5.1.
+`traceId` is the request's W3C trace id. The 500 body returns the same `traceId` with a generic message, so a client can quote it and nothing else leaks. The operator pastes it into the trace search and finds the request's spans and every log it wrote. This meets ASVS 16.3.4 and 16.5.1.
 
 `ApiExceptionHandler` doesn't log the foreign-key 400 or the unique-violation 409. They're expected outcomes.
 
@@ -199,7 +238,7 @@ A `System.Diagnostics.Metrics` meter named `Laneway.Auth`. Counter tags hold onl
 - The email typed into sign-in, raw or hashed. People type passwords into the email field.
 - A refresh token, or its hash.
 - Any part of an access token. A `kid` is a key name, not part of the secret, and follows the rule below.
-- A client IP address or user agent.
+- A user agent.
 - The Pwned Passwords request URI. It ends in the first 5 hex characters of the password's SHA-1, so the `BreachedPasswords` client has its HttpClient request logs turned off. Its span ships `url.full` as `https://api.pwnedpasswords.com/range/{prefix}`.
 - The raw request path. `http.route` names the endpoint instead.
 - The query string.
@@ -229,4 +268,4 @@ Our instrumentation never calls `RecordException`. Npgsql 9 still adds an `excep
 
 ## Request values
 
-No field carries a value from the request unless the value is checked against a known set first. `kid` on `AccessTokenRejected` is logged only when it matches a key in `Auth:SigningKeys`. `code` on `DeliveryFailed` is logged only when it matches one of Brevo's documented error codes. `event` on the webhook events is logged only after it matches Brevo's event list, and as `other` otherwise. A webhook's `message-id` is never logged. A matched event logs our own `deliveryId` instead. Every other field comes from the server: ids from the database, and reasons from fixed lists.
+No field carries a value from the request unless the value is checked against a known set first. The one exception is `clientIp`, an address Kestrel parsed from the connection or `ForwardedHeadersMiddleware` parsed from a trusted proxy's header. `kid` on `AccessTokenRejected` is logged only when it matches a key in `Auth:SigningKeys`. `code` on `DeliveryFailed` is logged only when it matches one of Brevo's documented error codes. `event` on the webhook events is logged only after it matches Brevo's event list, and as `other` otherwise. A webhook's `message-id` is never logged. A matched event logs our own `deliveryId` instead. Every other field comes from the server: ids from the database, and reasons from fixed lists.

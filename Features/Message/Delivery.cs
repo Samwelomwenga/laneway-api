@@ -27,4 +27,5 @@ public class Delivery
     public DateTime NextAttemptAt { get; set; }
     public DateTime SendBy { get; set; }
     public string? ProviderMessageId { get; set; }
+    public string? Traceparent { get; set; }
 }

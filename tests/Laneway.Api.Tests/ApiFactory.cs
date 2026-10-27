@@ -92,7 +92,7 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
             services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddInMemoryExporter(ShippedSpans));
             services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddInMemoryExporter(ShippedMetrics));
             services.AddHttpClient<BreachedPasswords>()
-                .ConfigurePrimaryHttpMessageHandler(() => PwnedPasswords)
+                .ConfigurePrimaryHttpMessageHandler(PwnedPasswords.OverLoopback)
                 .SetHandlerLifetime(Timeout.InfiniteTimeSpan);
             services.AddHttpClient<IEmailProvider, BrevoEmail>()
                 .ConfigurePrimaryHttpMessageHandler(() => Brevo)

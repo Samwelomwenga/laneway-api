@@ -13,9 +13,16 @@ public sealed class CopyJobSweep
         _context = context;
     }
 
-    public Task<int> RunAsync(CancellationToken token)
+    public async Task<int> RunAsync(CancellationToken token)
     {
         var cutoff = DateTime.UtcNow - JobLife;
-        return _context.CopyJobs.Where(job => job.FinishedAt < cutoff).ExecuteDeleteAsync(token);
+        var old = _context.CopyJobs.Where(job => job.FinishedAt < cutoff);
+        if (!await old.AnyAsync(token))
+        {
+            return 0;
+        }
+
+        using var span = WorkerSpans.CopyJob.StartRoot(nameof(CopyJobSweep));
+        return await old.ExecuteDeleteAsync(token);
     }
 }

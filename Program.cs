@@ -159,7 +159,9 @@ await Log.CloseAndFlushAsync();
 app.Services.GetRequiredService<AuthMeter>();
 app.Services.GetRequiredService<Passwords>();
 
+app.UseTraceIdentifier();
 app.UseTrustedForwardedHeaders();
+app.UseRequestLine();
 app.UseSecurityHeaders(app.Environment);
 app.UseExceptionHandler();
 

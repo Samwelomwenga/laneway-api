@@ -45,11 +45,17 @@ public sealed partial class InviteSweeper : BackgroundService
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var now = _time.GetUtcNow().UtcDateTime;
+        var expired = context.Invites.Where(invite => invite.ExpiresAt <= now);
+        if (!await expired.AnyAsync(token))
+        {
+            return 0;
+        }
+
+        using var span = WorkerSpans.Worker.StartRoot(nameof(InviteSweeper));
         var total = 0;
         while (true)
         {
-            var deleted = await context.Invites
-                .Where(invite => invite.ExpiresAt <= now)
+            var deleted = await expired
                 .OrderBy(invite => invite.Id)
                 .Take(BatchSize)
                 .ExecuteDeleteAsync(token);

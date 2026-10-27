@@ -39,6 +39,19 @@ public class UnexpectedErrorTests : ApiTests
     }
 
     [Fact]
+    public async Task The_500_body_quotes_the_w3c_trace_id_of_its_request()
+    {
+        var (client, _) = WithFaults();
+
+        using var response = await client.GetAsync(new Uri("/api/v1/faults/unexpected", UriKind.Relative));
+
+        var body = await response.ReadEnvelope<object>();
+        var shipped = Assert.Single(ShippedLogs, log => log.EventId.Name == "UnexpectedError");
+        Assert.Equal(shipped.TraceId.ToHexString(), body.TraceId);
+        Assert.Matches("^[0-9a-f]{32}$", body.TraceId);
+    }
+
+    [Fact]
     public async Task The_exception_handler_middleware_stays_muted()
     {
         var (client, collector) = WithFaults();
@@ -69,7 +82,7 @@ public class UnexpectedErrorTests : ApiTests
         HostWith(services => services.AddControllers().AddApplicationPart(typeof(FaultController).Assembly));
 
     private static IEnumerable<FakeLogRecord> ErrorLogs(FakeLogCollector collector) =>
-        collector.GetSnapshot().Where(log => log.Level >= LogLevel.Error);
+        collector.GetSnapshot().Where(log => log.Level >= LogLevel.Error && log.Category != RequestLine.Category);
 }
 
 [ApiController]
@@ -78,6 +91,9 @@ public class UnexpectedErrorTests : ApiTests
 public sealed class FaultController : ControllerBase
 {
     public const string Detail = "connection to db-7 refused";
+
+    [HttpGet("problem")]
+    public IActionResult Problem() => NotFound();
 
     [HttpGet("{fault}")]
     public IActionResult Throw(string fault) => throw (fault switch

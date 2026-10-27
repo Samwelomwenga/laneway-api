@@ -16,16 +16,21 @@ public static class TelemetryPipeline
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.Logging.ClearProviders();
+        builder.Services.AddTraceBoundary();
+        builder.Services.AddHttpContextAccessor();
         builder.Services.AddSerilog(
             (services, logger) => logger
                 .ReadFrom.Configuration(services.GetRequiredService<IConfiguration>())
-                .Enrich.With<RequestScopeScrub>(),
+                .Enrich.With<RequestScopeScrub>()
+                .Enrich.With(new AuthClientIp(services.GetRequiredService<IHttpContextAccessor>())),
             preserveStaticLogger: true,
             writeToProviders: true);
 
         var telemetry = builder.Services.AddOpenTelemetry()
             .WithLogging(configureBuilder: null, configureOptions: options => options.IncludeScopes = true)
             .WithTracing(tracing => tracing
+                .SetSampler(ParentlessClientDrop.Sampler)
+                .AddSource(WorkerSpans.Sources)
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddNpgsql()

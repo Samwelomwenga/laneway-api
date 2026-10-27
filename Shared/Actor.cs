@@ -13,6 +13,8 @@ public sealed class Actor
 
     public bool IsResolved => _id is not null;
 
+    public bool HasSession => _sessionId is not null;
+
     public void Resolve(Guid id, Guid? sessionId = null)
     {
         _id = id;

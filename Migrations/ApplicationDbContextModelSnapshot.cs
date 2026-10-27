@@ -548,6 +548,9 @@ namespace Laneway.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Traceparent")
+                        .HasColumnType("varchar(55)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedBy");
@@ -601,6 +604,9 @@ namespace Laneway.Api.Migrations
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("Traceparent")
+                        .HasColumnType("varchar(55)");
 
                     b.Property<string>("Type")
                         .IsRequired()

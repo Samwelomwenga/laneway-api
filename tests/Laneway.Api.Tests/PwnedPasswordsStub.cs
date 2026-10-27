@@ -7,17 +7,27 @@ namespace Laneway.Api.Tests;
 
 internal sealed class PwnedPasswordsStub : DelegatingHandler
 {
-    public PwnedPasswordsStub() => InnerHandler = LoopbackTls.Handler(Answer);
-
     private readonly ConcurrentDictionary<string, byte> _breached = new(StringComparer.Ordinal);
 
     private readonly ConcurrentQueue<PwnedRequest> _requests = new();
+
+    private readonly ConcurrentQueue<IReadOnlyList<string>> _wireHeaderNames = new();
 
     public Exception? Failure { get; set; }
 
     public Func<Task>? BeforeAnswer { get; set; }
 
     public IReadOnlyList<PwnedRequest> Requests => [.. _requests];
+
+    public IReadOnlyList<IReadOnlyList<string>> WireHeaderNames => [.. _wireHeaderNames];
+
+    // IHttpClientFactory builds its SocketsHttpHandler with the pipeline, after the host set the process-wide
+    // propagator, so the loopback handler waits for the pipeline too.
+    public PwnedPasswordsStub OverLoopback()
+    {
+        InnerHandler ??= LoopbackTls.Handler(Answer);
+        return this;
+    }
 
     public void Breach(string password) => _breached[Sha1(password)] = 0;
 
@@ -48,8 +58,9 @@ internal sealed class PwnedPasswordsStub : DelegatingHandler
         return await base.SendAsync(request, cancellationToken);
     }
 
-    private string Answer(string path)
+    private string Answer(string path, IReadOnlyList<string> headerNames)
     {
+        _wireHeaderNames.Enqueue(headerNames);
         var prefix = path[(path.LastIndexOf('/') + 1)..];
         var lines = _breached.Keys
             .Where(hash => hash.StartsWith(prefix, StringComparison.Ordinal))

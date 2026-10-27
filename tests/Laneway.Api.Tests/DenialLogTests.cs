@@ -29,6 +29,35 @@ public class DenialLogTests : ApiTests
         Assert.Equal("404", denied.GetStructuredStateValue("status"));
         Assert.Equal(ErrorCodes.NotFound, denied.GetStructuredStateValue("code"));
         Assert.Equal(DenialDrainer.Category, denied.Category);
+        Assert.Null(denied.GetStructuredStateValue(ClientIp.Field));
+    }
+
+    [Fact]
+    public async Task A_denial_carries_the_address_that_sent_the_request()
+    {
+        var stranger = await CreateUserAsync();
+        var workspace = await CreateWorkspaceAsync("Finance", visibility: WorkspaceVisibility.Private);
+
+        using var response = await SendFromAsync("2001:db8::7", HttpMethod.Get, $"/api/v1/workspaces/{workspace.Id}", stranger);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var denied = await DeniedAsync(workspace.Id);
+        Assert.Equal("2001:db8::7", denied.GetStructuredStateValue(ClientIp.Field));
+    }
+
+    [Fact]
+    public async Task A_denial_logs_in_its_request_trace_without_a_span_of_its_own()
+    {
+        var stranger = await CreateUserAsync();
+        var workspace = await CreateWorkspaceAsync("Finance", visibility: WorkspaceVisibility.Private);
+
+        using var response = await GetAsync($"/api/v1/workspaces/{workspace.Id}", stranger);
+
+        await DeniedAsync(workspace.Id);
+        var server = ServerSpan("api/v1/workspaces/{id}");
+        var shipped = Assert.Single(ShippedLogs, log => log.EventId.Name == "AccessDenied");
+        Assert.Equal(server.TraceId, shipped.TraceId);
+        Assert.DoesNotContain(ShippedSpans, span => span.SpanId == shipped.SpanId);
     }
 
     [Fact]

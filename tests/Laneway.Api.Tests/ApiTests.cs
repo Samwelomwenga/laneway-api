@@ -51,6 +51,10 @@ public abstract class ApiTests : IAsyncLifetime
 
     internal Shipped<Activity> ShippedSpans => Factory.ShippedSpans;
 
+    internal Activity ServerSpan(string route) => Assert.Single(ShippedSpans, span =>
+        span.Kind == ActivityKind.Server
+        && string.Equals(span.GetTagItem("http.route") as string, route, StringComparison.OrdinalIgnoreCase));
+
     internal IReadOnlyList<MetricSnapshot> ShippedMetrics()
     {
         Services.GetRequiredService<MeterProvider>().ForceFlush();
@@ -1126,10 +1130,18 @@ public abstract class ApiTests : IAsyncLifetime
         return query.Length == 0 ? "/api/v1/activity" : $"/api/v1/activity?{query}";
     }
 
+    protected Task<HttpResponseMessage> SendFromAsync(
+        string clientIp, HttpMethod method, string path, TestUser? user = null, object? body = null) =>
+        SendAsync(method, path, body, user, clientIp: clientIp);
+
     private async Task<HttpResponseMessage> SendAsync(
-        HttpMethod method, string path, object? body, TestUser? user, string? userAgent = null)
+        HttpMethod method, string path, object? body, TestUser? user, string? userAgent = null, string? clientIp = null)
     {
         using var request = new HttpRequestMessage(method, path);
+        if (clientIp is not null)
+        {
+            request.Headers.Add(ApiFactory.ClientIpHeader, clientIp);
+        }
         if (body is not null)
         {
             request.Content = body as HttpContent ?? JsonContent.Create(body);

@@ -221,7 +221,7 @@ internal sealed partial class LoggingInventory
     [GeneratedRegex("under the `([^`]+)` category")]
     private static partial Regex CategoryLine();
 
-    [GeneratedRegex("scope that carries ([^.]+)\\.")]
+    [GeneratedRegex("(?:scope that|also) carries ([^.]+)\\.")]
     private static partial Regex ScopeLine();
 
     [GeneratedRegex("`([^`]+)`")]

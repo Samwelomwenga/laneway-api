@@ -47,23 +47,29 @@ public sealed partial class AuthSweeper : BackgroundService
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var now = _time.GetUtcNow().UtcDateTime;
-        await InBatchesAsync(() => context.AuthTokens
-            .Where(t => t.ExpiresAt <= now)
+        var expiredTokens = context.AuthTokens.Where(t => t.ExpiresAt <= now);
+        var replacedBefore = now - PasswordHistoryEntry.KeptFor;
+        var oldHistory = context.PasswordHistory.Where(h => h.ReplacedAt <= replacedBefore);
+        var signedUpBefore = now - UnverifiedLife;
+        var unverified = context.Users.Where(u => !u.Verified && (u.UpdatedAt ?? u.CreatedAt) <= signedUpBefore);
+        if (!await expiredTokens.AnyAsync(token) && !await oldHistory.AnyAsync(token) && !await unverified.AnyAsync(token))
+        {
+            return;
+        }
+
+        using var span = WorkerSpans.Worker.StartRoot(nameof(AuthSweeper));
+        await InBatchesAsync(() => expiredTokens
             .OrderBy(t => t.Id)
             .Take(BatchSize)
             .ExecuteDeleteAsync(token));
 
-        var replacedBefore = now - PasswordHistoryEntry.KeptFor;
-        await InBatchesAsync(() => context.PasswordHistory
-            .Where(h => h.ReplacedAt <= replacedBefore)
+        await InBatchesAsync(() => oldHistory
             .OrderBy(h => h.Id)
             .Take(BatchSize)
             .ExecuteDeleteAsync(token));
 
         // Postgres rechecks only the outer filter on a row a sign-up or verification changed while this waited.
-        var signedUpBefore = now - UnverifiedLife;
-        await InBatchesAsync(() => context.Users
-            .Where(u => !u.Verified && (u.UpdatedAt ?? u.CreatedAt) <= signedUpBefore)
+        await InBatchesAsync(() => unverified
             .Where(u => context.Users
                 .Where(batch => !batch.Verified && (batch.UpdatedAt ?? batch.CreatedAt) <= signedUpBefore)
                 .OrderBy(batch => batch.Id)

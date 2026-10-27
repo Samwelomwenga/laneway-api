@@ -59,7 +59,8 @@ public sealed class BoardCopyService : IBoardCopyService
             Request = CopyRequests.Of(write),
             Status = CopyJobStatus.Queued,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = _actor.Id
+            CreatedBy = _actor.Id,
+            Traceparent = WorkerSpans.Origin()
         };
 
         _context.CopyJobs.Add(job);
