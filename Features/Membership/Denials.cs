@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Threading.Channels;
@@ -30,7 +31,13 @@ public static class AccessTargets
 }
 
 public sealed record Denial(
-    Guid ActorId, AccessTarget Target, Guid TargetId, string? Code, bool FromField = false, string? ClientIp = null)
+    Guid ActorId,
+    AccessTarget Target,
+    Guid TargetId,
+    string? Code,
+    bool FromField = false,
+    string? ClientIp = null,
+    ActivityContext Trace = default)
 {
     public bool IsHidingNotFound => Code is null;
 
@@ -140,6 +147,7 @@ public sealed partial class DenialDrainer : BackgroundService
         }
 
         var code = denial.Code ?? ErrorCodes.NotFound;
+        using var trace = Rejoin(denial.Trace);
         if (denial.ClientIp is { } clientIp)
         {
             AccessDenied(_logger, denial.ActorId, denial.Target, denial.TargetId, denial.Status, code, clientIp);
@@ -148,6 +156,21 @@ public sealed partial class DenialDrainer : BackgroundService
         {
             AccessDenied(_logger, denial.ActorId, denial.Target, denial.TargetId, denial.Status, code);
         }
+    }
+
+    // No ActivitySource the tracer listens to starts this Activity, so the log joins the request's trace and no
+    // span ships.
+    private static Activity? Rejoin(ActivityContext trace)
+    {
+        if (trace == default)
+        {
+            return null;
+        }
+
+        var activity = new Activity(nameof(AccessDenied));
+        activity.SetParentId(trace.TraceId, trace.SpanId, trace.TraceFlags);
+        activity.Start();
+        return activity;
     }
 
     private async Task<bool> ExistsAsync(Denial denial, CancellationToken token)

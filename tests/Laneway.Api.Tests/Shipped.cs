@@ -24,7 +24,10 @@ internal sealed class Shipped<T> : ICollection<T>
     {
         lock (_items)
         {
-            _items.Add(item);
+            if (!_items.Contains(item))
+            {
+                _items.Add(item);
+            }
         }
     }
 

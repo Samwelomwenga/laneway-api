@@ -51,6 +51,10 @@ public abstract class ApiTests : IAsyncLifetime
 
     internal Shipped<Activity> ShippedSpans => Factory.ShippedSpans;
 
+    internal Activity ServerSpan(string route) => Assert.Single(ShippedSpans, span =>
+        span.Kind == ActivityKind.Server
+        && string.Equals(span.GetTagItem("http.route") as string, route, StringComparison.OrdinalIgnoreCase));
+
     internal IReadOnlyList<MetricSnapshot> ShippedMetrics()
     {
         Services.GetRequiredService<MeterProvider>().ForceFlush();

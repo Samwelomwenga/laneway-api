@@ -16,6 +16,7 @@ public static class TelemetryPipeline
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.Logging.ClearProviders();
+        builder.Services.AddTraceBoundary();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddSerilog(
             (services, logger) => logger

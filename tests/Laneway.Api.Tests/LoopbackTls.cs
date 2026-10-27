@@ -12,7 +12,7 @@ internal static class LoopbackTls
 {
     private static readonly Lazy<X509Certificate2> Certificate = new(CreateCertificate);
 
-    public static SocketsHttpHandler Handler(Func<string, string> answer) => new()
+    public static SocketsHttpHandler Handler(Func<string, IReadOnlyList<string>, string> answer) => new()
     {
         ConnectCallback = async (context, cancellationToken) =>
         {
@@ -38,18 +38,20 @@ internal static class LoopbackTls
         }
     };
 
-    private static async Task ServeAsync(Socket server, Func<string, string> answer)
+    private static async Task ServeAsync(Socket server, Func<string, IReadOnlyList<string>, string> answer)
     {
         await using var stream = new SslStream(new NetworkStream(server, ownsSocket: true));
         await stream.AuthenticateAsServerAsync(Certificate.Value);
 
         using var reader = new StreamReader(stream, Encoding.ASCII, leaveOpen: true);
         var requestLine = await reader.ReadLineAsync() ?? string.Empty;
-        while (!string.IsNullOrEmpty(await reader.ReadLineAsync()))
+        var headerNames = new List<string>();
+        while (await reader.ReadLineAsync() is { Length: > 0 } header)
         {
+            headerNames.Add(header[..header.IndexOf(':', StringComparison.Ordinal)]);
         }
 
-        var body = Encoding.UTF8.GetBytes(answer(requestLine.Split(' ')[1]));
+        var body = Encoding.UTF8.GetBytes(answer(requestLine.Split(' ')[1], headerNames));
         var head = Encoding.ASCII.GetBytes(
             $"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n");
         await stream.WriteAsync(head);

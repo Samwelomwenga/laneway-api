@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 
@@ -308,7 +309,11 @@ public sealed class Readable
     }
 
     private void Deny(Denial denial) =>
-        _denials.Add(denial with { ClientIp = ClientIp.Of(_requests.HttpContext) });
+        _denials.Add(denial with
+        {
+            ClientIp = ClientIp.Of(_requests.HttpContext),
+            Trace = Activity.Current?.Context ?? default
+        });
 
     private sealed class OnBoard<T>
     {

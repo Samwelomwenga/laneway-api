@@ -49,6 +49,14 @@ It appears on these entries only:
 
 Delivery events, sweeps, `UnexpectedError`, and the other webhook events never carry it. No counter tags by it.
 
+## Correlation
+
+Every entry logged inside a request carries the request's W3C trace id, and so do its spans. `UseTraceIdentifier` runs first in the pipeline and sets `HttpContext.TraceIdentifier` to that trace id. The 500 body, `UnexpectedError`, and a ProblemDetails body all quote it as `traceId`. ProblemDetails would otherwise quote the whole `traceparent`.
+
+Each request starts a fresh root trace. The API ignores an inbound `traceparent`, `tracestate`, and `baggage`, so a client can't pick its trace id or join someone else's trace. It sends none of them on any outbound HttpClient either, so Brevo and Pwned Passwords learn nothing about our traces. Their client spans still ship. `TraceBoundary` does both by setting the runtime's propagator and OpenTelemetry's to ones that read and write nothing.
+
+`AccessDenied` logs after the response, on `DenialDrainer`'s thread. The `Denial` record carries the request's trace context, and the drainer restores it for the log call only. The entry has the request's trace id and a span id that names no shipped span. The drainer's existence check runs before that, outside the request trace.
+
 ## Events
 
 Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Every entry also carries the route and the time, and `clientIp` inside a request with an address.
@@ -198,7 +206,7 @@ A failed sweep, drain, or poll keeps the batches it already finished, and the ne
 |---|---|---|---|
 | 1 | `UnexpectedError` | Error | `traceId`, and the exception |
 
-`traceId` is the request's `TraceIdentifier`. The 500 body returns the same `traceId` with a generic message, so a client can quote it and nothing else leaks. This meets ASVS 16.3.4 and 16.5.1.
+`traceId` is the request's W3C trace id. The 500 body returns the same `traceId` with a generic message, so a client can quote it and nothing else leaks. The operator pastes it into the trace search and finds the request's spans and every log it wrote. This meets ASVS 16.3.4 and 16.5.1.
 
 `ApiExceptionHandler` doesn't log the foreign-key 400 or the unique-violation 409. They're expected outcomes.
 

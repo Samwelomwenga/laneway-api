@@ -46,6 +46,21 @@ public class DenialLogTests : ApiTests
     }
 
     [Fact]
+    public async Task A_denial_logs_in_its_request_trace_without_a_span_of_its_own()
+    {
+        var stranger = await CreateUserAsync();
+        var workspace = await CreateWorkspaceAsync("Finance", visibility: WorkspaceVisibility.Private);
+
+        using var response = await GetAsync($"/api/v1/workspaces/{workspace.Id}", stranger);
+
+        await DeniedAsync(workspace.Id);
+        var server = ServerSpan("api/v1/workspaces/{id}");
+        var shipped = Assert.Single(ShippedLogs, log => log.EventId.Name == "AccessDenied");
+        Assert.Equal(server.TraceId, shipped.TraceId);
+        Assert.DoesNotContain(ShippedSpans, span => span.SpanId == shipped.SpanId);
+    }
+
+    [Fact]
     public async Task A_missing_id_isnt_logged()
     {
         var stranger = await CreateUserAsync();
