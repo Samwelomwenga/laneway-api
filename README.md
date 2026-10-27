@@ -27,6 +27,8 @@ OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=local
 
 Service name, environment, and host come only from `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. Log levels live under `Serilog:MinimumLevel` in `appsettings.json`. Serilog ignores `Logging:LogLevel`. [ADR 0011](docs/adr/0011-serilog-in-front-of-the-otel-sdk.md) explains the pipeline.
 
+Production ships to Grafana Cloud. [docs/runbooks/grafana.md](docs/runbooks/grafana.md) covers the stack, the tokens, the readers, and purging a leaked item.
+
 ## Email
 
 The app won't start without `BREVO__APIKEY`, `BREVO__SENDEREMAIL`, and `BREVO__WEBHOOKSIGNINGKEY` in Doppler. Local runs send real mail through the shared dev Brevo account. Tests swap Brevo for a stub and never reach it.

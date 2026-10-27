@@ -4,7 +4,18 @@ What Laneway logs about requests, auth, and unexpected errors, and what it never
 
 ## Sink
 
-The API ships logs over OTLP, with traces and metrics, through one exporter. Only startup failures and Serilog's own errors go to stderr. OTLP carries each field as its own attribute, so a value can't forge a second entry. Retention is 30 days, the longest a session lives, and the deploy enforces it.
+The API ships logs over OTLP, with traces and metrics, through one exporter. Only startup failures and Serilog's own errors go to stderr. OTLP carries each field as its own attribute, so a value can't forge a second entry. Retention is at most 30 days, the longest a session lives. Grafana's free tier keeps 14 until Laneway moves to Pro.
+
+## Backend
+
+Production ships to one Grafana Cloud stack on the free tier, in an EU region, per [ADR 0012](../adr/0012-grafana-cloud-for-telemetry-without-sentry.md). Local runs ship to the Aspire Dashboard. [The Grafana runbook](../runbooks/grafana.md) has the setup steps.
+
+- The app's token holds `logs:write`, `traces:write`, and `metrics:write` only. It can't read or delete. The OTLP endpoint and the token live in Doppler, project `laneway-api`, config `prd`, never in appsettings.
+- No standing token holds `logs:delete`. The operator makes one only to purge a never-logged item that leaked, then revokes it.
+- Readers are named people, each with MFA. There is no shared login. The free tier allows 3 users.
+- Pro, at $19 a month, keeps 30 days. Laneway moves to Pro on the first paying customer, or on the first incident that needed older logs.
+- A 500 always shows as an `UnexpectedError` line. Application Observability's Exceptions tab lists only spans with an `exception` event, which only Npgsql adds. Sentry isn't used.
+- The free tier doesn't record who read what, and tamper evidence is access control, not cryptographic. [ADR 0004](../adr/0004-auth-targets-asvs-l2-with-exceptions.md#1642-logs-protected-from-access-and-edits-l2) lists both as exceptions.
 
 ## Fields on every entry
 
