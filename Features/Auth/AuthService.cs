@@ -382,11 +382,12 @@ public sealed class AuthService(
             .SetProperty(e => e.SignInBlockedUntil, (DateTime?)null)
             .SetProperty(e => e.UpdatedAt, now)
             .SetProperty(e => e.UpdatedBy, id));
-        await invites.ConvertAsync(id);
+        var converted = await invites.ConvertAsync(id);
         var session = database.Sessions.Add(Session.Start(id, userAgent, now)).Entity;
         var (cookie, _) = AddRefreshToken(session, now);
         await database.SaveChangesAsync();
         await transaction.CommitAsync();
+        invites.LogConverted(converted);
 
         _log.SignInSucceeded(id, session.Id);
         meter.SignInAttempted(SignInResult.Succeeded);
@@ -657,12 +658,13 @@ public sealed class AuthService(
             return EmailTaken(field: null);
         }
         await DeleteTokensAsync(userId, AuthTokenKind.Reset);
-        await invites.ConvertAsync(userId);
+        var converted = await invites.ConvertAsync(userId);
         var (undo, value) = AuthToken.Issue(userId, AuthTokenKind.Undo, AuthToken.UndoLifetime, now, user.Email);
         database.AuthTokens.Add(undo);
         messages.Add(new EmailChanged(user.Email, newEmail, now, userAgent, user.TimeZone) { Token = value });
         await database.SaveChangesAsync();
         await transaction.CommitAsync();
+        invites.LogConverted(converted);
 
         _log.EmailChanged(userId);
         return NoContent("Email changed", RefreshCookieChange.None);

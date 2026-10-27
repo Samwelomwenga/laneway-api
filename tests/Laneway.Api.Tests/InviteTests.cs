@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Testing;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -164,6 +165,63 @@ public class InviteTests : ApiTests
         ActivityAssert.Actor(entry, ActorUser);
         Assert.Equal(joined, entry.Data.Id("member.id"));
         Assert.False(await FromDatabaseAsync(database => database.Invites.AnyAsync()));
+    }
+
+    [Fact]
+    public async Task A_converted_invite_logs_member_added_by_the_inviter_in_the_invitees_request()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var board = await CreateBoardAsync(workspace.Id, "Roadmap");
+        var inviter = await AddWorkspaceMemberAsync(workspace.Id, WorkspaceRole.Admin);
+        var email = NewEmail();
+        using (var invited = await PostAsync(WorkspaceMembersPath(workspace.Id), new { email, role = "Admin" }, inviter))
+        {
+            Assert.Equal(HttpStatusCode.Created, invited.StatusCode);
+        }
+
+        var workspaceInvite = await FromDatabaseAsync(database => database.Invites.Select(i => i.Id).SingleAsync());
+        var boardInvite = await InviteIdAsync(BoardMembersPath(board.Id), email, role: "Observer");
+        const string ip = "2001:db8::51";
+
+        var joined = await SignUpAndVerifyAsync(email, ip);
+
+        var verify = ServerSpan("api/v1/auth/verify-email");
+        var added = AccessLogs("MemberAdded").Where(log => log.GetStructuredStateValue("memberSub") == joined.ToString());
+        Assert.Equal(
+            [
+                (inviter.Id.ToString(), "Workspace", workspace.Id.ToString(), "Admin", workspaceInvite.ToString(), ip),
+                (ActorId.ToString(), "Board", board.Id.ToString(), "Observer", boardInvite.ToString(), ip)
+            ],
+            added.Select(log => (
+                log.GetStructuredStateValue("sub"),
+                log.GetStructuredStateValue("targetType"),
+                log.GetStructuredStateValue("targetId"),
+                log.GetStructuredStateValue("role"),
+                log.GetStructuredStateValue("inviteId"),
+                log.GetStructuredStateValue(ClientIp.Field))).OrderByDescending(row => row.Item2, StringComparer.Ordinal));
+        var shipped = ShippedLogs.Where(log => log.EventId.Name == "MemberAdded"
+            && log.Attributes!.Any(pair => pair.Key == "memberSub" && Equals(pair.Value, joined))).ToList();
+        Assert.Equal(2, shipped.Count);
+        Assert.All(shipped, log => Assert.Equal(verify.TraceId, log.TraceId));
+        Assert.Empty(AccessLogs("InviteRevoked"));
+    }
+
+    [Fact]
+    public async Task A_confirmed_email_change_logs_the_invite_it_converts()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var user = await CreateUserAsync();
+        var email = NewEmail();
+        var invite = await InviteIdAsync(WorkspaceMembersPath(workspace.Id), email);
+
+        await ChangeEmailAsync(user, email);
+
+        var log = Assert.Single(AccessLogs("MemberAdded"), log => log.GetStructuredStateValue("memberSub") == user.Id.ToString());
+        Assert.Equal(
+            (ActorId.ToString(), workspace.Id.ToString(), "Normal", invite.ToString()),
+            (log.GetStructuredStateValue("sub"), log.GetStructuredStateValue("targetId"),
+                log.GetStructuredStateValue("role"), log.GetStructuredStateValue("inviteId")));
+        Assert.Empty(AccessLogs("InviteRevoked"));
     }
 
     [Fact]
@@ -351,6 +409,52 @@ public class InviteTests : ApiTests
     }
 
     [Fact]
+    public async Task Inviting_and_revoking_log_under_access_with_the_invite_id_and_never_the_email()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var board = await CreateBoardAsync(workspace.Id, "Roadmap");
+        var email = NewEmail();
+        const string ip = "192.0.2.44";
+
+        using var invited = await SendFromAsync(
+            ip, HttpMethod.Post, WorkspaceMembersPath(workspace.Id), ActorUser, new { email, role = "Admin" });
+        using var renewed = await SendFromAsync(
+            ip, HttpMethod.Post, WorkspaceMembersPath(workspace.Id), ActorUser, new { email, role = "Admin" });
+        var boardInvite = await InviteIdAsync(BoardMembersPath(board.Id), email, role: "Observer");
+        using var revoked = await SendFromAsync(
+            ip, HttpMethod.Delete, $"{BoardInvitesPath(board.Id)}/{boardInvite}", ActorUser);
+        using var missing = await DeleteAsync($"{BoardInvitesPath(board.Id)}/{boardInvite}");
+
+        Assert.Equal(
+            [HttpStatusCode.Created, HttpStatusCode.Created, HttpStatusCode.NoContent, HttpStatusCode.NotFound],
+            [invited.StatusCode, renewed.StatusCode, revoked.StatusCode, missing.StatusCode]);
+        var workspaceInvite = (await invited.ReadEnvelope<JsonElement>()).Data.Id("inviteId");
+        var sent = AccessLogs("InviteSent");
+        Assert.Equal(
+            [
+                ("Workspace", workspace.Id.ToString(), workspaceInvite.ToString(), "Admin", ip),
+                ("Workspace", workspace.Id.ToString(), workspaceInvite.ToString(), "Admin", ip),
+                ("Board", board.Id.ToString(), boardInvite.ToString(), "Observer", null)
+            ],
+            sent.Select(log => (
+                log.GetStructuredStateValue("targetType"),
+                log.GetStructuredStateValue("targetId"),
+                log.GetStructuredStateValue("inviteId"),
+                log.GetStructuredStateValue("role"),
+                log.GetStructuredStateValue(ClientIp.Field))));
+        var revoke = Assert.Single(AccessLogs("InviteRevoked"));
+        Assert.Equal(
+            (ActorId.ToString(), "Board", board.Id.ToString(), boardInvite.ToString(), "Observer", ip),
+            (revoke.GetStructuredStateValue("sub"), revoke.GetStructuredStateValue("targetType"),
+                revoke.GetStructuredStateValue("targetId"), revoke.GetStructuredStateValue("inviteId"),
+                revoke.GetStructuredStateValue("role"), revoke.GetStructuredStateValue(ClientIp.Field)));
+        Assert.All(sent, log => Assert.Equal(ActorId.ToString(), log.GetStructuredStateValue("sub")));
+        Assert.DoesNotContain(Logs(), log =>
+            log.Message.Contains(email, StringComparison.OrdinalIgnoreCase)
+            || log.StructuredState?.Any(pair => pair.Value?.Contains(email, StringComparison.OrdinalIgnoreCase) == true) == true);
+    }
+
+    [Fact]
     public async Task The_sweeper_deletes_an_invite_30_days_after_its_last_resend()
     {
         var workspace = await CreateWorkspaceAsync("Design");
@@ -422,7 +526,7 @@ public class InviteTests : ApiTests
         Assert.Equal(HttpStatusCode.NoContent, confirm.StatusCode);
     }
 
-    private async Task<Guid> SignUpAndVerifyAsync(string email)
+    private async Task<Guid> SignUpAndVerifyAsync(string email, string? clientIp = null)
     {
         using (var signUp = await SignUpAsync(SignUpBody(email)))
         {
@@ -430,7 +534,7 @@ public class InviteTests : ApiTests
         }
 
         var send = await Brevo.AwaitEmailAsync(email, "VerifyEmail");
-        using var verify = await VerifyEmailAsync(send.TokenFrom(AppRoutes.VerifyEmail));
+        using var verify = await VerifyEmailAsync(send.TokenFrom(AppRoutes.VerifyEmail), clientIp);
         Assert.Equal(HttpStatusCode.OK, verify.StatusCode);
         return await FromDatabaseAsync(database => database.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync());
     }

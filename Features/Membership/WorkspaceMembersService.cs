@@ -19,15 +19,24 @@ public class WorkspaceMembersService : IWorkspaceMembersService
     private readonly Readable _readable;
     private readonly ActivityWriter _activity;
     private readonly Invites _invites;
+    private readonly ILogger _log;
 
     public WorkspaceMembersService(
-        ApplicationDbContext context, Actor actor, Readable readable, ActivityWriter activity, Invites invites)
+        ApplicationDbContext context,
+        Actor actor,
+        Readable readable,
+        ActivityWriter activity,
+        Invites invites,
+        ILoggerFactory loggers)
     {
+        ArgumentNullException.ThrowIfNull(loggers);
+
         _context = context;
         _actor = actor;
         _readable = readable;
         _activity = activity;
         _invites = invites;
+        _log = loggers.CreateLogger(AccessLog.Category);
     }
 
     public async Task<ApiResponse<List<WorkspaceMemberDto>>> GetAllAsync(Guid workspaceId, MemberSearchDto searchDto)
@@ -105,6 +114,7 @@ public class WorkspaceMembersService : IWorkspaceMembersService
             ActivityPlace.OnWorkspace(workspaceId),
             actor => new AddMemberData<WorkspaceRole>(actor, workspace, null, MemberRef.Of(user), member.Role));
         await _context.SaveChangesAsync();
+        _log.MemberAdded(userId, AccessTarget.Workspace, workspaceId, user.Id, member.Role);
 
         return ApiResponse<AddedWorkspaceMemberDto>.SuccessResponse(
             new AddedWorkspaceMemberDto(Members.UserOf(user), member.Role, member.Status, null, null),
@@ -153,6 +163,11 @@ public class WorkspaceMembersService : IWorkspaceMembersService
         }
 
         await transaction.CommitAsync();
+        if (old != write.Role)
+        {
+            _log.MemberRoleChanged(userId, AccessTarget.Workspace, workspaceId, memberId, write.Role, old);
+        }
+
         return ApiResponse<WorkspaceMemberDto>.SuccessResponse(
             new WorkspaceMemberDto(Members.UserOf(user), member.Role, member.Status), "Member updated successfully");
     }
@@ -226,6 +241,12 @@ public class WorkspaceMembersService : IWorkspaceMembersService
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
+        _log.MemberRemoved(userId, AccessTarget.Workspace, workspaceId, memberId, member.Role);
+        foreach (var row in onBoards)
+        {
+            _log.MemberRemoved(userId, AccessTarget.Board, row.Board.Id, memberId, row.Member.Role);
+        }
+
         return ApiResponse<bool>.SuccessResponse(true, "Member removed successfully", StatusCodes.Status204NoContent);
     }
 

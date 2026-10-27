@@ -20,6 +20,7 @@ public class BoardMembersService : IBoardMembersService
     private readonly ActivityWriter _activity;
     private readonly ActivityTree _tree;
     private readonly Invites _invites;
+    private readonly ILogger _log;
 
     public BoardMembersService(
         ApplicationDbContext context,
@@ -27,14 +28,18 @@ public class BoardMembersService : IBoardMembersService
         Readable readable,
         ActivityWriter activity,
         ActivityTree tree,
-        Invites invites)
+        Invites invites,
+        ILoggerFactory loggers)
     {
+        ArgumentNullException.ThrowIfNull(loggers);
+
         _context = context;
         _actor = actor;
         _readable = readable;
         _activity = activity;
         _tree = tree;
         _invites = invites;
+        _log = loggers.CreateLogger(AccessLog.Category);
     }
 
     public async Task<ApiResponse<List<BoardMemberDto>>> GetAllAsync(Guid boardId, MemberSearchDto searchDto)
@@ -121,6 +126,7 @@ public class BoardMembersService : IBoardMembersService
             chain.Place,
             actor => new AddMemberData<BoardRole>(actor, chain.Workspace, chain.Board, MemberRef.Of(user), member.Role));
         await _context.SaveChangesAsync();
+        _log.MemberAdded(userId, AccessTarget.Board, boardId, user.Id, member.Role);
 
         var isGuest = !await _context.WorkspaceMembers.AnyAsync(inWorkspace =>
             inWorkspace.WorkspaceId == board.WorkspaceId && inWorkspace.UserId == user.Id);
@@ -171,6 +177,11 @@ public class BoardMembersService : IBoardMembersService
         }
 
         await transaction.CommitAsync();
+        if (old != write.Role)
+        {
+            _log.MemberRoleChanged(userId, AccessTarget.Board, boardId, memberId, write.Role, old);
+        }
+
         return ApiResponse<BoardMemberDto>.SuccessResponse(
             new BoardMemberDto(Members.UserOf(user), member.Role, member.Status, found.IsGuest),
             "Member updated successfully");
@@ -211,6 +222,7 @@ public class BoardMembersService : IBoardMembersService
             actor => new RemoveMemberData<BoardRole>(actor, chain.Workspace, chain.Board, MemberRef.Of(found.User), member.Role));
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
+        _log.MemberRemoved(userId, AccessTarget.Board, boardId, memberId, member.Role);
         return ApiResponse<bool>.SuccessResponse(true, "Member removed successfully", StatusCodes.Status204NoContent);
     }
 

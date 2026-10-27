@@ -1,4 +1,6 @@
 using System.Net;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Testing;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -54,6 +56,54 @@ public class WorkspaceMemberTests : ApiTests
         Assert.Equal("Normal", entries[1].Data.Text("role.old"));
         Assert.Equal("Admin", entries[1].Data.Text("role.new"));
         Assert.Equal(user.Id, entries[0].Data.Id("member.id"));
+    }
+
+    [Fact]
+    public async Task Adding_changing_and_removing_a_member_each_log_under_access_with_the_address()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var user = await CreateUserAsync();
+        const string ip = "203.0.113.9";
+
+        using var added = await SendFromAsync(
+            ip, HttpMethod.Post, WorkspaceMembersPath(workspace.Id), ActorUser, new { userId = user.Id });
+        using var changed = await SendFromAsync(
+            ip, HttpMethod.Put, $"{WorkspaceMembersPath(workspace.Id)}/{user.Id}", ActorUser, new { role = "Admin" });
+        using var removed = await SendFromAsync(
+            ip, HttpMethod.Delete, $"{WorkspaceMembersPath(workspace.Id)}/{user.Id}", ActorUser);
+
+        Assert.Equal(
+            [HttpStatusCode.Created, HttpStatusCode.OK, HttpStatusCode.NoContent],
+            [added.StatusCode, changed.StatusCode, removed.StatusCode]);
+        var add = Assert.Single(AccessLogs("MemberAdded"));
+        var change = Assert.Single(AccessLogs("MemberRoleChanged"));
+        var remove = Assert.Single(AccessLogs("MemberRemoved"));
+        foreach (var log in new[] { add, change, remove })
+        {
+            Assert.Equal(LogLevel.Information, log.Level);
+            Assert.Equal(
+                (ActorId.ToString(), "Workspace", workspace.Id.ToString(), user.Id.ToString(), ip),
+                (log.GetStructuredStateValue("sub"), log.GetStructuredStateValue("targetType"),
+                    log.GetStructuredStateValue("targetId"), log.GetStructuredStateValue("memberSub"),
+                    log.GetStructuredStateValue(ClientIp.Field)));
+        }
+
+        Assert.Equal("Normal", add.GetStructuredStateValue("role"));
+        Assert.Null(add.GetStructuredStateValue("inviteId"));
+        Assert.Equal(("Admin", "Normal"), (change.GetStructuredStateValue("role"), change.GetStructuredStateValue("previousRole")));
+        Assert.Equal("Admin", remove.GetStructuredStateValue("role"));
+    }
+
+    [Fact]
+    public async Task Setting_the_role_a_member_has_logs_nothing()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var member = await AddWorkspaceMemberAsync(workspace.Id, WorkspaceRole.Normal);
+
+        using var response = await PutAsync($"{WorkspaceMembersPath(workspace.Id)}/{member.Id}", new { role = "Normal" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(AccessLogs("MemberRoleChanged"));
     }
 
     [Fact]
@@ -149,6 +199,42 @@ public class WorkspaceMemberTests : ApiTests
         Assert.Equal(
             new Guid?[] { null, first.Id, second.Id }.Order(),
             entries.Select(entry => entry.BoardId).Order());
+    }
+
+    [Fact]
+    public async Task Leaving_a_workspace_logs_one_removal_for_it_then_one_per_board()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var leaver = await AddWorkspaceMemberAsync(workspace.Id, WorkspaceRole.Normal);
+        var roadmap = await CreateBoardAsync(workspace.Id, "Roadmap", BoardVisibility.Private);
+        var hiring = await CreateBoardAsync(workspace.Id, "Hiring", BoardVisibility.Private);
+        using (var add = await PostAsync(BoardMembersPath(roadmap.Id), new { userId = leaver.Id, role = "Observer" }))
+        {
+            Assert.Equal(HttpStatusCode.Created, add.StatusCode);
+        }
+
+        using (var add = await PostAsync(BoardMembersPath(hiring.Id), new { userId = leaver.Id }))
+        {
+            Assert.Equal(HttpStatusCode.Created, add.StatusCode);
+        }
+
+        using var response = await DeleteAsync($"{WorkspaceMembersPath(workspace.Id)}/{leaver.Id}", leaver);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var removals = AccessLogs("MemberRemoved");
+        Assert.Equal(
+            [
+                ("Workspace", workspace.Id.ToString(), "Normal"),
+                ("Board", hiring.Id.ToString(), "Normal"),
+                ("Board", roadmap.Id.ToString(), "Observer")
+            ],
+            removals.Select(log => (
+                log.GetStructuredStateValue("targetType"),
+                log.GetStructuredStateValue("targetId"),
+                log.GetStructuredStateValue("role"))));
+        Assert.All(removals, log => Assert.Equal(
+            (leaver.Id.ToString(), leaver.Id.ToString()),
+            (log.GetStructuredStateValue("sub"), log.GetStructuredStateValue("memberSub"))));
     }
 
     [Fact]

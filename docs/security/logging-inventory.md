@@ -46,6 +46,7 @@ It appears on these entries only:
 - Every `Laneway.Auth` event logged inside a request, `RateLimited` and `CsrfRejected` included.
 - `AccessDenied`. The `Denial` record carries it, since `DenialDrainer` logs on another thread.
 - `WebhookRejected`.
+- Every `Laneway.Access` event logged inside a request.
 
 Delivery events, sweeps, `UnexpectedError`, and the other webhook events never carry it. No counter tags by it.
 
@@ -140,6 +141,28 @@ A hiding denial on an id that doesn't exist logs nothing, but `DenialDrainer` co
 |---|---|
 | `laneway.authorization.denials.dropped` | none |
 | `laneway.authorization.denials.unknown_target` | `targetType`: one of the `AccessDenied` target types |
+
+## Access changes
+
+Membership and invite changes log under the `Laneway.Access` category, so an admin action reaches a store the app can't edit. Activity entries record the same changes in the app database. Each event logs after its transaction commits. Every entry also carries `clientIp` inside a request with an address.
+
+| Id | Event | Level | Fields |
+|---|---|---|---|
+| 1 | `MemberAdded` | Information | `sub`, `targetType`, `targetId`, `memberSub`, `role`, and `inviteId` when an invite made the member |
+| 2 | `MemberRoleChanged` | Information | `sub`, `targetType`, `targetId`, `memberSub`, `role`, `previousRole` |
+| 3 | `MemberRemoved` | Information | `sub`, `targetType`, `targetId`, `memberSub`, `role` |
+| 4 | `InviteSent` | Information | `sub`, `targetType`, `targetId`, `inviteId`, `role` |
+| 5 | `InviteRevoked` | Information | `sub`, `targetType`, `targetId`, `inviteId`, `role` |
+
+`sub` is the user who made the change. `targetType` is `Workspace` or `Board`, and `targetId` is its id. `memberSub` is the member the change is about. `role` is the role the member or invite has after the change, and for `MemberRemoved` the role they had. No entry carries the invited email.
+
+Leaving logs `MemberRemoved` with `sub` equal to `memberSub`. A self-join logs `MemberAdded` the same way. Leaving or removing someone from a workspace logs one `MemberRemoved` for the workspace, then one for each board in it they were on, by board name. Setting the role a member already has logs nothing.
+
+`InviteSent` logs each invite to an address with no verified user, a repeat invite that renews a live one included. A revoke that finds no live invite logs nothing.
+
+Verifying an address, or confirming an email change to it, turns its live invites into memberships. Each one logs `MemberAdded` with `sub` as the user who sent the invite, `memberSub` as the new member, the invite's `role`, and its `inviteId`. That matches the activity entry and ADR 0010. The entry carries the invitee's `clientIp` and trace id, since their request made the change. An invite for a place the user is already in is deleted and logs nothing, and conversion never logs `InviteRevoked`.
+
+Creating a workspace or board makes its creator an admin and logs no `MemberAdded`. Deleting a user ends their memberships and logs `UserDeleted` only.
 
 ## Deliveries
 
