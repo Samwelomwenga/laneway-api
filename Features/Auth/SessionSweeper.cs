@@ -47,11 +47,17 @@ public sealed partial class SessionSweeper : BackgroundService
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var cutoff = _time.GetUtcNow().UtcDateTime - KeptAfterFinish;
+        var finished = context.Sessions.Where(Session.FinishedBefore(cutoff));
+        if (!await finished.AnyAsync(token))
+        {
+            return 0;
+        }
+
+        using var span = WorkerSpans.Worker.StartRoot(nameof(SessionSweeper));
         var total = 0;
         while (true)
         {
-            var deleted = await context.Sessions
-                .Where(Session.FinishedBefore(cutoff))
+            var deleted = await finished
                 .OrderBy(session => session.Id)
                 .Take(BatchSize)
                 .ExecuteDeleteAsync(token);

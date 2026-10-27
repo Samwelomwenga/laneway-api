@@ -57,6 +57,10 @@ Each request starts a fresh root trace. The API ignores an inbound `traceparent`
 
 `AccessDenied` logs after the response, on `DenialDrainer`'s thread. The `Denial` record carries the request's trace context, and the drainer restores it for the log call only. The entry has the request's trace id and a span id that names no shipped span. The drainer's existence check runs before that, outside the request trace.
 
+Deliveries and copy jobs store their origin's `traceparent`, which is the span that added the row. `DeliveryWorker` starts a `DeliveryAttempt` span under the `Laneway.Message` source for each send attempt, and `CopyJobWorker` starts a `CopyJobAttempt` span under `Laneway.CopyJob`. Each attempt is its own root trace with a link to that origin, so a retry hours later doesn't stretch the request's trace. A row added outside a request has no `traceparent`, and its span has no link. Brevo webhooks are requests with their own traces and no link to a delivery.
+
+Timed workers make a span only when a poll finds work. `DeliverySweep` and `CopyJobSweep` start a root span under their worker's source. `AuthSweeper`, `SessionSweeper`, `InviteSweeper`, and `PendingObjectDrainer` start one under `Laneway.Worker`. The sampler drops any database or HTTP client span with no parent, so an empty poll ships nothing. Its log entries, such as a failed poll, carry no trace id, and the category names the worker.
+
 ## Events
 
 Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Every entry also carries the route and the time, and `clientIp` inside a request with an address.

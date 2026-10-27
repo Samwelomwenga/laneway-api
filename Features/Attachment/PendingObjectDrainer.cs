@@ -44,7 +44,14 @@ public sealed partial class PendingObjectDrainer : BackgroundService
 
         try
         {
-            while (await NextBatchAsync(context, token) is { Count: > 0 } batch)
+            var batch = await NextBatchAsync(context, token);
+            if (batch.Count == 0)
+            {
+                return;
+            }
+
+            using var span = WorkerSpans.Worker.StartRoot(nameof(PendingObjectDrainer));
+            while (batch.Count > 0)
             {
                 var removed = await _storage.RemoveAsync(batch.ConvertAll(pending => pending.ObjectKey));
                 if (removed < batch.Count)
@@ -59,6 +66,8 @@ public sealed partial class PendingObjectDrainer : BackgroundService
                 {
                     return;
                 }
+
+                batch = await NextBatchAsync(context, token);
             }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)

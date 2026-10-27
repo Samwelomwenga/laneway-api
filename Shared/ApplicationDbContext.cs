@@ -340,6 +340,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(job => job.CreatedAt).HasColumnType("timestamp with time zone");
             entity.Property(job => job.StartedAt).HasColumnType("timestamp with time zone");
             entity.Property(job => job.FinishedAt).HasColumnType("timestamp with time zone");
+            entity.Property(job => job.Traceparent).HasColumnType("varchar(55)");
             entity.HasOne<User>()
                 .WithMany()
                 .HasForeignKey(job => job.CreatedBy)
@@ -354,6 +355,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(d => d.CreatedAt).HasColumnType("timestamp with time zone");
             entity.Property(d => d.NextAttemptAt).HasColumnType("timestamp with time zone");
             entity.Property(d => d.SendBy).HasColumnType("timestamp with time zone");
+            entity.Property(d => d.Traceparent).HasColumnType("varchar(55)");
             entity.HasIndex(d => new { d.Status, d.NextAttemptAt });
             entity.HasIndex(d => d.CreatedAt);
             entity.HasIndex(d => d.ProviderMessageId);

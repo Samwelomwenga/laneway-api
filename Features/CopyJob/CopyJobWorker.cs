@@ -72,6 +72,7 @@ public sealed partial class CopyJobWorker : BackgroundService
 
     private async Task RunAsync(CopyJobClaim claim, CancellationToken token)
     {
+        using var span = WorkerSpans.CopyJob.StartRoot("CopyJobAttempt", claim.Job.Traceparent);
         try
         {
             await using (claim)

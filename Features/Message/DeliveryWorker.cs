@@ -135,6 +135,7 @@ public sealed class DeliveryWorker : BackgroundService
 
     private async Task SendAsync(Delivery delivery, CancellationToken token)
     {
+        using var span = WorkerSpans.Message.StartRoot("DeliveryAttempt", delivery.Traceparent);
         using var logScope = _log.BeginDeliveryScope(delivery);
         try
         {

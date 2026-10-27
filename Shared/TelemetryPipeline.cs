@@ -29,6 +29,8 @@ public static class TelemetryPipeline
         var telemetry = builder.Services.AddOpenTelemetry()
             .WithLogging(configureBuilder: null, configureOptions: options => options.IncludeScopes = true)
             .WithTracing(tracing => tracing
+                .SetSampler(ParentlessClientDrop.Sampler)
+                .AddSource(WorkerSpans.Sources)
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddNpgsql()

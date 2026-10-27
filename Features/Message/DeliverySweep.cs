@@ -11,11 +11,17 @@ public sealed class DeliverySweep(ApplicationDbContext database, TimeProvider ti
     public async Task<int> RunAsync(CancellationToken token)
     {
         var cutoff = time.GetUtcNow().UtcDateTime - DeliveryLife;
+        var old = database.Deliveries.Where(d => d.CreatedAt < cutoff);
+        if (!await old.AnyAsync(token))
+        {
+            return 0;
+        }
+
+        using var span = WorkerSpans.Message.StartRoot(nameof(DeliverySweep));
         var total = 0;
         while (true)
         {
-            var deleted = await database.Deliveries
-                .Where(d => d.CreatedAt < cutoff)
+            var deleted = await old
                 .OrderBy(d => d.Id)
                 .Take(BatchSize)
                 .ExecuteDeleteAsync(token);
