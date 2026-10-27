@@ -151,6 +151,7 @@ builder.Services.AddDbContext<ApplicationDbContext>((services, options) => optio
 
 
 var app = builder.Build();
+LogMuteCheck.ThrowIfLanewayMuted(app.Configuration);
 if (!app.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(app.Configuration[TelemetryPipeline.OtlpEndpoint]))
 {
     Log.Warning("{Variable} isn't set, so no logs, traces, or metrics ship", TelemetryPipeline.OtlpEndpoint);
@@ -159,6 +160,7 @@ if (!app.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(app.Configurat
 await Log.CloseAndFlushAsync();
 app.Services.GetRequiredService<AuthMeter>();
 app.Services.GetRequiredService<Passwords>();
+app.Services.LogSigningKeys();
 
 app.UseTraceIdentifier();
 app.UseTrustedForwardedHeaders();

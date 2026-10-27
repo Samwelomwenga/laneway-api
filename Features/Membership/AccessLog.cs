@@ -37,6 +37,37 @@ public static partial class AccessLog
     private static partial void InviteRevokedEvent(
         ILogger logger, Guid sub, AccessTarget targetType, Guid targetId, Guid inviteId, string role);
 
+    [LoggerMessage(EventId = 6, EventName = "VisibilityChanged", Level = LogLevel.Information,
+        Message = "Visibility changed: sub {sub}, {targetType} {targetId}, visibility {visibility}, previousVisibility {previousVisibility}")]
+    private static partial void VisibilityChangedEvent(
+        ILogger logger, Guid sub, AccessTarget targetType, Guid targetId, string visibility, string previousVisibility);
+
+    [LoggerMessage(EventId = 7, EventName = "BoardSettingsChanged", Level = LogLevel.Information,
+        Message = "Board settings changed: sub {sub}, {targetType} {targetId}, settings {settings}")]
+    private static partial void BoardSettingsChangedEvent(
+        ILogger logger, Guid sub, AccessTarget targetType, Guid targetId, string[] settings);
+
+    [LoggerMessage(EventId = 8, EventName = "WorkspaceDeleted", Level = LogLevel.Information,
+        Message = "Workspace deleted: sub {sub}, {targetType} {targetId}")]
+    private static partial void WorkspaceDeletedEvent(ILogger logger, Guid sub, AccessTarget targetType, Guid targetId);
+
+    [LoggerMessage(EventId = 9, EventName = "BoardDeleted", Level = LogLevel.Information,
+        Message = "Board deleted: sub {sub}, {targetType} {targetId}")]
+    private static partial void BoardDeletedEvent(ILogger logger, Guid sub, AccessTarget targetType, Guid targetId);
+
+    public static void VisibilityChanged(
+        this ILogger logger, Guid sub, AccessTarget targetType, Guid targetId, Enum visibility, Enum previousVisibility) =>
+        VisibilityChangedEvent(logger, sub, targetType, targetId, visibility.ToString(), previousVisibility.ToString());
+
+    public static void BoardSettingsChanged(this ILogger logger, Guid sub, Guid boardId, string[] settings) =>
+        BoardSettingsChangedEvent(logger, sub, AccessTarget.Board, boardId, settings);
+
+    public static void WorkspaceDeleted(this ILogger logger, Guid sub, Guid workspaceId) =>
+        WorkspaceDeletedEvent(logger, sub, AccessTarget.Workspace, workspaceId);
+
+    public static void BoardDeleted(this ILogger logger, Guid sub, Guid boardId) =>
+        BoardDeletedEvent(logger, sub, AccessTarget.Board, boardId);
+
     public static void MemberAdded(
         this ILogger logger, Guid sub, AccessTarget targetType, Guid targetId, Guid memberSub, Enum role, Guid? inviteId = null)
     {

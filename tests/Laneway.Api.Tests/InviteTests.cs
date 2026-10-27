@@ -500,6 +500,27 @@ public class InviteTests : ApiTests
     }
 
     [Fact]
+    public async Task Each_unsubscribe_logs_whether_the_address_was_already_suppressed_and_never_the_address()
+    {
+        var design = await CreateWorkspaceAsync("Design");
+        var email = NewEmail();
+        await InviteIdAsync(WorkspaceMembersPath(design.Id), email);
+        var token = (await Brevo.AwaitEmailAsync(email, "InviteSent")).TokenFrom(AppRoutes.UnsubscribeInvites);
+
+        using var unsubscribe = await SendFromAsync("198.51.100.8", HttpMethod.Post, "/api/v1/invites/unsubscribe", body: new { token });
+        using var again = await SendFromAsync("198.51.100.8", HttpMethod.Post, "/api/v1/invites/unsubscribe", body: new { token });
+
+        Assert.Equal([HttpStatusCode.NoContent, HttpStatusCode.NoContent], [unsubscribe.StatusCode, again.StatusCode]);
+        var logs = LogsOf(MessageLog.Category, "InvitesUnsubscribed");
+        Assert.Equal(["False", "True"], logs.Select(log => log.GetStructuredStateValue("alreadySuppressed")));
+        Assert.All(logs, log =>
+        {
+            Assert.Null(log.GetStructuredStateValue(ClientIp.Field));
+            Assert.DoesNotContain(email, log.Message, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    [Fact]
     public async Task A_bad_unsubscribe_token_is_400_invalid_token()
     {
         using var response = await UnsubscribeAsync("not-a-protected-payload");
@@ -507,6 +528,7 @@ public class InviteTests : ApiTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(ErrorCodes.InvalidToken, Assert.Single(await response.ReadErrors()).Code);
         Assert.False(await FromDatabaseAsync(database => database.Suppressions.AnyAsync()));
+        Assert.Empty(LogsOf(MessageLog.Category, "InvitesUnsubscribed"));
     }
 
     private Task<HttpResponseMessage> UnsubscribeAsync(string token) =>

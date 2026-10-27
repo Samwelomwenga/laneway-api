@@ -24,6 +24,7 @@ public class BoardService : IBoardService
     private readonly ActivityTree _tree;
     private readonly CardReads _cards;
     private readonly Readable _readable;
+    private readonly ILogger _log;
 
     public BoardService(
         ApplicationDbContext context,
@@ -32,8 +33,11 @@ public class BoardService : IBoardService
         ActivityWriter activity,
         ActivityTree tree,
         CardReads cards,
-        Readable readable)
+        Readable readable,
+        ILoggerFactory loggers)
     {
+        ArgumentNullException.ThrowIfNull(loggers);
+
         _context = context;
         _actor = actor;
         _archive = archive;
@@ -41,6 +45,7 @@ public class BoardService : IBoardService
         _tree = tree;
         _cards = cards;
         _readable = readable;
+        _log = loggers.CreateLogger(AccessLog.Category);
     }
 
     public async Task<ApiResponse<List<BoardDto>>> GetAllAsync(Guid workspaceId, BoardSearchDto searchDto)
@@ -202,6 +207,7 @@ public class BoardService : IBoardService
         }
 
         var board = access.Target;
+        var previous = SettingsOf(board);
         board.Commenting = write.Commenting;
         board.AddingMembers = write.AddingMembers;
         board.SelfJoin = write.SelfJoin;
@@ -220,6 +226,7 @@ public class BoardService : IBoardService
         }
 
         await _context.SaveChangesAsync();
+        LogAccessChanges(board, previous);
         return ApiResponse<BoardSettingsDto>.SuccessResponse(SettingsOf(board), "Board settings updated successfully");
     }
 
@@ -308,6 +315,7 @@ public class BoardService : IBoardService
             new ActivityPlace(WorkspaceId: existingBoard.WorkspaceId, BoardId: existingBoard.Id),
             actor => new DeleteBoardData(actor, workspace, BoardRef.Of(existingBoard)));
         await _context.SaveChangesAsync();
+        _log.BoardDeleted(_actor.Id, id);
         return ApiResponse<bool>.SuccessResponse(true, "Board deleted successfully", 204);
     }
 
@@ -326,6 +334,28 @@ public class BoardService : IBoardService
             board.CreatedBy,
             board.UpdatedBy
         );
+    }
+
+    private void LogAccessChanges(Board board, BoardSettingsDto previous)
+    {
+        if (board.Visibility != previous.Visibility)
+        {
+            _log.VisibilityChanged(_actor.Id, AccessTarget.Board, board.Id, board.Visibility, previous.Visibility);
+        }
+
+        var settings = new List<string>();
+        if (board.AddingMembers != previous.AddingMembers)
+        {
+            settings.Add("addingMembers");
+        }
+        if (board.SelfJoin != previous.SelfJoin)
+        {
+            settings.Add("selfJoin");
+        }
+        if (settings.Count > 0)
+        {
+            _log.BoardSettingsChanged(_actor.Id, board.Id, [.. settings]);
+        }
     }
 
     private static BoardSettingsDto SettingsOf(Board board) =>

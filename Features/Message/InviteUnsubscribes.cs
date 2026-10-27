@@ -4,11 +4,17 @@ using Microsoft.AspNetCore.DataProtection;
 namespace Laneway.Api;
 
 public sealed class InviteUnsubscribes(
-    IDataProtectionProvider protection, ApplicationDbContext database, TimeProvider time, MessageMeter meter)
+    IDataProtectionProvider protection,
+    ApplicationDbContext database,
+    TimeProvider time,
+    MessageMeter meter,
+    ILoggerFactory loggers)
 {
     public const string MessageId = "unsubscribe-link";
 
     private readonly IDataProtector _protector = protection.CreateProtector("Laneway.InviteUnsubscribe");
+
+    private readonly ILogger _log = loggers.CreateLogger(MessageLog.Category);
 
     public string TokenFor(string email) => _protector.Protect(email);
 
@@ -29,11 +35,14 @@ public sealed class InviteUnsubscribes(
                 [new ApiError("token", ErrorCodes.InvalidToken, "This link is invalid.")]);
         }
 
-        if (await Suppressions.AddAsync(database, Suppressions.Hash(email), SuppressionKind.Unsubscribed, MessageId,
-                time.GetUtcNow().UtcDateTime, cancellation))
+        var added = await Suppressions.AddAsync(database, Suppressions.Hash(email), SuppressionKind.Unsubscribed, MessageId,
+            time.GetUtcNow().UtcDateTime, cancellation);
+        if (added)
         {
             meter.Suppressed(SuppressionKind.Unsubscribed);
         }
+
+        _log.InvitesUnsubscribed(alreadySuppressed: !added);
 
         return ApiResponse<bool>.SuccessResponse(true, "Unsubscribed from invites", StatusCodes.Status204NoContent);
     }

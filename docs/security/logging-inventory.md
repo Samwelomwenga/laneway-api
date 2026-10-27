@@ -43,7 +43,7 @@ The purpose is network and information security, which GDPR recital 49 names as 
 It appears on these entries only:
 
 - `RequestCompleted`.
-- Every `Laneway.Auth` event logged inside a request, `RateLimited` and `CsrfRejected` included.
+- Every `Laneway.Auth` event logged inside a request, `RateLimited`, `CsrfRejected`, and `UsernameChanged` included.
 - `AccessDenied`. The `Denial` record carries it, since `DenialDrainer` logs on another thread.
 - `WebhookRejected`.
 - Every `Laneway.Access` event logged inside a request.
@@ -64,7 +64,7 @@ Timed workers make a span only when a poll finds work. `DeliverySweep` and `Copy
 
 ## Events
 
-Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Every entry also carries the route and the time, and `clientIp` inside a request with an address.
+Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Every entry also carries the time, and inside a request the route, and `clientIp` when the request has an address.
 
 | Id | Event | Level | Fields |
 |---|---|---|---|
@@ -87,6 +87,8 @@ Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Ev
 | 17 | `RateLimited` | Warning | `policy`, and `sub` when the policy counts by user |
 | 18 | `MessageSkipped` | Information, or Warning for `addressCapped` | `messageType`, `reason`, and `sub` when the address belongs to a user |
 | 19 | `EmailChangeUndone` | Warning | `sub` |
+| 20 | `UsernameChanged` | Information | `sub` |
+| 21 | `SigningKeysLoaded` | Information | `kids`, `signingKid` |
 
 `reason` is one of `malformed`, `expired`, `unknownKey`, `invalidSignature`, `invalidAlgorithm`, `invalidType`, `invalidIssuer`, `invalidAudience`, `sessionEnded`, or `invalid`.
 
@@ -116,6 +118,10 @@ An unverified user who sends the right password gets a 403 and logs `SignInFaile
 
 `PasswordChanged` and `UserDeleted` log the action itself, with the `sid` of the session that made it. A password reset logs `PasswordChanged` with no `sid`, since a link made the change and no session did. `EmailChanged` logs when someone uses the confirm link, so it has no `sid` either. Asking for a change logs nothing, because nothing on the account changes yet. `EmailChanged` never logs either email. `EmailChangeUndone` logs when someone uses an undo link, with no `sid` and no email. It also covers the new password the undo sets, so no `PasswordChanged` logs. It logs at Warning, since an undo means someone the owner didn't trust changed the address.
 
+`UsernameChanged` logs a profile edit that changes the username. It never logs the old name or the new one. A put that keeps the name logs nothing. A sign-up that takes over an unverified user logs `SignUp`, not `UsernameChanged`, even when it brings a new username.
+
+`SigningKeysLoaded` logs once at startup. `kids` lists every id in `Auth:SigningKeys`, in order, and `signingKid` is key 0, the one that signs new tokens. Keys change only through a deploy, so this entry dates each rotation. It logs outside any request and has no `clientIp`.
+
 `RateLimited` logs a request that got a 429 from a rate limit. `policy` is any policy in [Rate limits](rate-limits.md), such as `sign-in`, `email-request`, or `anonymous`. Only `password-check` and `signed-in` count by user, so only they log `sub`. The limits are in [Rate limits](rate-limits.md).
 
 `BreachedCheckUnavailable` means the Pwned Passwords check failed or took over 2 seconds, so the password was accepted without it. Each entry is one password that skipped ASVS 6.2.12.
@@ -144,7 +150,7 @@ A hiding denial on an id that doesn't exist logs nothing, but `DenialDrainer` co
 
 ## Access changes
 
-Membership and invite changes log under the `Laneway.Access` category, so an admin action reaches a store the app can't edit. Activity entries record the same changes in the app database. Each event logs after its transaction commits. Every entry also carries `clientIp` inside a request with an address.
+Membership, invite, visibility, and member-adding settings changes, and workspace and board deletes, log under the `Laneway.Access` category, so an admin action reaches a store the app can't edit. Activity entries record the same changes in the app database. Each event logs after its transaction commits. Every entry also carries `clientIp` inside a request with an address.
 
 | Id | Event | Level | Fields |
 |---|---|---|---|
@@ -153,6 +159,10 @@ Membership and invite changes log under the `Laneway.Access` category, so an adm
 | 3 | `MemberRemoved` | Information | `sub`, `targetType`, `targetId`, `memberSub`, `role` |
 | 4 | `InviteSent` | Information | `sub`, `targetType`, `targetId`, `inviteId`, `role` |
 | 5 | `InviteRevoked` | Information | `sub`, `targetType`, `targetId`, `inviteId`, `role` |
+| 6 | `VisibilityChanged` | Information | `sub`, `targetType`, `targetId`, `visibility`, `previousVisibility` |
+| 7 | `BoardSettingsChanged` | Information | `sub`, `targetType`, `targetId`, `settings` |
+| 8 | `WorkspaceDeleted` | Information | `sub`, `targetType`, `targetId` |
+| 9 | `BoardDeleted` | Information | `sub`, `targetType`, `targetId` |
 
 `sub` is the user who made the change. `targetType` is `Workspace` or `Board`, and `targetId` is its id. `memberSub` is the member the change is about. `role` is the role the member or invite has after the change, and for `MemberRemoved` the role they had. No entry carries the invited email.
 
@@ -163,6 +173,12 @@ Leaving logs `MemberRemoved` with `sub` equal to `memberSub`. A self-join logs `
 Verifying an address, or confirming an email change to it, turns its live invites into memberships. Each one logs `MemberAdded` with `sub` as the user who sent the invite, `memberSub` as the new member, the invite's `role`, and its `inviteId`. That matches the activity entry and ADR 0010. The entry carries the invitee's `clientIp` and trace id, since their request made the change. An invite for a place the user is already in is deleted and logs nothing, and conversion never logs `InviteRevoked`.
 
 Creating a workspace or board makes its creator an admin and logs no `MemberAdded`. Deleting a user ends their memberships and logs `UserDeleted` only.
+
+`VisibilityChanged` logs a workspace edit or a board settings change that changes the visibility. `visibility` and `previousVisibility` are `Private`, `Workspace`, or `Public`. A workspace is only ever `Private` or `Public`. A put that keeps the visibility logs nothing.
+
+`BoardSettingsChanged` logs a board settings change that changes who may add members, whether workspace members may join on their own, or both. `settings` lists the names that changed, `addingMembers` and `selfJoin`, never their values. A visibility change in the same put logs its own `VisibilityChanged`. The commenting setting, the other workspace and board edits, and attachment uploads and deletes stay activity entries only.
+
+`WorkspaceDeleted` and `BoardDeleted` log a delete that went through. A board must be archived first, and a workspace must hold no boards, so a refused delete logs nothing.
 
 ## Deliveries
 
@@ -181,6 +197,7 @@ Deliveries log under the `Laneway.Message` category. Features never learn how a 
 | 9 | `WebhookEventIgnored` | Information | `event` |
 | 10 | `DeliveryPollFailed` | Warning | the exception |
 | 11 | `DeliverySendThrew` | Error | the exception |
+| 12 | `InvitesUnsubscribed` | Information | `alreadySuppressed` |
 
 `DeliveryRetrying` has `reason` `rateLimited`, `serverError`, `timeout`, or `networkError`. A 429 is `rateLimited` and a 5xx is `serverError`. Each Brevo call times out after 10 seconds. Attempts run at 0, 30 seconds, 2 minutes, and 10 minutes after the one before, all with the same idempotency key.
 
@@ -205,7 +222,7 @@ A `Laneway.Message` meter counts each delivery once, when it ends. Locally, `dot
 | `laneway.message.deliveries` | `result`: `sent`, `failed`, `expired`, or `dropped`. `channel`: `email` |
 | `laneway.message.suppressions` | `event`: `hardBounce`, `spam`, `blocked`, or `unsubscribed`. It counts new suppressions only, not repeats. |
 
-The unsubscribe link in an invite email writes the same `unsubscribed` suppression a webhook event does, with `unsubscribe-link` in place of a Brevo `message-id`. It adds to `laneway.message.suppressions` and logs no event, since no delivery matches it.
+The unsubscribe link in an invite email writes the same `unsubscribed` suppression a webhook event does, with `unsubscribe-link` in place of a Brevo `message-id`. It adds to `laneway.message.suppressions` and logs `InvitesUnsubscribed`. `alreadySuppressed: true` means the address was already unsubscribed, so the use wrote nothing new. The entry has no email, no `deliveryId`, since no delivery matches it, and no `clientIp`. A bad token logs no event, and the request line records its `invalidToken`.
 
 ## Background jobs and cleanup
 
@@ -288,6 +305,7 @@ Every environment runs the same pipeline, so Development ships what production s
 - `SpanScrub` keeps the user agent, the connection string, the raw path, the query string, and exception text off spans. It drops `user_agent.original`, Npgsql's `db.connection_string`, the server span's `url.path` and `url.query`, and every status description. It rewrites the Pwned Passwords `url.full` to its template. When a span has an `exception` event and no `error.type`, it copies the event's `exception.type` into `error.type`.
 - `RequestScopeScrub` keeps the raw path off log events by dropping ASP.NET Core's `RequestPath` and `RequestId` scope fields. `ConnectionId` stays.
 - The `Include Error Detail` check stops the app at startup when `ConnectionStrings:DefaultConnection` sets it. That keeps Postgres's DETAIL field, which quotes row values, out of errors.
+- The mute check stops the app at startup when `Serilog:MinimumLevel`, `Serilog:MinimumLevel:Default`, an entry under `Serilog:MinimumLevel:Override`, or an entry under `Logging:OpenTelemetry:LogLevel` would drop Information from any `Laneway.*` category. Warning, Error, Fatal, Critical, and None all count, by name or by number. A `*` in an entry counts as reaching every category it could match. A muted default passes when a `Laneway` entry sets Information or lower, and Debug is always allowed. Framework categories stay free to set.
 - `BannedSymbols.txt` keeps unparameterized SQL and EF's parameter values out of spans and logs. It fails the API build on `FromSqlRaw`, `ExecuteSqlRaw`, `ExecuteSqlRawAsync`, `SqlQueryRaw`, and `EnableSensitiveDataLogging`, since spans keep `db.statement`. The test project may use raw SQL.
 
 Our instrumentation never calls `RecordException`. Npgsql 9 still adds an `exception` event to a failed database span, with Postgres's primary message and a stack trace. No setting or processor can remove it. The `Include Error Detail` check keeps Postgres's DETAIL field out of that message. A primary message can still quote an input value, such as `invalid input syntax for type uuid`. Npgsql sends typed parameters, so that error is rare.

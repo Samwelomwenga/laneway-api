@@ -395,8 +395,10 @@ public abstract class ApiTests : IAsyncLifetime
 
     protected IReadOnlyList<FakeLogRecord> Logs() => Factory.Services.GetFakeLogCollector().GetSnapshot();
 
-    protected List<FakeLogRecord> AccessLogs(string name) =>
-        [.. Logs().Where(log => log.Category == AccessLog.Category && log.Id.Name == name)];
+    protected List<FakeLogRecord> LogsOf(string category, string name) =>
+        [.. Logs().Where(log => log.Category == category && log.Id.Name == name)];
+
+    protected List<FakeLogRecord> AccessLogs(string name) => LogsOf(AccessLog.Category, name);
 
     protected async Task<List<FakeLogRecord>> AwaitLogsAsync(string name, int count)
     {

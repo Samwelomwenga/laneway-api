@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Microsoft.Extensions.Logging.Testing;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -41,6 +42,31 @@ public class ProfileTests : ApiTests
         Assert.Equal(other.Id, edited.UpdatedBy);
         using var mine = await GetAsync("/api/v1/profile");
         Assert.Equal(ActorUser.User.Username, (await mine.ReadEnvelope<UserDto>()).Data!.Username);
+    }
+
+    [Fact]
+    public async Task Changing_the_username_logs_username_changed_without_either_name()
+    {
+        const string ip = "198.51.100.9";
+
+        using var response = await SendFromAsync(ip, HttpMethod.Put, "/api/v1/profile", ActorUser, ProfileBody(username: "wanjiru"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var log = Assert.Single(LogsOf(AuthLog.Category, "UsernameChanged"));
+        Assert.Equal(
+            (ActorId.ToString(), ip),
+            (log.GetStructuredStateValue("sub"), log.GetStructuredStateValue(ClientIp.Field)));
+        Assert.DoesNotContain("wanjiru", log.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(ActorUser.User.Username, log.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_profile_put_that_keeps_the_username_logs_no_username_change()
+    {
+        using var response = await PutAsync("/api/v1/profile", ProfileBody(username: ActorUser.User.Username));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(LogsOf(AuthLog.Category, "UsernameChanged"));
     }
 
     [Fact]

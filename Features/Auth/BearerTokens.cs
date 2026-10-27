@@ -27,6 +27,11 @@ public static class BearerTokens
         return services;
     }
 
+    public static void LogSigningKeys(this IServiceProvider services) =>
+        services.GetRequiredService<ILoggerFactory>()
+            .CreateLogger(AuthLog.Category)
+            .SigningKeysLoaded(services.GetRequiredService<SigningKeys>());
+
     public static IApplicationBuilder RefuseFailedBearerTokens(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>
         {

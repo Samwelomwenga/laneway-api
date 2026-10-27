@@ -18,13 +18,18 @@ public class WorkSpaceService : IWorkSpaceService
     private readonly Actor _actor;
     private readonly ActivityWriter _activity;
     private readonly Readable _readable;
+    private readonly ILogger _log;
 
-    public WorkSpaceService(ApplicationDbContext context, Actor actor, ActivityWriter activity, Readable readable)
+    public WorkSpaceService(
+        ApplicationDbContext context, Actor actor, ActivityWriter activity, Readable readable, ILoggerFactory loggers)
     {
+        ArgumentNullException.ThrowIfNull(loggers);
+
         _context = context;
         _actor = actor;
         _activity = activity;
         _readable = readable;
+        _log = loggers.CreateLogger(AccessLog.Category);
     }
 
     public async Task<ApiResponse<List<WorkspaceSummaryDto>>> GetAllAsync(WorkSpaceSearchDto searchDto)
@@ -108,6 +113,7 @@ public class WorkSpaceService : IWorkSpaceService
         }
 
         var existingWorkSpace = access.Target;
+        var previousVisibility = existingWorkSpace.Visibility;
 
         existingWorkSpace.Name = write.Name;
         existingWorkSpace.Description = write.Description;
@@ -125,6 +131,10 @@ public class WorkSpaceService : IWorkSpaceService
         }
 
         await _context.SaveChangesAsync();
+        if (previousVisibility != existingWorkSpace.Visibility)
+        {
+            _log.VisibilityChanged(_actor.Id, AccessTarget.Workspace, id, existingWorkSpace.Visibility, previousVisibility);
+        }
 
         return ApiResponse<WorkSpaceDto>.SuccessResponse(MapToDto(existingWorkSpace), "Workspace updated successfully", 200);
     }
@@ -154,6 +164,7 @@ public class WorkSpaceService : IWorkSpaceService
             ActivityPlace.OnWorkspace(workSpace.Id),
             actor => new DeleteWorkspaceData(actor, WorkspaceRef.Of(workSpace)));
         await _context.SaveChangesAsync();
+        _log.WorkspaceDeleted(_actor.Id, id);
         return ApiResponse<bool>.SuccessResponse(true, "Workspace deleted successfully", 204);
     }
 

@@ -13,11 +13,15 @@ namespace Laneway.Api
     {
         private readonly ApplicationDbContext _context;
         private readonly Actor _actor;
+        private readonly ILogger _log;
 
-        public UserService(ApplicationDbContext context, Actor actor)
+        public UserService(ApplicationDbContext context, Actor actor, ILoggerFactory loggers)
         {
+            ArgumentNullException.ThrowIfNull(loggers);
+
             _context = context;
             _actor = actor;
+            _log = loggers.CreateLogger(AuthLog.Category);
         }
 
         public async Task<ApiResponse<UserDto>> GetProfileAsync()
@@ -44,10 +48,15 @@ namespace Laneway.Api
                 return UserRules.AlreadyExists<UserDto>(errors);
             }
 
+            var previousUsername = user.Username;
             user.Apply(updateProfileDto);
             _context.StampChange(user, _actor);
 
             await _context.SaveChangesAsync();
+            if (user.Username != previousUsername)
+            {
+                _log.UsernameChanged(user.Id);
+            }
 
             return ApiResponse<UserDto>.SuccessResponse(UserView.Of(user), "Profile updated successfully", 200);
         }
