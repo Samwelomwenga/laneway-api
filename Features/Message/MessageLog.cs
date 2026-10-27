@@ -62,6 +62,10 @@ public static partial class MessageLog
         Message = "A delivery send threw. The claim's lease runs out and the next poll retries it.")]
     public static partial void DeliverySendThrew(this ILogger logger, Exception exception);
 
+    [LoggerMessage(EventId = 12, EventName = "InvitesUnsubscribed", Level = LogLevel.Information,
+        Message = "Invites unsubscribed: alreadySuppressed {alreadySuppressed}")]
+    public static partial void InvitesUnsubscribed(this ILogger logger, bool alreadySuppressed);
+
     public static void DeliveryFailed(this ILogger logger, string reason, int? status, string? code)
     {
         if (status is 401 or 402 or 403)

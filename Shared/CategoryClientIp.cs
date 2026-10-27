@@ -3,9 +3,9 @@ using Serilog.Events;
 
 namespace Laneway.Api;
 
-internal sealed class AuthClientIp(IHttpContextAccessor requests) : ILogEventEnricher
+internal sealed class CategoryClientIp(IHttpContextAccessor requests) : ILogEventEnricher
 {
-    private static readonly ScalarValue AuthCategory = new(AuthLog.Category);
+    private static readonly ScalarValue[] Categories = [new(AuthLog.Category), new(AccessLog.Category)];
 
     public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
     {
@@ -13,7 +13,7 @@ internal sealed class AuthClientIp(IHttpContextAccessor requests) : ILogEventEnr
         ArgumentNullException.ThrowIfNull(propertyFactory);
 
         if (logEvent.Properties.TryGetValue(Constants.SourceContextPropertyName, out var category)
-            && AuthCategory.Equals(category)
+            && Categories.Contains(category)
             && ClientIp.Of(requests.HttpContext) is { } address)
         {
             logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(ClientIp.Field, address));

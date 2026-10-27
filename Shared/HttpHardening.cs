@@ -78,7 +78,7 @@ public static class HttpHardening
                 }
 
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await context.Response.WriteAsJsonAsync(
+                await context.Response.WriteApiResponseAsync(
                     ApiResponse<object>.ErrorResponse(UseHttps, StatusCodes.Status400BadRequest,
                         [new ApiError(null, ErrorCodes.HttpsRequired, UseHttps)]),
                     context.RequestAborted);

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Microsoft.Extensions.Logging.Testing;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -183,6 +184,40 @@ public class BoardMemberTests : ApiTests
     }
 
     [Fact]
+    public async Task Adding_changing_and_removing_a_board_member_each_log_under_access_with_the_address()
+    {
+        var workspace = await CreateWorkspaceAsync("Design");
+        var board = await CreateBoardAsync(workspace.Id, "Roadmap");
+        var user = await CreateUserAsync();
+        const string ip = "198.51.100.4";
+
+        using var added = await SendFromAsync(
+            ip, HttpMethod.Post, BoardMembersPath(board.Id), ActorUser, new { userId = user.Id, role = "Observer" });
+        using var changed = await SendFromAsync(
+            ip, HttpMethod.Put, $"{BoardMembersPath(board.Id)}/{user.Id}", ActorUser, new { role = "Normal" });
+        using var removed = await SendFromAsync(ip, HttpMethod.Delete, $"{BoardMembersPath(board.Id)}/{user.Id}", ActorUser);
+
+        Assert.Equal(
+            [HttpStatusCode.Created, HttpStatusCode.OK, HttpStatusCode.NoContent],
+            [added.StatusCode, changed.StatusCode, removed.StatusCode]);
+        var add = Assert.Single(AccessLogs("MemberAdded"));
+        var change = Assert.Single(AccessLogs("MemberRoleChanged"));
+        var remove = Assert.Single(AccessLogs("MemberRemoved"));
+        foreach (var log in new[] { add, change, remove })
+        {
+            Assert.Equal(
+                (ActorId.ToString(), "Board", board.Id.ToString(), user.Id.ToString(), ip),
+                (log.GetStructuredStateValue("sub"), log.GetStructuredStateValue("targetType"),
+                    log.GetStructuredStateValue("targetId"), log.GetStructuredStateValue("memberSub"),
+                    log.GetStructuredStateValue(ClientIp.Field)));
+        }
+
+        Assert.Equal("Observer", add.GetStructuredStateValue("role"));
+        Assert.Equal(("Normal", "Observer"), (change.GetStructuredStateValue("role"), change.GetStructuredStateValue("previousRole")));
+        Assert.Equal("Normal", remove.GetStructuredStateValue("role"));
+    }
+
+    [Fact]
     public async Task Setting_the_role_a_member_has_succeeds_and_writes_nothing()
     {
         var workspace = await CreateWorkspaceAsync("Design");
@@ -262,6 +297,10 @@ public class BoardMemberTests : ApiTests
         ActivityAssert.Actor(entry, observer);
         Assert.Equal(observer.Id, entry.Data.Id("member.id"));
         Assert.Equal("Observer", entry.Data.Text("role"));
+        var log = Assert.Single(AccessLogs("MemberRemoved"));
+        Assert.Equal(
+            (observer.Id.ToString(), observer.Id.ToString(), "Observer"),
+            (log.GetStructuredStateValue("sub"), log.GetStructuredStateValue("memberSub"), log.GetStructuredStateValue("role")));
     }
 
     [Fact]
@@ -291,6 +330,10 @@ public class BoardMemberTests : ApiTests
         var entry = Assert.Single((await ActivityAsync($"boardId={board.Id}&type=addMember")).Entries);
         ActivityAssert.Actor(entry, joiner);
         Assert.Equal(joiner.Id, entry.Data.Id("member.id"));
+        var log = Assert.Single(AccessLogs("MemberAdded"), log => log.GetStructuredStateValue("targetType") == "Board");
+        Assert.Equal(
+            (joiner.Id.ToString(), joiner.Id.ToString(), board.Id.ToString()),
+            (log.GetStructuredStateValue("sub"), log.GetStructuredStateValue("memberSub"), log.GetStructuredStateValue("targetId")));
     }
 
     [Fact]

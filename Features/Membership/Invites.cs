@@ -13,6 +13,8 @@ public sealed record InviteTarget(InvitePlace Place, Guid Id, string Name)
 
 public sealed record InviteRow(Invite Invite, MemberUserDto? Inviter);
 
+public sealed record ConvertedInvite(Guid InviteId, Guid InviterId, AccessTarget TargetType, Guid TargetId, Guid MemberId, Enum Role);
+
 public sealed class Invites(
     ApplicationDbContext database,
     Messages messages,
@@ -20,8 +22,11 @@ public sealed class Invites(
     ActivityWriter activity,
     ActivityTree tree,
     InviteUnsubscribes unsubscribes,
-    TimeProvider time)
+    TimeProvider time,
+    ILoggerFactory loggers)
 {
+    private readonly ILogger _log = loggers.CreateLogger(AccessLog.Category);
+
     public const int DailyEmails = 50;
 
     public static readonly TimeSpan Lifetime = TimeSpan.FromDays(30);
@@ -94,6 +99,7 @@ public sealed class Invites(
         }
 
         await database.SaveChangesAsync();
+        _log.InviteSent(actor.Id, invite);
         return ApiResponse<T>.SuccessResponse(reply(invite), "Member invited", StatusCodes.Status201Created);
     }
 
@@ -128,25 +134,31 @@ public sealed class Invites(
 
     public async Task<ApiResponse<bool>> RevokeAsync(InvitePlace place, Guid placeId, Guid inviteId)
     {
-        var deleted = await LiveIn(place, placeId).Where(invite => invite.Id == inviteId).ExecuteDeleteAsync();
-        return deleted == 0
-            ? ApiResponse<bool>.ErrorResponse("Invite not found", StatusCodes.Status404NotFound)
-            : ApiResponse<bool>.SuccessResponse(true, "Invite revoked", StatusCodes.Status204NoContent);
+        var live = LiveIn(place, placeId).Where(invite => invite.Id == inviteId);
+        var invite = await live.AsNoTracking().FirstOrDefaultAsync();
+        if (invite is null || await live.ExecuteDeleteAsync() == 0)
+        {
+            return ApiResponse<bool>.ErrorResponse("Invite not found", StatusCodes.Status404NotFound);
+        }
+
+        _log.InviteRevoked(actor.Id, invite);
+        return ApiResponse<bool>.SuccessResponse(true, "Invite revoked", StatusCodes.Status204NoContent);
     }
 
     /// <summary>
     /// Deletes every live invite for the user's current address and adds the user to each place they aren't in yet,
-    /// as added by whoever sent the invite. Call it inside the transaction that proves the user owns the address. See
-    /// ADR 0010.
+    /// as added by whoever sent the invite. Call it inside the transaction that proves the user owns the address, and
+    /// pass what it returns to <see cref="LogConverted"/> once that transaction commits. See ADR 0010.
     /// </summary>
-    public async Task ConvertAsync(Guid userId)
+    public async Task<List<ConvertedInvite>> ConvertAsync(Guid userId)
     {
         var now = time.GetUtcNow().UtcDateTime;
         var user = await database.Users.AsNoTracking().SingleAsync(u => u.Id == userId);
         var invites = await database.Invites.Where(i => i.Email == user.Email && i.ExpiresAt > now).ToListAsync();
+        List<ConvertedInvite> converted = [];
         if (invites.Count == 0)
         {
-            return;
+            return converted;
         }
 
         var member = MemberRef.Of(user);
@@ -176,6 +188,7 @@ public sealed class Invites(
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = inviter.Id
                 });
+                converted.Add(new ConvertedInvite(invite.Id, inviter.Id, AccessTarget.Workspace, workspaceId, userId, role));
                 var workspace = await tree.WorkspaceAsync(workspaceId);
                 activity.Add(
                     ActivityType.AddMember,
@@ -195,6 +208,7 @@ public sealed class Invites(
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = inviter.Id
                 });
+                converted.Add(new ConvertedInvite(invite.Id, inviter.Id, AccessTarget.Board, boardId, userId, role));
                 var chain = await tree.BoardAsync(boardId);
                 activity.Add(
                     ActivityType.AddMember,
@@ -205,6 +219,18 @@ public sealed class Invites(
         }
 
         await database.SaveChangesAsync();
+        return converted;
+    }
+
+    public void LogConverted(IEnumerable<ConvertedInvite> converted)
+    {
+        ArgumentNullException.ThrowIfNull(converted);
+
+        foreach (var invite in converted)
+        {
+            _log.MemberAdded(
+                invite.InviterId, invite.TargetType, invite.TargetId, invite.MemberId, invite.Role, invite.InviteId);
+        }
     }
 
     private IQueryable<Invite> LiveIn(InvitePlace place, Guid placeId)

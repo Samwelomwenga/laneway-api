@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -17,6 +18,18 @@ public class BearerTokenTests : ApiTests
 {
     public BearerTokenTests(TestStack stack) : base(stack)
     {
+    }
+
+    [Fact]
+    public void Startup_logs_the_signing_key_ids_and_the_one_that_signs()
+    {
+        var log = Assert.Single(LogsOf(AuthLog.Category, "SigningKeysLoaded"));
+
+        Assert.Equal(LogLevel.Information, log.Level);
+        Assert.Equal(
+            ($"[\"{ApiFactory.SigningKeyId}\"]", ApiFactory.SigningKeyId),
+            (log.GetStructuredStateValue("kids"), log.GetStructuredStateValue("signingKid")));
+        Assert.Null(log.GetStructuredStateValue(ClientIp.Field));
     }
 
     [Fact]

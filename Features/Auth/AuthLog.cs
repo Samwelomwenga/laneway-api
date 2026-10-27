@@ -111,6 +111,21 @@ public static partial class AuthLog
         Message = "Email change undone: sub {sub}")]
     public static partial void EmailChangeUndone(this ILogger logger, Guid sub);
 
+    [LoggerMessage(EventId = 20, EventName = "UsernameChanged", Level = LogLevel.Information,
+        Message = "Username changed: sub {sub}")]
+    public static partial void UsernameChanged(this ILogger logger, Guid sub);
+
+    [LoggerMessage(EventId = 21, EventName = "SigningKeysLoaded", Level = LogLevel.Information,
+        Message = "Signing keys loaded: kids {kids}, signingKid {signingKid}")]
+    private static partial void SigningKeysLoadedEvent(ILogger logger, string[] kids, string signingKid);
+
+    public static void SigningKeysLoaded(this ILogger logger, SigningKeys keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+
+        SigningKeysLoadedEvent(logger, [.. keys.All.Select(key => key.KeyId)], keys.Signing.Key.KeyId);
+    }
+
     public static void SignInFailed(this ILogger logger, Guid? userId, bool blocked)
     {
         if (userId is { } sub)

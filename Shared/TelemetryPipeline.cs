@@ -22,7 +22,7 @@ public static class TelemetryPipeline
             (services, logger) => logger
                 .ReadFrom.Configuration(services.GetRequiredService<IConfiguration>())
                 .Enrich.With<RequestScopeScrub>()
-                .Enrich.With(new AuthClientIp(services.GetRequiredService<IHttpContextAccessor>())),
+                .Enrich.With(new CategoryClientIp(services.GetRequiredService<IHttpContextAccessor>())),
             preserveStaticLogger: true,
             writeToProviders: true);
 

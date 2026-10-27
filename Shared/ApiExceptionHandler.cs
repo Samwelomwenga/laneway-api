@@ -30,7 +30,7 @@ public sealed partial class ApiExceptionHandler(ILogger<ApiExceptionHandler> log
         };
 
         httpContext.Response.StatusCode = response.StatusCode;
-        await httpContext.Response.WriteAsJsonAsync(response, cancellationToken);
+        await httpContext.Response.WriteApiResponseAsync(response, cancellationToken);
         return true;
     }
 

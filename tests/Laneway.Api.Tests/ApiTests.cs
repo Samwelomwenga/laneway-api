@@ -188,13 +188,18 @@ public abstract class ApiTests : IAsyncLifetime
         return await Client.SendAsync(request);
     }
 
-    protected async Task<HttpResponseMessage> PostOverHttpsAsync(string path, object body, string? userAgent = null)
+    protected async Task<HttpResponseMessage> PostOverHttpsAsync(
+        string path, object body, string? userAgent = null, string? clientIp = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body) };
         AddHeaders(request, BrowserHeaders());
         if (userAgent is not null)
         {
             request.Headers.UserAgent.ParseAdd(userAgent);
+        }
+        if (clientIp is not null)
+        {
+            request.Headers.Add(ApiFactory.ClientIpHeader, clientIp);
         }
 
         return await Https.SendAsync(request);
@@ -252,8 +257,8 @@ public abstract class ApiTests : IAsyncLifetime
     protected async Task<string> VerifyTokenSentToAsync(string email) =>
         (await AwaitEmailAsync(Emails.Normalize(email))).TokenFrom(AppRoutes.VerifyEmail);
 
-    protected Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
-        PostOverHttpsAsync("/api/v1/auth/verify-email", new { token });
+    protected Task<HttpResponseMessage> VerifyEmailAsync(string token, string? clientIp = null) =>
+        PostOverHttpsAsync("/api/v1/auth/verify-email", new { token }, clientIp: clientIp);
 
     protected Task<HttpResponseMessage> ResendVerificationAsync(string email) =>
         SendAnonymousAsync(HttpMethod.Post, "/api/v1/auth/resend-verification", new { email });
@@ -389,6 +394,11 @@ public abstract class ApiTests : IAsyncLifetime
     protected IServiceProvider Services => Factory.Services;
 
     protected IReadOnlyList<FakeLogRecord> Logs() => Factory.Services.GetFakeLogCollector().GetSnapshot();
+
+    protected List<FakeLogRecord> LogsOf(string category, string name) =>
+        [.. Logs().Where(log => log.Category == category && log.Id.Name == name)];
+
+    protected List<FakeLogRecord> AccessLogs(string name) => LogsOf(AccessLog.Category, name);
 
     protected async Task<List<FakeLogRecord>> AwaitLogsAsync(string name, int count)
     {

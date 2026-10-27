@@ -93,7 +93,7 @@ public static class RateLimits
         services.GetRequiredService<AuthMeter>().RateLimited(limit.Policy);
 
         http.Response.Headers.RetryAfter = Math.Ceiling(limit.Segment.TotalSeconds).ToString(CultureInfo.InvariantCulture);
-        await http.Response.WriteAsJsonAsync(
+        await http.Response.WriteApiResponseAsync(
             ApiResponse<object>.ErrorResponse(
                 TryLater,
                 StatusCodes.Status429TooManyRequests,

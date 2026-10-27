@@ -27,6 +27,11 @@ public static class BearerTokens
         return services;
     }
 
+    public static void LogSigningKeys(this IServiceProvider services) =>
+        services.GetRequiredService<ILoggerFactory>()
+            .CreateLogger(AuthLog.Category)
+            .SigningKeysLoaded(services.GetRequiredService<SigningKeys>());
+
     public static IApplicationBuilder RefuseFailedBearerTokens(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>
         {
@@ -108,7 +113,7 @@ public sealed class BearerEvents(
         var response = context.Response;
         response.StatusCode = StatusCodes.Status401Unauthorized;
         response.Headers.WWWAuthenticate = JwtBearerDefaults.AuthenticationScheme;
-        await response.WriteAsJsonAsync(NotAuthenticated.Response<object>(), context.HttpContext.RequestAborted);
+        await response.WriteApiResponseAsync(NotAuthenticated.Response<object>(), context.HttpContext.RequestAborted);
     }
 
     public override async Task Forbidden(ForbiddenContext context)
@@ -116,7 +121,7 @@ public sealed class BearerEvents(
         ArgumentNullException.ThrowIfNull(context);
 
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
-        await context.Response.WriteAsJsonAsync(NotAllowed.Response<object>(), context.HttpContext.RequestAborted);
+        await context.Response.WriteApiResponseAsync(NotAllowed.Response<object>(), context.HttpContext.RequestAborted);
     }
 
     private void Reject(TokenValidatedContext context, string reason, string? kid)
