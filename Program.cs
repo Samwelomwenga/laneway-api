@@ -33,6 +33,7 @@ builder.AddTelemetry();
 builder.Services.AddControllers(options =>
     {
         options.Filters.Add<ValidationFilter>();
+        options.Filters.Add<ErrorCodesFilter>();
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
     })
     .AddJsonOptions(options =>

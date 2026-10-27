@@ -2,7 +2,12 @@ using System.Text.Json.Serialization;
 
 namespace Laneway.Api;
 
-public class ApiResponse<T>
+public interface IApiResponse
+{
+    List<ApiError> Errors { get; }
+}
+
+public class ApiResponse<T> : IApiResponse
 {
     public bool Success { get; set; }
     public string Message { get; set; } = string.Empty;

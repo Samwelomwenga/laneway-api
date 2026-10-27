@@ -28,9 +28,9 @@ Each request logs one line when it ends, under the `Laneway.Request` category. `
 
 | Id | Event | Level | Fields |
 |---|---|---|---|
-| 1 | `RequestCompleted` | Error for a 5xx or an unhandled exception, Warning over 1 second, otherwise Information | `RequestMethod`, `route`, `StatusCode`, `Elapsed`, `clientIp` when the request has an address, and `sub` and `sid` when a valid access token signed it in |
+| 1 | `RequestCompleted` | Error for a 5xx or an unhandled exception, Warning over 1 second, otherwise Information | `RequestMethod`, `route`, `StatusCode`, `Elapsed`, `clientIp` when the request has an address, `sub` and `sid` when a valid access token signed it in, and `errorCodes` on a 4xx with an `ApiError` body |
 
-`RequestMethod` is `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `TRACE`, or `CONNECT`, and `other` for anything else. `route` is the endpoint's route template, such as `api/v1/WorkSpaces/{id}`, or `unmatched` when no endpoint matched. A 500 keeps the route of the endpoint that threw. `Elapsed` is in milliseconds. A token that fails, or names an ended session, leaves `sub` and `sid` off.
+`RequestMethod` is `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `TRACE`, or `CONNECT`, and `other` for anything else. `route` is the endpoint's route template, such as `api/v1/WorkSpaces/{id}`, or `unmatched` when no endpoint matched. A 500 keeps the route of the endpoint that threw. `Elapsed` is in milliseconds. A token that fails, or names an ended session, leaves `sub` and `sid` off. `errorCodes` lists the distinct codes from the body's errors, sorted, such as `["required", "tooLong"]`. It holds only codes from the fixed set in `ErrorCodes`, never a field name, so a failed validation is on record as ASVS 16.3.3 asks without logging what the caller sent.
 
 A 4xx logs at Information. A 404 or 405 gets no event of its own, so this line is its only record.
 
@@ -134,9 +134,12 @@ The service puts each denial on a bounded channel and answers at once, so a hidi
 
 The channel holds 1024 entries. When it's full, `DenialLog` drops the denial and counts it on the `Laneway.Authorization` meter.
 
+A hiding denial on an id that doesn't exist logs nothing, but `DenialDrainer` counts it by `targetType`. An id scan shows up as a climbing count, and the random ids never log.
+
 | Counter | Tags |
 |---|---|
 | `laneway.authorization.denials.dropped` | none |
+| `laneway.authorization.denials.unknown_target` | `targetType`: one of the `AccessDenied` target types |
 
 ## Deliveries
 

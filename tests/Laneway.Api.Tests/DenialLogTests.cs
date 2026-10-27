@@ -136,6 +136,25 @@ public class DenialLogTests : ApiTests
     }
 
     [Fact]
+    public async Task A_missing_id_is_counted_by_type_and_a_real_one_isnt()
+    {
+        var meters = Services.GetRequiredService<IMeterFactory>();
+        using var unknown = new MetricCollector<long>(meters, DenialMeter.Name, DenialMeter.UnknownTargetName);
+        var stranger = await CreateUserAsync();
+        var workspace = await CreateWorkspaceAsync("Finance", visibility: WorkspaceVisibility.Private);
+        var board = await CreateBoardAsync(workspace.Id, "Payroll", BoardVisibility.Private);
+
+        using var gone = await GetAsync($"/api/v1/boards/{Guid.NewGuid()}", stranger);
+        using var hidden = await GetAsync($"/api/v1/boards/{board.Id}", stranger);
+
+        Assert.Equal([HttpStatusCode.NotFound, HttpStatusCode.NotFound], [gone.StatusCode, hidden.StatusCode]);
+        await DeniedAsync(board.Id);
+        var counted = Assert.Single(unknown.GetMeasurementSnapshot());
+        Assert.Equal(1, counted.Value);
+        Assert.Equal("Board", counted.Tags["targetType"]);
+    }
+
+    [Fact]
     public void A_full_channel_drops_the_entry_and_counts_it()
     {
         var meters = Services.GetRequiredService<IMeterFactory>();

@@ -1,5 +1,7 @@
 using System.Collections.Frozen;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -15,6 +17,10 @@ public static class RequestLine
     public const string Unmatched = "unmatched";
 
     public const string OtherMethod = "other";
+
+    public const string ErrorCodesField = "errorCodes";
+
+    private static readonly object ErrorCodesKey = new();
 
     private const double SlowMs = 1000;
 
@@ -56,6 +62,11 @@ public static class RequestLine
                     diagnostics.Set(ClientIp.Field, address);
                 }
 
+                if (ErrorCodesOf(context) is { } codes)
+                {
+                    diagnostics.Set(ErrorCodesField, codes);
+                }
+
                 if (context.RequestServices.GetService<Actor>() is { IsResolved: true, HasSession: true } actor)
                 {
                     diagnostics.Set("sub", actor.Id);
@@ -63,6 +74,36 @@ public static class RequestLine
                 }
             };
         });
+
+    public static void Note(HttpContext context, IEnumerable<ApiError> errors)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(errors);
+
+        if (context.Items[ErrorCodesKey] is not SortedSet<string> codes)
+        {
+            codes = new SortedSet<string>(StringComparer.Ordinal);
+            context.Items[ErrorCodesKey] = codes;
+        }
+
+        codes.UnionWith(errors.Select(error => error.Code).Where(ErrorCodes.All.Contains));
+    }
+
+    public static Task WriteApiResponseAsync<T>(
+        this HttpResponse response, ApiResponse<T> body, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        ArgumentNullException.ThrowIfNull(body);
+
+        Note(response.HttpContext, body.Errors);
+        return response.WriteAsJsonAsync(body, cancellationToken);
+    }
+
+    private static string[]? ErrorCodesOf(HttpContext context) =>
+        context.Response.StatusCode is >= 400 and < 500
+        && context.Items[ErrorCodesKey] is SortedSet<string> { Count: > 0 } codes
+            ? [.. codes]
+            : null;
 
     private static LogEventLevel Level(HttpContext context, double elapsedMs, Exception? exception) =>
         exception is not null || context.Response.StatusCode >= StatusCodes.Status500InternalServerError
@@ -79,4 +120,21 @@ public static class RequestLine
         (context.GetEndpoint() ?? context.Features.Get<IExceptionHandlerFeature>()?.Endpoint) is RouteEndpoint endpoint
             ? endpoint.RoutePattern.RawText ?? Unmatched
             : Unmatched;
+}
+
+public sealed class ErrorCodesFilter : IAlwaysRunResultFilter
+{
+    public void OnResultExecuting(ResultExecutingContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (context.Result is ObjectResult { Value: IApiResponse response })
+        {
+            RequestLine.Note(context.HttpContext, response.Errors);
+        }
+    }
+
+    public void OnResultExecuted(ResultExecutedContext context)
+    {
+    }
 }

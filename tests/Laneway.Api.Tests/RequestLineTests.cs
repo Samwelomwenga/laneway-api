@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
@@ -61,6 +62,107 @@ public class RequestLineTests : ApiTests
         Assert.Equal(LogLevel.Information, line.Level);
         Assert.Equal("POST", line.GetStructuredStateValue("RequestMethod"));
         Assert.Equal("400", line.GetStructuredStateValue("StatusCode"));
+    }
+
+    [Fact]
+    public async Task A_validator_failure_logs_its_distinct_codes_sorted()
+    {
+        using var response = await SendFromAsync(
+            Ip, HttpMethod.Post, "/api/v1/workspaces", ActorUser,
+            new { name = "", description = new string('d', 1001), visibility = "Public" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var line = await RequestLineAsync(log => log.GetStructuredStateValue(ClientIp.Field) == Ip);
+        Assert.Equal(LogLevel.Information, line.Level);
+        Assert.Equal("[\"required\", \"tooLong\"]", line.GetStructuredStateValue("errorCodes"));
+    }
+
+    [Fact]
+    public async Task Malformed_json_logs_invalid_format()
+    {
+        using var body = new StringContent("{\"name\": ", Encoding.UTF8, "application/json");
+
+        using var response = await SendFromAsync(Ip, HttpMethod.Post, "/api/v1/workspaces", ActorUser, body);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var line = await RequestLineAsync(log => log.GetStructuredStateValue(ClientIp.Field) == Ip);
+        Assert.Equal("[\"invalidFormat\"]", line.GetStructuredStateValue("errorCodes"));
+    }
+
+    [Fact]
+    public async Task An_unknown_field_logs_its_code_and_never_its_name()
+    {
+        using var response = await SendFromAsync(
+            Ip, HttpMethod.Post, "/api/v1/workspaces", ActorUser,
+            new { name = "Finance", visibility = "Public", canaryField = 1 });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var line = await RequestLineAsync(log => log.GetStructuredStateValue(ClientIp.Field) == Ip);
+        Assert.Equal("[\"unknownField\"]", line.GetStructuredStateValue("errorCodes"));
+        Assert.DoesNotContain(Logs(), log => log.Message.Contains("canaryField", StringComparison.Ordinal)
+            || log.StructuredState!.Any(pair => pair.Value?.Contains("canaryField", StringComparison.Ordinal) == true));
+    }
+
+    [Fact]
+    public async Task A_rejected_upload_logs_its_code()
+    {
+        var workspace = await CreateWorkspaceAsync("Finance");
+        var board = await CreateBoardAsync(workspace.Id, "Budget");
+        var list = await CreateListAsync(board.Id, "Doing");
+        var card = await CreateCardAsync(list.Id, "Receipt");
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent("MZ not a picture"u8.ToArray()), "file", "payload.exe");
+
+        using var response = await SendFromAsync(Ip, HttpMethod.Post, $"/api/v1/cards/{card.Id}/attachments", ActorUser, form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var line = await RequestLineAsync(log => log.GetStructuredStateValue(ClientIp.Field) == Ip);
+        Assert.Equal("[\"typeNotAllowed\"]", line.GetStructuredStateValue("errorCodes"));
+    }
+
+    [Fact]
+    public async Task A_bad_unsubscribe_token_logs_invalid_token()
+    {
+        using var response = await SendFromAsync(
+            Ip, HttpMethod.Post, "/api/v1/invites/unsubscribe", body: new { token = "not-a-protected-payload" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var line = await RequestLineAsync(log => log.GetStructuredStateValue(ClientIp.Field) == Ip);
+        Assert.Equal("[\"invalidToken\"]", line.GetStructuredStateValue("errorCodes"));
+    }
+
+    [Fact]
+    public async Task A_csrf_refusal_logs_its_code()
+    {
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [ApiFactory.ClientIpHeader] = Ip };
+
+        using var response = await SendFromBrowserAsync(
+            "/api/v1/auth/sign-in", new { email = "nobody@example.com", password = "not the password" }, headers);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var line = await RequestLineAsync(log => log.GetStructuredStateValue(ClientIp.Field) == Ip);
+        Assert.Equal("[\"csrfRejected\"]", line.GetStructuredStateValue("errorCodes"));
+    }
+
+    [Fact]
+    public async Task A_missing_token_logs_not_authenticated()
+    {
+        using var response = await SendFromAsync(Ip, HttpMethod.Get, "/api/v1/workspaces");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var line = await RequestLineAsync(log => log.GetStructuredStateValue(ClientIp.Field) == Ip);
+        Assert.Equal("[\"notAuthenticated\"]", line.GetStructuredStateValue("errorCodes"));
+    }
+
+    [Fact]
+    public async Task A_success_logs_no_error_codes()
+    {
+        using var response = await SendFromAsync(
+            Ip, HttpMethod.Post, "/api/v1/workspaces", ActorUser, new { name = "Finance", visibility = "Public" });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var line = await RequestLineAsync(log => log.GetStructuredStateValue(ClientIp.Field) == Ip);
+        Assert.Null(line.GetStructuredStateValue("errorCodes"));
     }
 
     [Fact]

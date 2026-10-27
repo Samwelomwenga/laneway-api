@@ -1,3 +1,6 @@
+using System.Collections.Frozen;
+using System.Reflection;
+
 namespace Laneway.Api;
 
 public static class ErrorCodes
@@ -51,4 +54,10 @@ public static class ErrorCodes
     public const string LastMember = "lastMember";
     public const string InvalidToken = "invalidToken";
     public const string EmailNotVerified = "emailNotVerified";
+
+    public static FrozenSet<string> All { get; } = typeof(ErrorCodes)
+        .GetFields(BindingFlags.Public | BindingFlags.Static)
+        .Where(field => field.IsLiteral)
+        .Select(field => (string)field.GetRawConstantValue()!)
+        .ToFrozenSet(StringComparer.Ordinal);
 }

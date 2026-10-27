@@ -52,16 +52,24 @@ public sealed class DenialMeter
 
     public const string DroppedName = "laneway.authorization.denials.dropped";
 
+    public const string UnknownTargetName = "laneway.authorization.denials.unknown_target";
+
     private readonly Counter<long> _dropped;
+    private readonly Counter<long> _unknownTarget;
 
     public DenialMeter(IMeterFactory factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
 
-        _dropped = factory.Create(Name).CreateCounter<long>(DroppedName);
+        var meter = factory.Create(Name);
+        _dropped = meter.CreateCounter<long>(DroppedName);
+        _unknownTarget = meter.CreateCounter<long>(UnknownTargetName);
     }
 
     public void Dropped() => _dropped.Add(1);
+
+    public void UnknownTarget(AccessTarget target) =>
+        _unknownTarget.Add(1, new KeyValuePair<string, object?>("targetType", target.ToString()));
 }
 
 public sealed class DenialLog
@@ -112,14 +120,16 @@ public sealed partial class DenialDrainer : BackgroundService
     private static partial void DenialCheckFailed(ILogger logger, Exception exception);
 
     private readonly DenialLog _denials;
+    private readonly DenialMeter _meter;
     private readonly IServiceScopeFactory _scopes;
     private readonly ILogger _logger;
 
-    public DenialDrainer(DenialLog denials, IServiceScopeFactory scopes, ILoggerFactory loggers)
+    public DenialDrainer(DenialLog denials, DenialMeter meter, IServiceScopeFactory scopes, ILoggerFactory loggers)
     {
         ArgumentNullException.ThrowIfNull(loggers);
 
         _denials = denials;
+        _meter = meter;
         _scopes = scopes;
         _logger = loggers.CreateLogger(Category);
     }
@@ -143,6 +153,7 @@ public sealed partial class DenialDrainer : BackgroundService
     {
         if (denial.IsHidingNotFound && !await ExistsAsync(denial, token))
         {
+            _meter.UnknownTarget(denial.Target);
             return;
         }
 
