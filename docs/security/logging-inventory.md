@@ -8,7 +8,7 @@ The API ships logs over OTLP, with traces and metrics, through one exporter. Onl
 
 ## Backend
 
-Production ships to one Grafana Cloud stack on the free tier, in an EU region, per [ADR 0012](../adr/0012-grafana-cloud-for-telemetry-without-sentry.md). Local runs ship to the Aspire Dashboard. [The Grafana runbook](../runbooks/grafana.md) has the setup steps.
+Production ships to one Grafana Cloud stack, `lanewayapi`, on the free tier, in the EU region `prod-eu-west-2`, per [ADR 0012](../adr/0012-grafana-cloud-for-telemetry-without-sentry.md). Local runs ship to the Aspire Dashboard. [The Grafana runbook](../runbooks/grafana.md) has the setup steps.
 
 - The app's token holds `logs:write`, `traces:write`, and `metrics:write` only. It can't read or delete. The OTLP endpoint and the token live in Doppler, project `laneway-api`, config `prd`, never in appsettings.
 - No standing token holds `logs:delete`. The operator makes one only to purge a never-logged item that leaked, then revokes it.
