@@ -107,6 +107,24 @@ To fix a red run:
 - A `${{ }}` expression sits inside a `run:` script. Pass the value in through `env:` and read the variable in the script.
 - You accept the finding. Add `# zizmor: ignore[<audit>]` on the flagged line, followed by the reason. Every exception lives next to the line it excuses.
 
+## Terraform check
+
+The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on `terraform/alerting`. It holds no Grafana token and never runs `plan` or `apply`. The operator applies by hand, as [docs/runbooks/alerting.md](runbooks/alerting.md) says. It isn't in the `main` ruleset yet.
+
+To run it locally:
+
+```sh
+terraform -chdir=terraform fmt -check -recursive
+terraform -chdir=terraform/alerting init -backend=false
+terraform -chdir=terraform/alerting validate
+```
+
+To fix a red run:
+
+- Format failed. Run `terraform -chdir=terraform fmt -recursive` and commit the result.
+- Init failed on a provider version. Run `terraform -chdir=terraform/alerting init -upgrade -backend=false` and commit `.terraform.lock.hcl`.
+- Validate failed. The log names the file and line. A rule entry in `rules.tf` with a missing field fails here.
+
 ## PR title
 
 The check runs `.husky/csx/commit-lint.csx` on the PR title. Your `commit-msg` hook runs the same script on each commit message, so both follow one rule. A squash merge uses the PR title as the commit on main, which is why CI checks the title and not each commit.

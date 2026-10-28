@@ -10,6 +10,8 @@ public static class TelemetryPipeline
 {
     public const string OtlpEndpoint = "OTEL_EXPORTER_OTLP_ENDPOINT";
 
+    private const string RuntimeMeter = "System.Runtime";
+
     // See ADR 0011.
     public static WebApplicationBuilder AddTelemetry(this WebApplicationBuilder builder)
     {
@@ -38,7 +40,7 @@ public static class TelemetryPipeline
             .WithMetrics(metrics => metrics
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddMeter(AuthMeter.Name, DenialMeter.Name, MessageMeter.Name));
+                .AddMeter(AuthMeter.Name, DenialMeter.Name, MessageMeter.Name, RuntimeMeter));
 
         if (!string.IsNullOrWhiteSpace(builder.Configuration[OtlpEndpoint]))
         {

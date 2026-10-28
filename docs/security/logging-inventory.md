@@ -14,6 +14,7 @@ Production ships to one Grafana Cloud stack, `lanewayapi`, on the free tier, in 
 - No standing token holds `logs:delete`. The operator makes one only to purge a never-logged item that leaked, then revokes it.
 - Readers are named people, each with MFA. There is no shared login. The free tier allows 3 users.
 - Pro, at $19 a month, keeps 30 days. Laneway moves to Pro on the first paying customer, or on the first incident that needed older logs.
+- The .NET `System.Runtime` meter ships too, so production sends metrics every 60 seconds at zero traffic. The [logging stopped](../runbooks/alerts/logging-stopped.md) alert fires when they stop.
 - A 500 always shows as an `UnexpectedError` line. Application Observability's Exceptions tab lists only spans with an `exception` event, which only Npgsql adds. Sentry isn't used.
 - The free tier doesn't record who read what, and tamper evidence is access control, not cryptographic. [ADR 0004](../adr/0004-auth-targets-asvs-l2-with-exceptions.md#1642-logs-protected-from-access-and-edits-l2) lists both as exceptions.
 

@@ -2,7 +2,7 @@
 
 Production ships logs, traces, and metrics over OTLP to one Grafana Cloud stack on the free tier, in an EU region. [ADR 0012](../adr/0012-grafana-cloud-for-telemetry-without-sentry.md) records why. The [logging inventory](../security/logging-inventory.md#backend) lists the rules this page puts in place. Local runs ship to the Aspire Dashboard instead, as the README says.
 
-Everything on this page lives in Grafana Cloud and Doppler, not in the repo. If you change a setting by hand, change it here too.
+Alert rules and their routing live in the repo as Terraform. [The alerting runbook](alerting.md) covers them. Everything else on this page lives in Grafana Cloud and Doppler, not in the repo. If you change a setting by hand, change it here too.
 
 ## Create the stack
 
