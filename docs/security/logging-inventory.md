@@ -18,6 +18,29 @@ Production ships to one Grafana Cloud stack, `lanewayapi`, on the free tier, in 
 - A 500 always shows as an `UnexpectedError` line. Application Observability's Exceptions tab lists only spans with an `exception` event, which only Npgsql adds. Sentry isn't used.
 - The free tier doesn't record who read what, and tamper evidence is access control, not cryptographic. [ADR 0004](../adr/0004-auth-targets-asvs-l2-with-exceptions.md#1642-logs-protected-from-access-and-edits-l2) lists both as exceptions.
 
+## Alerting
+
+Grafana alerts the operator from these logs and counters. OWASP A09 asks for alert thresholds and a playbook per alert. Every rule but log usage reads production alone. Every threshold is a starting guess, retuned once real traffic exists. [The alerting runbook](../runbooks/alerting.md) has the queries and the thresholds.
+
+| Rule | Source | Tier | Playbook |
+|---|---|---|---|
+| Sign-in failure ratio | `laneway.auth.sign_in.attempts` | notify | [sign-in-failure-ratio.md](../runbooks/alerts/sign-in-failure-ratio.md) |
+| Refresh token reused | `laneway.auth.refresh{result=reused}` | page | [refresh-token-reused.md](../runbooks/alerts/refresh-token-reused.md) |
+| Delivery failed at Error | `Laneway.Message` `DeliveryFailed` at Error | page | [delivery-failed.md](../runbooks/alerts/delivery-failed.md) |
+| WebhookRejected run | `Laneway.Message` `WebhookRejected` | notify | [webhook-rejected-run.md](../runbooks/alerts/webhook-rejected-run.md) |
+| One clientIp burst | `Laneway.*` Warnings by `clientIp` | notify | [client-ip-burst.md](../runbooks/alerts/client-ip-burst.md) |
+| UnexpectedError | `Laneway.Api.ApiExceptionHandler` `UnexpectedError` | page | [unexpected-error.md](../runbooks/alerts/unexpected-error.md) |
+| Unknown value or field | `Laneway.Request` `RequestCompleted` with `unknownValue` or `unknownField` in `errorCodes` | notify | [unknown-value-or-field.md](../runbooks/alerts/unknown-value-or-field.md) |
+| Id scan | `laneway.authorization.denials.unknown_target` | notify | [id-scan.md](../runbooks/alerts/id-scan.md) |
+| Admin granted | `Laneway.Access` `MemberAdded` or `MemberRoleChanged` with `role` Admin | notify | [admin-granted.md](../runbooks/alerts/admin-granted.md) |
+| Made public | `Laneway.Access` `VisibilityChanged` to Public | notify | [made-public.md](../runbooks/alerts/made-public.md) |
+| Logging stopped | No Data on `dotnet.process.cpu.count` | page | [logging-stopped.md](../runbooks/alerts/logging-stopped.md) |
+| Log usage | `bytes_over_time` over the whole stack | notify | [log-usage.md](../runbooks/alerts/log-usage.md) |
+
+Two contact points carry them. `Laneway page` goes to Grafana IRM, which pushes to the operator's phone and emails after 15 minutes without an ack, and to Telegram. `Laneway notify` goes to email and Telegram. A rule whose query fails sends Grafana's `DatasourceError`, which goes to `Laneway notify`.
+
+The rules, the contact points, and the notification policy tree live in `terraform/alerting`. Terraform is the only way to change them. Provenance locks them in the Grafana UI, and the service account token that can write them lives in its own Doppler project, apart from the app's.
+
 ## Fields on every entry
 
 The record itself holds the time, the level, the category, the event id and name, the message template, the trace id and span id, and the exception when there is one. OTLP sends them as record fields, not attributes. OTLP calls the category the scope name. The stable key for an event is the scope name plus `EventName`, since ids repeat across categories. OpenTelemetry's experimental `OTEL_DOTNET_EXPERIMENTAL_LOGS_EMIT_EVENT_LOG_ATTRIBUTES` flag, which copies the id and name into attributes, stays off.

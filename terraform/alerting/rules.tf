@@ -84,6 +84,54 @@ locals {
     },
     {
       group         = "Every minute"
+      title         = "Unknown value or field"
+      playbook      = "unknown-value-or-field"
+      tier          = "notify"
+      summary       = "A request sent a value or a field the API doesn't know. Our clients never do that."
+      source        = "logs"
+      expr          = "sum(count_over_time(${local.logs} | scope_name=\"Laneway.Request\" | event_name=\"RequestCompleted\" | errorCodes=~`.*\"(unknownValue|unknownField)\".*` [15m]))"
+      range         = 900
+      fires_when    = { type = "gt", params = [0] }
+      no_data_state = "OK"
+    },
+    {
+      group         = "Every minute"
+      title         = "Id scan"
+      playbook      = "id-scan"
+      tier          = "notify"
+      summary       = "20 or more requests in 10 minutes named ids that don't exist."
+      source        = "metrics"
+      expr          = "sum(increase(laneway_authorization_denials_unknown_target_total{${local.metrics}}[10m]))"
+      range         = 600
+      fires_when    = { type = "gt", params = [19] }
+      no_data_state = "OK"
+    },
+    {
+      group         = "Every minute"
+      title         = "Admin granted"
+      playbook      = "admin-granted"
+      tier          = "notify"
+      summary       = "Someone became an admin of a workspace or a board."
+      source        = "logs"
+      expr          = "sum(count_over_time(${local.logs} | scope_name=\"Laneway.Access\" | event_name=~\"MemberAdded|MemberRoleChanged\" | role=\"Admin\" [5m]))"
+      range         = 300
+      fires_when    = { type = "gt", params = [0] }
+      no_data_state = "OK"
+    },
+    {
+      group         = "Every minute"
+      title         = "Made public"
+      playbook      = "made-public"
+      tier          = "notify"
+      summary       = "A workspace or a board became public."
+      source        = "logs"
+      expr          = "sum(count_over_time(${local.logs} | scope_name=\"Laneway.Access\" | event_name=\"VisibilityChanged\" | visibility=\"Public\" [5m]))"
+      range         = 300
+      fires_when    = { type = "gt", params = [0] }
+      no_data_state = "OK"
+    },
+    {
+      group         = "Every minute"
       title         = "Logging stopped"
       playbook      = "logging-stopped"
       tier          = "page"

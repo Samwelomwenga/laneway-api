@@ -16,6 +16,10 @@ The operator runs `plan` and `apply` by hand. CI runs only `terraform fmt -check
 | [WebhookRejected run](alerts/webhook-rejected-run.md) | LogQL | 5 or more in 15 min | notify |
 | [One clientIp burst](alerts/client-ip-burst.md) | LogQL, `Laneway.*` Warnings by `clientIp` | 30 or more from one address in 10 min | notify |
 | [UnexpectedError](alerts/unexpected-error.md) | LogQL | any in 5 min | page |
+| [Unknown value or field](alerts/unknown-value-or-field.md) | LogQL on `errorCodes` | any in 15 min | notify |
+| [Id scan](alerts/id-scan.md) | `laneway.authorization.denials.unknown_target` | 20 or more in 10 min | notify |
+| [Admin granted](alerts/admin-granted.md) | LogQL, `MemberAdded` or `MemberRoleChanged` with `role` Admin | any in 5 min | notify |
+| [Made public](alerts/made-public.md) | LogQL, `VisibilityChanged` to Public | any in 5 min | notify |
 | [Logging stopped](alerts/logging-stopped.md) | No Data on `dotnet.process.cpu.count` | no data for 10 min | page |
 | [Log usage](alerts/log-usage.md) | LogQL `bytes_over_time`, whole stack | over 1.33 GB in a day | notify |
 
@@ -70,7 +74,12 @@ Every rule but logging stopped treats no data as OK. A wrong label name makes a 
 1. In `grafanacloud-lanewayapi-logs`, run `{service_name="laneway-api", deployment_environment_name="production"} | event_name="RequestCompleted" | scope_name="Laneway.Request"`. Lines must come back. If none do, open one line's details and read the field names Loki gave the event name and the category, then fix `rules.tf` to match.
 2. Run the same with `| severity_text="Warning"` after a slow or refused request, and check a `clientIp` field shows.
 3. In `grafanacloud-lanewayapi-prom`, run `dotnet_process_cpu_count{deployment_environment_name="production", job="laneway-api"}` and `laneway_auth_csrf_rejections_total{deployment_environment_name="production"}`. Both must return a series. If the label is missing, Grafana didn't promote `deployment.environment.name`, and it sits on `target_info` only.
-4. Paste each rule's `expr` from `rules.tf` into Explore. Each must parse.
+4. Force each field the newer rules filter on, then find it in Explore:
+   - Send `POST /api/v1/workspaces` with a body that has an extra field, such as `{"name": "Test", "bogus": 1}`. Its `RequestCompleted` line must show `errorCodes` as `["unknownField"]`, quotes included. If Loki stores it another way, fix the `errorCodes` regex in `rules.tf`.
+   - Make a member of a test board admin. The `MemberRoleChanged` line must show `role` `Admin`.
+   - Make the test board public. The `VisibilityChanged` line must show `visibility` `Public`.
+   - Request a board by a random id. `laneway_authorization_denials_unknown_target_total{deployment_environment_name="production"}` must return a series within a minute.
+5. Paste each rule's `expr` from `rules.tf` into Explore. Each must parse.
 
 ## Apply
 
@@ -98,4 +107,4 @@ Set `TF_VAR_production_hosted=true` in Doppler, then plan and apply. Logging sto
 
 ## Changing a rule
 
-Edit `terraform/alerting/rules.tf` and its playbook in the same diff. Every rule names a `playbook`, and `AlertPlaybookTests` fails when the file is missing or lacks the five headings. Then plan and apply.
+Edit `terraform/alerting/rules.tf`, its playbook, its row in the Rules table above, and its row in the Alerting section of [the logging inventory](../security/logging-inventory.md#alerting) in the same diff. Every rule names a `playbook`, and `AlertPlaybookTests` fails when the file is missing, lacks the five headings, or the inventory row's title, tier, or playbook disagrees with `rules.tf`. Then plan and apply.

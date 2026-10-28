@@ -47,6 +47,24 @@ public partial class AlertPlaybookTests
         });
     }
 
+    [Fact]
+    public void The_inventory_lists_every_rule_with_its_tier_and_playbook()
+    {
+        var rules = Read("terraform/alerting/rules.tf");
+        var defined = RulePattern().Matches(rules)
+            .Select(match => $"{match.Groups[1].Value} | {match.Groups[3].Value} | {match.Groups[2].Value}")
+            .ToList();
+        var inventory = LoggingInventory.ReadMarkdown();
+        Assert.Contains("\n## Alerting\n", inventory, StringComparison.Ordinal);
+        var alerting = inventory.Split("\n## Alerting\n")[1].Split("\n## ")[0];
+        var listed = InventoryRowPattern().Matches(alerting)
+            .Select(match => $"{match.Groups[1].Value} | {match.Groups[2].Value} | {match.Groups[3].Value}")
+            .ToList();
+
+        Assert.Equal(TitlePattern().Matches(rules).Count, defined.Count);
+        Assert.Equal(defined.Order(StringComparer.Ordinal), listed.Order(StringComparer.Ordinal));
+    }
+
     private static string Read(string relative) => File.ReadAllText(PathOf(relative));
 
     private static string PathOf(string relative, [CallerFilePath] string source = "") =>
@@ -57,4 +75,10 @@ public partial class AlertPlaybookTests
 
     [GeneratedRegex("""^\s*playbook\s*=\s*"([a-z0-9-]+)"\s*$""", RegexOptions.Multiline)]
     private static partial Regex PlaybookPattern();
+
+    [GeneratedRegex("""^\s*title\s*=\s*"([^"]+)"\s*\n\s*playbook\s*=\s*"([a-z0-9-]+)"\s*\n\s*tier\s*=\s*"(page|notify)"\s*$""", RegexOptions.Multiline)]
+    private static partial Regex RulePattern();
+
+    [GeneratedRegex("""^\| ([^|]+?) \| [^|]+ \| (page|notify) \| \[([a-z0-9-]+)\.md\]\(\.\./runbooks/alerts/\3\.md\) \|$""", RegexOptions.Multiline)]
+    private static partial Regex InventoryRowPattern();
 }
