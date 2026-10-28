@@ -81,6 +81,8 @@ Every rule but logging stopped treats no data as OK. A wrong label name makes a 
    - Request a board by a random id. `laneway_authorization_denials_unknown_target_total{deployment_environment_name="production"}` must return a series within a minute.
 5. Paste each rule's `expr` from `rules.tf` into Explore. Each must parse.
 
+On 2026-10-29 every step passed. All twelve rule queries ran in Explore without an error. The unknown value or field, id scan, admin granted, and made public queries each returned a value after their event was forced, so `errorCodes` keeps its quotes in Loki and the regex matches. The prom data source's id is the default, `grafanacloud-prom`. The logs id is still to check.
+
 ## Apply
 
 State is local and never committed, until a future Terraform map picks a backend. Keep `terraform/alerting/terraform.tfstate` on the operator's machine, and back it up after each apply. It holds the contact point secrets.
