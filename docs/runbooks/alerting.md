@@ -67,6 +67,8 @@ TF_VAR_telegram_chat_id=<chat id>
 
 The rules query `grafanacloud-logs` and `grafanacloud-prom`, the uids Grafana Cloud gives its default data sources. A uid isn't the display name. Explore and the playbooks show the names, `grafanacloud-lanewayapi-logs` and `grafanacloud-lanewayapi-prom`. Open Connections, then Data sources, and check each one's uid in its URL. If they differ, set `TF_VAR_logs_datasource_uid` and `TF_VAR_metrics_datasource_uid` in Doppler.
 
+Both uids are the defaults. The operator checked the prom one on 2026-10-29 and the logs one on 2026-10-30, so Doppler needs neither override.
+
 ### Check the labels the rules use
 
 Every rule but logging stopped treats no data as OK. A wrong label name makes a rule return nothing and never fire. So check the labels against real data first. Run the arrival check in [the Grafana runbook](grafana.md#check-the-data-arrives), then in Explore:
@@ -81,7 +83,7 @@ Every rule but logging stopped treats no data as OK. A wrong label name makes a 
    - Request a board by a random id. `laneway_authorization_denials_unknown_target_total{deployment_environment_name="production"}` must return a series within a minute.
 5. Paste each rule's `expr` from `rules.tf` into Explore. Each must parse.
 
-On 2026-10-29 every step passed. All twelve rule queries ran in Explore without an error. The unknown value or field, id scan, admin granted, and made public queries each returned a value after their event was forced, so `errorCodes` keeps its quotes in Loki and the regex matches. The prom data source's id is the default, `grafanacloud-prom`. The logs id is still to check.
+On 2026-10-29 every step passed. All twelve rule queries ran in Explore without an error. The unknown value or field, id scan, admin granted, and made public queries each returned a value after their event was forced, so `errorCodes` keeps its quotes in Loki and the regex matches.
 
 ## Apply
 
