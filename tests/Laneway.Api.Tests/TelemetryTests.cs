@@ -54,6 +54,13 @@ public class TelemetryTests : ApiTests
     }
 
     [Fact]
+    public void A_runtime_metric_ships_with_no_traffic()
+    {
+        Assert.Contains(ShippedMetrics(), metric =>
+            metric.MeterName == "System.Runtime" && metric.Name == "dotnet.process.cpu.count");
+    }
+
+    [Fact]
     public async Task A_server_span_ships_without_the_user_agent()
     {
         using var response = await SignInWithTheWrongPasswordAsync(userAgent: "Mozilla/5.0 Canary/1.0");

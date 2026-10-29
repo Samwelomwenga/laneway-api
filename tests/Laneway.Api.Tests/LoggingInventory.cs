@@ -152,6 +152,8 @@ internal sealed partial class LoggingInventory
                     }
 
                     break;
+                case "Rule | Source | Tier | Playbook":
+                    break;
                 case "Field | Carries":
                     foreach (var row in Rows(section, table))
                     {

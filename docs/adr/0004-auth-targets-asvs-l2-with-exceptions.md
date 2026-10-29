@@ -52,3 +52,15 @@ The minimum password length is 8, which meets 6.2.1 at every level, so it isn't 
   - An event suppresses an address only when its `message-id` matches a delivery to that address. A leaked token can only suppress addresses Laneway already emailed.
   - The `webhook` rate limit, 600 per minute by IP, covers the route.
 - What closes it: Brevo signing webhooks, or fetching each event back from Brevo's events API before suppressing.
+
+### 16.4.2, logs protected from access and edits (L2)
+
+- What Laneway doesn't do: record who read the logs, or make them tamper evident by cryptography. The free tier of Grafana Cloud doesn't record who ran which query. Nothing chains or signs log entries.
+- Why: the budget allows only a free tier, per [ADR 0012](0012-grafana-cloud-for-telemetry-without-sentry.md). Grafana's audit logs cover changes and failed sign-ins, and only by support ticket.
+- Mitigating controls:
+  - Logs live in Grafana Cloud, apart from the app (16.4.3). A breached app can't reach them.
+  - Tamper evidence is access control. Only the tokens and readers below can touch the logs.
+  - The app's token holds `logs:write`, `traces:write`, and `metrics:write` only. It can't read or delete.
+  - No standing token holds `logs:delete`. The operator makes one only to purge a leaked never-logged item, then revokes it, as [the Grafana runbook](../runbooks/grafana.md#purge-a-leaked-item) says.
+  - Readers are named people, each with MFA. There is no shared login, and the free tier allows 3 users.
+- What closes it: a Grafana plan that records queries, or a move to a backend that does.

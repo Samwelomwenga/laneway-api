@@ -4,7 +4,42 @@ What Laneway logs about requests, auth, and unexpected errors, and what it never
 
 ## Sink
 
-The API ships logs over OTLP, with traces and metrics, through one exporter. Only startup failures and Serilog's own errors go to stderr. OTLP carries each field as its own attribute, so a value can't forge a second entry. Retention is 30 days, the longest a session lives, and the deploy enforces it.
+The API ships logs over OTLP, with traces and metrics, through one exporter. Only startup failures and Serilog's own errors go to stderr. OTLP carries each field as its own attribute, so a value can't forge a second entry. Retention is at most 30 days, the longest a session lives. Grafana's free tier keeps 14 until Laneway moves to Pro.
+
+## Backend
+
+Production ships to one Grafana Cloud stack, `lanewayapi`, on the free tier, in the EU region `prod-eu-west-2`, per [ADR 0012](../adr/0012-grafana-cloud-for-telemetry-without-sentry.md). Local runs ship to the Aspire Dashboard. [The Grafana runbook](../runbooks/grafana.md) has the setup steps.
+
+- The app's token holds `logs:write`, `traces:write`, and `metrics:write` only. It can't read or delete. The OTLP endpoint and the token live in Doppler, project `laneway-api`, config `prd`, never in appsettings.
+- No standing token holds `logs:delete`. The operator makes one only to purge a never-logged item that leaked, then revokes it.
+- Readers are named people, each with MFA. There is no shared login. The free tier allows 3 users.
+- Pro, at $19 a month, keeps 30 days. Laneway moves to Pro on the first paying customer, or on the first incident that needed older logs.
+- The .NET `System.Runtime` meter ships too, so production sends metrics every 60 seconds at zero traffic. The [logging stopped](../runbooks/alerts/logging-stopped.md) alert fires when they stop.
+- A 500 always shows as an `UnexpectedError` line. Application Observability's Exceptions tab lists only spans with an `exception` event, which only Npgsql adds. Sentry isn't used.
+- The free tier doesn't record who read what, and tamper evidence is access control, not cryptographic. [ADR 0004](../adr/0004-auth-targets-asvs-l2-with-exceptions.md#1642-logs-protected-from-access-and-edits-l2) lists both as exceptions.
+
+## Alerting
+
+Grafana alerts the operator from these logs and counters. OWASP A09 asks for alert thresholds and a playbook per alert. Every rule but log usage reads production alone. Every threshold is a starting guess, retuned once real traffic exists. [The alerting runbook](../runbooks/alerting.md) has the queries and the thresholds.
+
+| Rule | Source | Tier | Playbook |
+|---|---|---|---|
+| Sign-in failure ratio | `laneway.auth.sign_in.attempts` | notify | [sign-in-failure-ratio.md](../runbooks/alerts/sign-in-failure-ratio.md) |
+| Refresh token reused | `laneway.auth.refresh{result=reused}` | page | [refresh-token-reused.md](../runbooks/alerts/refresh-token-reused.md) |
+| Delivery failed at Error | `Laneway.Message` `DeliveryFailed` at Error | page | [delivery-failed.md](../runbooks/alerts/delivery-failed.md) |
+| WebhookRejected run | `Laneway.Message` `WebhookRejected` | notify | [webhook-rejected-run.md](../runbooks/alerts/webhook-rejected-run.md) |
+| One clientIp burst | `Laneway.*` Warnings by `clientIp` | notify | [client-ip-burst.md](../runbooks/alerts/client-ip-burst.md) |
+| UnexpectedError | `Laneway.Api.ApiExceptionHandler` `UnexpectedError` | page | [unexpected-error.md](../runbooks/alerts/unexpected-error.md) |
+| Unknown value or field | `Laneway.Request` `RequestCompleted` with `unknownValue` or `unknownField` in `errorCodes` | notify | [unknown-value-or-field.md](../runbooks/alerts/unknown-value-or-field.md) |
+| Id scan | `laneway.authorization.denials.unknown_target` | notify | [id-scan.md](../runbooks/alerts/id-scan.md) |
+| Admin granted | `Laneway.Access` `MemberAdded` or `MemberRoleChanged` with `role` Admin | notify | [admin-granted.md](../runbooks/alerts/admin-granted.md) |
+| Made public | `Laneway.Access` `VisibilityChanged` to Public | notify | [made-public.md](../runbooks/alerts/made-public.md) |
+| Logging stopped | No Data on `dotnet.process.cpu.count` | page | [logging-stopped.md](../runbooks/alerts/logging-stopped.md) |
+| Log usage | `bytes_over_time` over the whole stack | notify | [log-usage.md](../runbooks/alerts/log-usage.md) |
+
+Two contact points carry them. `Laneway page` goes to Grafana IRM, which pushes to the operator's phone and emails after 15 minutes without an ack, and to Telegram. `Laneway notify` goes to email and Telegram. A rule whose query fails sends Grafana's `DatasourceError`, which goes to `Laneway notify`.
+
+The rules, the contact points, and the notification policy tree live in `terraform/alerting`. Terraform is the only way to change them. Provenance locks them in the Grafana UI, and the service account token that can write them lives in its own Doppler project, apart from the app's.
 
 ## Fields on every entry
 

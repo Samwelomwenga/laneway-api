@@ -145,8 +145,29 @@ jobs:
           advanced-security: false
           annotations: true
 
+  terraform:
+    name: Terraform check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+      - name: Format check
+        run: terraform -chdir=terraform fmt -check -recursive
+      - name: Init
+        run: terraform -chdir=terraform/alerting init -backend=false -input=false
+      - name: Validate
+        run: terraform -chdir=terraform/alerting validate
+
   notify:
-    needs: [build, secret-scan, dependencies, trivy, codeql, zizmor]
+    needs: [build, secret-scan, dependencies, trivy, codeql, zizmor, terraform]
     if: failure()
     runs-on: ubuntu-latest
     permissions: {}
