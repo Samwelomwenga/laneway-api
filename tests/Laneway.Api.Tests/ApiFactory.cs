@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using OpenTelemetry.Logs;
@@ -88,6 +89,7 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
         {
             services.Insert(0, ServiceDescriptor.Transient<IStartupFilter, ClientIpFromHeader>());
             services.AddSingleton<TimeProvider>(Time);
+            services.Configure<ConsoleLifetimeOptions>(options => options.SuppressStatusMessages = true);
             services.ConfigureOpenTelemetryLoggerProvider(logging => logging.AddInMemoryExporter(ShippedLogs));
             services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddInMemoryExporter(ShippedSpans));
             services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddInMemoryExporter(ShippedMetrics));
