@@ -4,7 +4,7 @@ Grafana alerts the operator in two tiers. Page goes to Grafana IRM and Telegram.
 
 `terraform/alerting` holds the contact points, the notification policy tree, the IRM escalation, and the rules. The repo is the source of truth. Provenance stays on, so the Grafana UI locks what Terraform made, and a change made there is drift. Each rule links its playbook in [alerts/](alerts/) from its `runbook_url`.
 
-The operator runs `plan` and `apply` by hand. CI runs only `terraform fmt -check` and `terraform validate`, with no token.
+A merge to `main` that touches `terraform/alerting` plans it in CI. The apply waits for the operator to approve the `alerting` environment. [The Terraform runbook](terraform.md) covers the state, the secrets, and the tokens every root shares. The three IRM notification rules are the one part Terraform doesn't manage. The operator sets them by hand.
 
 ## Rules
 
@@ -43,8 +43,7 @@ Logging stopped stays paused while `production_hosted` is false. Nothing runs in
 
 1. Sign in to IRM once as the operator, so it knows the user.
 2. Install the Grafana IRM mobile app, sign in, and connect it from the operator's IRM profile.
-3. On the operator's IRM profile, delete the default notification rules. Terraform adds its own at positions 0 to 2, and old rules would run after them.
-4. In IRM settings, under API tokens, make a token named `terraform-alerting`. The provider needs it for personal notification rules alone.
+3. On the operator's IRM profile, delete the default notification rules and add three in this order: notify by mobile app, wait 15 minutes, notify by email. Terraform used to own these, but the provider manages personal rules only with an IRM API token. Keeping them by hand drops that token.
 
 ### Telegram
 
@@ -55,13 +54,15 @@ The CI bot can post these too. Make a separate chat for alerts, add the bot, and
 Make a Doppler project `laneway-alerting` with one config, `prd`. Keep it apart from `laneway-api`, so the app never holds a token that can change alerting. Add these in the dashboard, not the shell:
 
 ```sh
+TF_TOKEN_app_terraform_io=<HCP owners team token>
 TF_VAR_grafana_auth=<service account token>
-TF_VAR_oncall_access_token=<IRM API token>
 TF_VAR_operator_username=<the operator's Grafana username>
 TF_VAR_operator_email=<the operator's email>
 TF_VAR_telegram_bot_token=<bot token>
 TF_VAR_telegram_chat_id=<chat id>
 ```
+
+[The Terraform runbook](terraform.md) says how to make the HCP token, the service token, and the two GitHub environments.
 
 ### Data source ids
 
@@ -87,17 +88,10 @@ On 2026-10-29 every step passed. All twelve rule queries ran in Explore without 
 
 ## Apply
 
-State is local and never committed, until a future Terraform map picks a backend. Keep `terraform/alerting/terraform.tfstate` on the operator's machine, and back it up after each apply. It holds the contact point secrets.
-
-```sh
-cd terraform/alerting
-terraform init
-doppler run --project laneway-alerting --config prd -- terraform plan -out=alerting.tfplan
-doppler run --project laneway-alerting --config prd -- terraform apply alerting.tfplan
-rm alerting.tfplan
-```
-
-Read the plan before applying. Delete `alerting.tfplan` after, since it holds the secrets too.
+1. If you want, plan locally first, as [the Terraform runbook](terraform.md#run-terraform-locally) shows.
+2. Merge the PR. `Terraform alerting` starts on `main`.
+3. Read the change list in the `Plan` job's summary. It shows each address and its action, and nothing else.
+4. In the run, click Review deployments, tick `alerting`, and approve. `Apply` plans again, checks the list didn't move, and applies.
 
 ## Check a test alert arrives
 
@@ -107,8 +101,8 @@ Read the plan before applying. Delete `alerting.tfplan` after, since it holds th
 
 ## Once production is hosted
 
-Set `TF_VAR_production_hosted=true` in Doppler, then plan and apply. Logging stopped starts evaluating.
+Open a PR that sets the `production_hosted` default to `true` in `terraform/alerting/variables.tf`. The first production deploy does this once its health check passes. Once the PR merges and the apply goes through, logging stopped starts evaluating. The value stays out of Doppler.
 
 ## Changing a rule
 
-Edit `terraform/alerting/rules.tf`, its playbook, its row in the Rules table above, and its row in the Alerting section of [the logging inventory](../security/logging-inventory.md#alerting) in the same diff. Every rule names a `playbook`, and `AlertPlaybookTests` fails when the file is missing, lacks the five headings, or the inventory row's title, tier, or playbook disagrees with `rules.tf`. Then plan and apply.
+Edit `terraform/alerting/rules.tf`, its playbook, its row in the Rules table above, and its row in the Alerting section of [the logging inventory](../security/logging-inventory.md#alerting) in the same diff. Every rule names a `playbook`, and `AlertPlaybookTests` fails when the file is missing, lacks the five headings, or the inventory row's title, tier, or playbook disagrees with `rules.tf`. Merge the PR, read the change list, and approve the gate.
