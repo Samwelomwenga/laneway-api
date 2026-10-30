@@ -4,7 +4,8 @@ WORKDIR /src
 COPY Directory.Build.props Directory.Packages.props global.json Laneway.Api.csproj ./
 RUN dotnet restore Laneway.Api.csproj
 COPY . .
-RUN dotnet publish Laneway.Api.csproj --no-restore -c Release -o /app/publish -p:UseAppHost=false
+ARG VERSION=0.0.0-pr
+RUN dotnet publish Laneway.Api.csproj --no-restore -c Release -o /app/publish -p:UseAppHost=false -p:Version=$VERSION
 
 FROM build AS migrations
 RUN dotnet tool restore \
