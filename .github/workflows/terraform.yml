@@ -1,0 +1,128 @@
+name: Terraform
+
+on:
+  workflow_call:
+    inputs:
+      root:
+        description: Folder under terraform/ that holds the root, such as alerting
+        required: true
+        type: string
+    secrets:
+      telegram-bot-token:
+        required: false
+      telegram-chat-id:
+        required: false
+
+permissions: {}
+
+env:
+  ALLOWED_ENDPOINTS: >-
+    api.doppler.com:443
+    api.github.com:443
+    app.terraform.io:443
+    cli.doppler.com:443
+    github.com:443
+    lanewayapi.grafana.net:443
+    objects.githubusercontent.com:443
+    oncall-prod-eu-west-0.grafana.net:443
+    registry.terraform.io:443
+    release-assets.githubusercontent.com:443
+    releases.hashicorp.com:443
+  CHECKPOINT_DISABLE: 1
+  DOPPLER_ENABLE_VERSION_CHECK: false
+  TF_IN_AUTOMATION: 1
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.root }}-plan
+    permissions:
+      contents: read
+    outputs:
+      digest: ${{ steps.plan.outputs.digest }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: block
+          allowed-endpoints: ${{ env.ALLOWED_ENDPOINTS }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the Terraform version
+        id: version
+        env:
+          ROOT: ${{ inputs.root }}
+        run: |
+          version=$(sed -nE 's/^\s*required_version\s*=\s*"([0-9.]+)"\s*$/\1/p' "terraform/$ROOT/versions.tf")
+          if [[ -z "$version" ]]; then
+            echo "::error::terraform/$ROOT/versions.tf pins no exact required_version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ steps.version.outputs.version }}
+          terraform_wrapper: false
+      - uses: dopplerhq/cli-action@4819d808ab99e5cde19a0637a16536a4038fad73 # v4.0.1
+      - name: Plan
+        id: plan
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          ROOT: ${{ inputs.root }}
+        run: doppler run -- bash scripts/terraform-plan.sh "$ROOT"
+
+  apply:
+    name: Apply
+    needs: plan
+    if: needs.plan.outputs.digest != 'none'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.root }}
+    permissions:
+      contents: read
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: block
+          allowed-endpoints: ${{ env.ALLOWED_ENDPOINTS }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ needs.plan.outputs.version }}
+          terraform_wrapper: false
+      - uses: dopplerhq/cli-action@4819d808ab99e5cde19a0637a16536a4038fad73 # v4.0.1
+      - name: Plan again
+        id: plan
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          ROOT: ${{ inputs.root }}
+        run: doppler run -- bash scripts/terraform-plan.sh "$ROOT"
+      - name: Compare with the approved plan
+        env:
+          APPROVED: ${{ needs.plan.outputs.digest }}
+          CURRENT: ${{ steps.plan.outputs.digest }}
+        run: |
+          if [[ "$CURRENT" != "$APPROVED" ]]; then
+            echo "::error::The change list moved since the Plan job. Compare both lists in the job summaries, then rerun the workflow."
+            exit 1
+          fi
+      - name: Apply
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          ROOT: ${{ inputs.root }}
+        run: doppler run -- terraform -chdir="terraform/$ROOT" apply -input=false -lock-timeout=5m tfplan > /dev/null
+
+  notify:
+    needs: [plan, apply]
+    if: failure()
+    permissions: {}
+    uses: $/.github/workflows/telegram-alert.yml
+    with:
+      message: Terraform plan or apply failed for ${{ inputs.root }}
+      needs: ${{ toJSON(needs) }}
+    secrets:
+      telegram-bot-token: ${{ secrets.telegram-bot-token }}
+      telegram-chat-id: ${{ secrets.telegram-chat-id }}
