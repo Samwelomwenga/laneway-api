@@ -17,6 +17,7 @@ updates:
           - "Microsoft.AspNetCore.*"
           - "Microsoft.EntityFrameworkCore*"
           - "Npgsql.EntityFrameworkCore.PostgreSQL"
+          - "dotnet-ef"
       fluentvalidation:
         patterns:
           - "FluentValidation*"
@@ -31,6 +32,8 @@ updates:
       - dependency-name: "Microsoft.EntityFrameworkCore*"
         update-types: ["version-update:semver-major"]
       - dependency-name: "Npgsql.EntityFrameworkCore.PostgreSQL"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "dotnet-ef"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: dotnet-sdk
