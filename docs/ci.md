@@ -1,6 +1,6 @@
 # CI
 
-CI runs no tests. A green PR means the code builds and passes the checks below. Run `dotnet test` before you push.
+PRs run no tests. A green PR means the code builds and passes the checks below. The full suite runs after the merge, on every push to main, as [main.yml](#mainyml) says. Run `dotnet test` before you push, so main doesn't go red.
 
 Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
 
@@ -195,17 +195,52 @@ To fix a red run, edit the PR title. The log lists what failed and shows valid e
 
 When any `CI` check fails, `notify` sends one Telegram message. It isn't a required check. It shows as a skipped `notify` on a green run, and it never goes red. When it runs, GitHub names the check `notify / Send`, after the caller job and the called job. `PR title` sends no alert. A cancelled run sends nothing, even when a job failed before a newer push cancelled it.
 
-`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. Today `ci.yml` is its only caller. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
+`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. `ci.yml` and `main.yml` call it. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
 
 A caller job uses `needs` plus `if: failure()`, passes `toJSON(needs)` and a `message` headline as inputs, and passes `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` by name. Never `secrets: inherit`. Titles and refs go in through `inputs` and reach the script through `env`, never through `${{ }}` inside `run:`. `ref` and `sha` are optional and default to the run's own ref name and SHA. `ci.yml` passes the PR number with the head branch, and the head SHA, because the run's own SHA is the merge commit.
 
-The alert job's log prints its `env`, and `NEEDS` holds the outputs of every job in `needs`. No `ci.yml` job has outputs today. A caller whose jobs set outputs must keep secrets and plan text out of them.
+The alert job's log prints its `env`, and `NEEDS` holds the outputs of every job in `needs`. No job in `ci.yml` or `main.yml` has outputs today. A caller whose jobs set outputs must keep secrets and plan text out of them.
 
 `telegram-alert.yml` reads both secrets. Doppler syncs them to the repo's Actions secrets and Dependabot secrets, because a Dependabot run reads only Dependabot secrets. A PR from a fork gets no secrets, so `notify` skips the call without a word. On any other run, a missing secret prints `Telegram secrets missing, failure alert not sent` as a warning. If you see that warning, check the Doppler sync. [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) has the setup steps. A failed send prints `Telegram alert failed to send`.
 
 The alert job has no checkout, and harden-runner blocks every host but `api.telegram.org`, since it holds the bot token.
 
 In a workflow with an alert job, a new job goes in that alert job's `needs` list. Otherwise its failures send no alert.
+
+## main.yml
+
+Every push to main runs `.github/workflows/main.yml`, the `Main` workflow. It has three jobs: `Tests`, `CodeQL (SAST)` and `Trivy filesystem scan`. None of them is a required check, since they run after the merge. A failed job sends a Telegram alert through `notify`, the same way `ci.yml` does, with `Laneway main failed` as the headline.
+
+Runs on main never cancel each other. They share the concurrency group `main` with `cancel-in-progress: false`, so a push waits for the run before it, and every commit on main gets a verdict of its own. The release will read that verdict and refuse to build a commit whose `main.yml` run isn't green.
+
+### Tests
+
+The job runs the full suite, the same `dotnet test` you run locally. Testcontainers starts `postgres:18` in the runner's Docker. Storage comes from the local Supabase stack. The workflow pins the Supabase CLI version in its `supabase/setup-cli` step, and `supabase start -x` leaves out every service storage doesn't need, so only the database, Kong, storage-api and auth start. Storage runs fine without auth, but `supabase status` prints no keys while auth is stopped. The test step reads `API_URL` and `SERVICE_ROLE_KEY` from `supabase status -o env` and hands them to the tests as `Supabase__Url` and `Supabase__ServiceRoleKey`. They are the local stack's public demo keys, not secrets.
+
+The test step sets `DOTNET_USE_POLLING_FILE_WATCHER=1`. Every test host watches the appsettings files. Without polling, a full run uses up the inotify instances and the later tests fail in 1 ms each.
+
+Harden-runner stays on audit for this job. Testcontainers and the CLI pull images from several registries, and that list is hard to pin down up front.
+
+Dependabot doesn't bump the CLI version, since it is an input to the action and not a dependency Dependabot reads. Bump it by hand. Then check that every name after `-x` is still in the list `supabase start --help` prints, because the CLI renames services now and then.
+
+To run it locally, start the stack with `supabase start`, put `Supabase:Url` and `Supabase:ServiceRoleKey` in the test project's user secrets, and run:
+
+```sh
+DOTNET_USE_POLLING_FILE_WATCHER=1 dotnet test Laneway.Api.sln
+```
+
+To fix a red run:
+
+- A test failed. The log names the test and the failed assertion. Run its class locally with `dotnet test Laneway.Api.sln --filter <ClassName>`, and fix it in a new PR.
+- Many tests failed in 1 ms each, with `The configured user limit (1024) on the number of inotify instances has been reached`. The polling variable is missing from the test step. Put it back.
+- `Start storage` failed. The log names the service. If the CLI says a name after `-x` is unknown, take the current name from `supabase start --help`.
+- Every test failed with `The test run needs Supabase:Url and Supabase:ServiceRoleKey`. `supabase status -o env` printed no `SERVICE_ROLE_KEY`. Check that `gotrue` isn't in the `-x` list. If it isn't, the CLI renamed the variables. Run `supabase status -o env` locally on the pinned version and fix the names in the test step.
+
+### Scans on main
+
+The `CodeQL (SAST)` and `Trivy filesystem scan` jobs are copies of the ones in `ci.yml`. Change both files together. Their results give code scanning a main baseline. GitHub compares each PR's analysis to the latest one on main, so a PR shows only the alerts it adds. Trivy uploads under the same `trivy` category as on PRs.
+
+`CodeQL (SAST)` stays green with findings here too, so a new CodeQL alert on main shows only in the Security tab. A red Trivy job on main means a finding got merged, or a new advisory came out for a package main already uses. Fix it in a PR, with the steps under [Trivy filesystem scan](#trivy-filesystem-scan).
 
 ## Local hooks
 
