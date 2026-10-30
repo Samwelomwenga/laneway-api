@@ -1,0 +1,66 @@
+name: Telegram alert
+
+on:
+  workflow_call:
+    inputs:
+      message:
+        description: First line of the alert, such as "Laneway CI failed"
+        required: true
+        type: string
+      needs:
+        description: The caller job's needs context, as toJSON(needs)
+        required: true
+        type: string
+      ref:
+        description: Ref shown in the alert. Defaults to the run's ref name.
+        required: false
+        type: string
+        default: ''
+      sha:
+        description: Commit shown in the alert. Defaults to the run's SHA.
+        required: false
+        type: string
+        default: ''
+    secrets:
+      telegram-bot-token:
+        required: false
+      telegram-chat-id:
+        required: false
+
+permissions: {}
+
+jobs:
+  send:
+    name: Send
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: block
+          allowed-endpoints: api.telegram.org:443
+      - name: Send Telegram alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.telegram-bot-token }}
+          TELEGRAM_CHAT_ID: ${{ secrets.telegram-chat-id }}
+          MESSAGE: ${{ inputs.message }}
+          NEEDS: ${{ inputs.needs }}
+          REF: ${{ inputs.ref }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          if [[ -z "$TELEGRAM_BOT_TOKEN" || -z "$TELEGRAM_CHAT_ID" ]]; then
+            echo "::warning::Telegram secrets missing, failure alert not sent"
+            exit 0
+          fi
+          failed=$(jq -r '[to_entries[] | select(.value.result == "failure") | .key] | join(", ")' <<< "$NEEDS")
+          ref=${REF:-$GITHUB_REF_NAME}
+          sha=${SHA:-$GITHUB_SHA}
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          text=$(printf '%s\nWorkflow: %s\nFailed jobs: %s\nRef: %s\nCommit: %s\n%s' \
+            "$MESSAGE" "$GITHUB_WORKFLOW" "$failed" "$ref" "${sha:0:7}" "$run_url")
+          if ! curl --silent --show-error --fail --max-time 30 \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=$text" \
+            "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" > /dev/null; then
+            echo "::warning::Telegram alert failed to send"
+          fi
