@@ -1,0 +1,25 @@
+name: Terraform alerting
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - terraform/alerting/**
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: terraform-alerting
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    permissions:
+      contents: read
+    uses: $/.github/workflows/terraform.yml
+    with:
+      root: alerting
+    secrets:
+      telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
