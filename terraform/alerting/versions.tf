@@ -18,7 +18,6 @@ terraform {
 }
 
 provider "grafana" {
-  url                 = var.grafana_url
-  auth                = var.grafana_auth
-  oncall_access_token = var.oncall_access_token
+  url  = var.grafana_url
+  auth = var.grafana_auth
 }

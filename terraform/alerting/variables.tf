@@ -9,12 +9,6 @@ variable "grafana_auth" {
   sensitive   = true
 }
 
-variable "oncall_access_token" {
-  description = "IRM API token. The provider manages personal notification rules only with one."
-  type        = string
-  sensitive   = true
-}
-
 variable "operator_username" {
   description = "The operator's Grafana username, the one person on the rota."
   type        = string
