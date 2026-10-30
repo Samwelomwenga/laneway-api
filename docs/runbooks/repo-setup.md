@@ -113,7 +113,7 @@ The `notify` section of [docs/ci.md](../ci.md#notify) says what the alert does a
 5. Add a second sync from the same config, target Dependabot secrets.
 6. Check that both secrets appear under Settings, Secrets and variables, in Actions and in Dependabot.
 
-Step 7 of the rollout tests it. If no message arrives, check the `notify` log for the missing-secrets warning.
+Step 7 of the rollout tests it. If no message arrives, check the `notify / Send` job log for the missing-secrets warning.
 
 ## Dependabot checks
 
