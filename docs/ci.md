@@ -2,7 +2,7 @@
 
 CI runs no tests. A green PR means the code builds and passes the checks below. Run `dotnet test` before you push.
 
-Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
+Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. [Terraform alerting](#terraform-alerting) runs on `main` after a merge, not on PRs. Each section heading is the check name GitHub shows on the PR. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
 
 ## Build & format
 
@@ -109,7 +109,7 @@ To fix a red run:
 
 ## Terraform check
 
-The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on `terraform/alerting`. It holds no Grafana token and never runs `plan` or `apply`. The operator applies by hand, as [docs/runbooks/alerting.md](runbooks/alerting.md) says. It isn't in the `main` ruleset yet.
+The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on `terraform/alerting`. It holds no secrets, has no path filter, and never runs `plan` or `apply`. `init -backend=false` skips the `cloud` block, so it needs no HCP token. [Terraform alerting](#terraform-alerting) plans and applies after the merge. It isn't in the `main` ruleset yet.
 
 To run it locally:
 
@@ -150,7 +150,7 @@ To fix a red run, edit the PR title. The log lists what failed and shows valid e
 
 When any `CI` check fails, `notify` sends one Telegram message. It isn't a required check. It shows as a skipped `notify` on a green run, and it never goes red. When it runs, GitHub names the check `notify / Send`, after the caller job and the called job. `PR title` sends no alert. A cancelled run sends nothing, even when a job failed before a newer push cancelled it.
 
-`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. Today `ci.yml` is its only caller. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
+`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. Its callers are `ci.yml` and `terraform.yml`. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
 
 A caller job uses `needs` plus `if: failure()`, passes `toJSON(needs)` and a `message` headline as inputs, and passes `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` by name. Never `secrets: inherit`. Titles and refs go in through `inputs` and reach the script through `env`, never through `${{ }}` inside `run:`. `ref` and `sha` are optional and default to the run's own ref name and SHA. `ci.yml` passes the PR number with the head branch, and the head SHA, because the run's own SHA is the merge commit.
 
@@ -161,6 +161,28 @@ The alert job's log prints its `env`, and `NEEDS` holds the outputs of every job
 The alert job has no checkout, and harden-runner blocks every host but `api.telegram.org`, since it holds the bot token.
 
 In a workflow with an alert job, a new job goes in that alert job's `needs` list. Otherwise its failures send no alert.
+
+## Terraform alerting
+
+`.github/workflows/terraform-alerting.yml` runs on a push to `main` that touches `terraform/alerting/**`, and by hand from the Actions tab. It calls `.github/workflows/terraform.yml`, the one reusable workflow every Terraform root uses, with `root: alerting`. Runs for one root never overlap or cancel each other mid-run, so an apply waiting at the gate holds the next push back. GitHub keeps one waiting run per root. A newer push replaces a waiting one, which is safe because the newer run plans all of `main`. [docs/runbooks/terraform.md](runbooks/terraform.md) has the setup.
+
+The run has three jobs:
+
+- `Plan` runs in the `alerting-plan` environment. It reads the Terraform version from `terraform/alerting/versions.tf`, loads the root's secrets with `doppler run`, and runs `scripts/terraform-plan.sh`. The log and the job summary show each changed address and its action, such as `create grafana_folder.laneway`. No attribute values appear, because the repo is public.
+- `Apply` runs in the `alerting` environment and waits for the operator to approve. It plans again, compares the change list with `Plan`'s, and fails if they differ. Then it applies that plan. No plan file leaves the runner. When `Plan` finds no changes, `Apply` shows as skipped.
+- `notify` sends one Telegram message, `Terraform plan or apply failed for alerting`, when either job fails. GitHub marks `Apply` failed when the operator rejects the gate or the gate times out, so those alert too. `notify` is skipped otherwise.
+
+Both jobs that hold the Doppler token run harden-runner with `egress-policy: block`. The runbook's [allowlist check](runbooks/terraform.md#check-the-egress-allowlist) says how to find a missing host.
+
+To fix a red run:
+
+- `Plan` failed at init with a 401. `TF_TOKEN_app_terraform_io` in Doppler expired or was revoked. Rotate it, as the runbook says.
+- `Plan` failed before init, at `doppler run`. The `DOPPLER_TOKEN` secret on the environment expired. Generate a new one and set it on both environments.
+- `Plan` failed on a provider error, such as a 401 from Grafana. The provider token in Doppler expired or lost a role. The error names the resource.
+- A step failed with a connection error to a host. harden-runner blocked it. Add the host to `ALLOWED_ENDPOINTS` at the top of `terraform.yml`.
+- `Plan` failed with a lock error. Another run or a local run holds the HCP state lock. Wait for it, or unlock the workspace in HCP once you're sure nothing is running.
+- `Apply` failed on `The change list moved since the Plan job`. Someone changed the resources between the two plans, often in the Grafana UI. Read both summaries, then run the workflow again by hand so `Plan` sees the new state.
+- `Apply` failed partway. Some resources changed and others didn't. HCP holds the state of what did change. Fix forward with a PR, or rerun the workflow by hand if the cause was outside the repo.
 
 ## Local hooks
 
