@@ -2,7 +2,7 @@
 
 PRs run no tests. A green PR means the code builds and passes the checks below. The full suite runs after the merge, on every push to main, as [main.yml](#mainyml) says. Run `dotnet test` before you push, so main doesn't go red.
 
-Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
+Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR, except [main.yml](#mainyml), whose jobs run after the merge. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
 
 ## Build & format
 
@@ -211,7 +211,9 @@ In a workflow with an alert job, a new job goes in that alert job's `needs` list
 
 Every push to main runs `.github/workflows/main.yml`, the `Main` workflow. It has three jobs: `Tests`, `CodeQL (SAST)` and `Trivy filesystem scan`. None of them is a required check, since they run after the merge. A failed job sends a Telegram alert through `notify`, the same way `ci.yml` does, with `Laneway main failed` as the headline.
 
-Runs on main never cancel each other. They share the concurrency group `main` with `cancel-in-progress: false`, so a push waits for the run before it, and every commit on main gets a verdict of its own. The release will read that verdict and refuse to build a commit whose `main.yml` run isn't green.
+Runs on main share the concurrency group `main` with `cancel-in-progress: false`, so a running job is never cut short. A new push waits for the run before it. GitHub keeps only one waiting run per group, though. If a third push lands while one run is going and one is waiting, GitHub cancels the waiting run, and that commit gets no verdict and no alert.
+
+The release will read the verdict and refuse to build a commit whose `main.yml` run isn't green. To release a commit whose run was cancelled, rerun that run from the Actions tab first.
 
 ### Tests
 
