@@ -292,7 +292,7 @@ A failed sweep, drain, or poll keeps the batches it already finished, and the ne
 
 `ApiExceptionHandler` doesn't log the foreign-key 400 or the unique-violation 409. They're expected outcomes.
 
-On .NET 9, `ExceptionHandlerMiddleware` logs every exception before the handler runs, so `Program.cs` filters that category out. The filter costs two rarer entries from the same category. One says the response had already started, so the handler never ran. The other carries the exception when `ApiExceptionHandler` itself throws. In both cases Kestrel still logs the original exception. .NET 10 adds `SuppressDiagnosticsCallback`, which mutes only the duplicate, and the upgrade should swap the filter for it.
+On .NET 10, `ExceptionHandlerMiddleware` skips its own log and metrics whenever an `IExceptionHandler` returns true from `TryHandleAsync`. `ApiExceptionHandler` always does, so the middleware logs nothing for a handled exception and no config mutes its category. It still logs at Warning or above in the two cases the handler never finishes. One is a response that has already started. The other is `ApiExceptionHandler` throwing.
 
 ## Meter
 
