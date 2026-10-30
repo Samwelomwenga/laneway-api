@@ -133,7 +133,7 @@ To fix a red run:
 
 ## Image build / Build and scan
 
-The check builds Laneway's container image and scans it with Trivy. It runs on every PR, fork PRs included, with no path filter. GitHub names a check from a reusable workflow `<caller job> / <called job>`, so the `main` ruleset lists it as `Image build / Build and scan`.
+The check builds Laneway's container image and scans it with Trivy. It runs on every PR, fork PRs included, with no path filter. GitHub names a check from a reusable workflow `<caller job> / <called job>`, so the check reports as `Image build / Build and scan`. It isn't in the `main` ruleset yet.
 
 The `Image build` job in `ci.yml` has no steps of its own. It calls `.github/workflows/image.yml`, the one workflow that builds the image. The release will call it too, with push and attest on. On a PR both stay off, so nothing leaves the runner.
 
@@ -150,7 +150,7 @@ To run it locally:
 
 ```sh
 docker build -t laneway-api:scan .
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed laneway-api:scan
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/src" -w /src aquasec/trivy image --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed laneway-api:scan
 ```
 
 To fix a red run:
@@ -166,7 +166,7 @@ To fix a red run:
   CVE-2026-12345 exp:2026-12-31
   ```
 
-  After the expiry date the gate fails on it again. Every entry needs both, so an accepted finding gets looked at again instead of staying hidden. `Trivy filesystem scan` reads the same file.
+  After the expiry date the gate fails on it again. Every entry needs both, so someone looks at an accepted finding again instead of letting it hide. `Trivy filesystem scan` reads the same file.
 
 ## PR title
 
