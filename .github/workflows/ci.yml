@@ -174,7 +174,7 @@ jobs:
     with:
       message: Laneway CI failed
       needs: ${{ toJSON(needs) }}
-      ref: PR #${{ github.event.pull_request.number }} ${{ github.head_ref }}
+      ref: 'PR #${{ github.event.pull_request.number }} ${{ github.head_ref }}'
       sha: ${{ github.event.pull_request.head.sha }}
     secrets:
       telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
