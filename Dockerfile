@@ -11,7 +11,7 @@ RUN dotnet tool restore \
     && CONNECTIONSTRINGS__DEFAULTCONNECTION='Host=localhost;Database=laneway' \
        dotnet ef migrations bundle --project Laneway.Api.csproj --configuration Release --output /app/efbundle
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra@sha256:9b755ea799ae649141a073e30d8b62d8095a5465af2b7694d17866e8c05131d8
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.0-noble-chiseled-extra@sha256:64f42416803e32bee1f5d2d3eab5825581abd45b2e9c6f888fc873ff2c4cc378
 WORKDIR /app
 COPY --from=build /app/publish .
 COPY --from=migrations /app/efbundle /app/efbundle
