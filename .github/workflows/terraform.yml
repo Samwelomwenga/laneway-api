@@ -7,6 +7,11 @@ on:
         description: Folder under terraform/ that holds the root, such as alerting
         required: true
         type: string
+      drift:
+        description: Plan with -detailed-exitcode, fail on any change, and never apply
+        required: false
+        type: boolean
+        default: false
     secrets:
       telegram-bot-token:
         required: false
@@ -70,13 +75,14 @@ jobs:
         id: plan
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          DRIFT: ${{ inputs.drift && '--drift' || '' }}
           ROOT: ${{ inputs.root }}
-        run: doppler run -- bash scripts/terraform-plan.sh "$ROOT"
+        run: doppler run -- bash scripts/terraform-plan.sh "$ROOT" ${DRIFT:+"$DRIFT"}
 
   apply:
     name: Apply
     needs: plan
-    if: needs.plan.outputs.digest != 'none'
+    if: needs.plan.outputs.digest != 'none' && !inputs.drift
     runs-on: ubuntu-latest
     environment: ${{ inputs.root }}
     permissions:
@@ -121,7 +127,7 @@ jobs:
     permissions: {}
     uses: $/.github/workflows/telegram-alert.yml
     with:
-      message: Terraform plan or apply failed for ${{ inputs.root }}
+      message: Terraform ${{ inputs.drift && 'drift check' || 'plan or apply' }} failed for ${{ inputs.root }}
       needs: ${{ toJSON(needs) }}
     secrets:
       telegram-bot-token: ${{ secrets.telegram-bot-token }}

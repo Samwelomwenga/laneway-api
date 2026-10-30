@@ -2,14 +2,35 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-root=${1:?usage: terraform-plan.sh <root>}
+usage="usage: terraform-plan.sh <root> [--drift]"
+root=${1:?$usage}
+case ${2:-} in
+  "") drift=false ;;
+  --drift) drift=true ;;
+  *)
+    echo "$usage" >&2
+    exit 1
+    ;;
+esac
 dir="terraform/$root"
 
+plan_args=(-input=false -lock-timeout=5m -out=tfplan)
+if $drift; then
+  plan_args+=(-detailed-exitcode)
+fi
+
 terraform -chdir="$dir" init -input=false -lockfile=readonly
-terraform -chdir="$dir" plan -input=false -lock-timeout=5m -out=tfplan > /dev/null
+status=0
+terraform -chdir="$dir" plan "${plan_args[@]}" > /dev/null || status=$?
+if [[ $status == 1 ]]; then
+  exit 1
+fi
 
 changes=$(terraform -chdir="$dir" show -json tfplan |
-  jq -r '.resource_changes[]? | select(.change.actions != ["no-op"]) | "\(.change.actions | join("+")) \(.address)"' |
+  jq -r '
+    (.resource_changes[]? | select(.change.actions != ["no-op"]) | "\(.change.actions | join("+")) \(.address)"),
+    (.output_changes // {} | to_entries[] | select(.value.actions != ["no-op"]) | "\(.value.actions | join("+")) output.\(.key)")
+  ' |
   sort)
 
 if [[ -z "$changes" ]]; then
@@ -23,7 +44,11 @@ fi
 
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
   {
-    echo "### Terraform plan for $root"
+    if $drift; then
+      echo "### Terraform drift check for $root"
+    else
+      echo "### Terraform plan for $root"
+    fi
     echo
     if [[ -z "$changes" ]]; then
       echo "No changes."
@@ -37,4 +62,9 @@ fi
 
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   echo "digest=$digest" >> "$GITHUB_OUTPUT"
+fi
+
+if $drift && [[ $status == 2 ]]; then
+  echo "::error::$root has drifted from main, or main holds changes no apply has made yet"
+  exit 1
 fi
