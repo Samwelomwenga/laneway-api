@@ -91,7 +91,9 @@ public class TelemetryTests : ApiTests
 
         var database = ShippedSpans.Where(span => span.Source.Name == "Npgsql").ToList();
         Assert.NotEmpty(database);
-        Assert.All(database, span => Assert.Null(span.GetTagItem("db.connection_string")));
+        Assert.All(database, span => Assert.DoesNotContain(
+            span.TagObjects,
+            tag => tag.Value is string text && text.Contains("Username=", StringComparison.OrdinalIgnoreCase)));
     }
 
     [Fact]
@@ -117,8 +119,8 @@ public class TelemetryTests : ApiTests
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var failed = Assert.Single(ShippedSpans, span =>
             span.Source.Name == "Npgsql" && span.Events.Any(recorded => recorded.Name == "exception"));
-        Assert.Equal("Npgsql.PostgresException", failed.GetTagItem("error.type"));
-        Assert.Equal("ERROR", failed.GetTagItem("otel.status_code"));
+        Assert.Equal("23505", failed.GetTagItem("error.type"));
+        Assert.Equal(ActivityStatusCode.Error, failed.Status);
         Assert.Null(failed.GetTagItem("otel.status_description"));
         Assert.Null(failed.StatusDescription);
         Assert.All(failed.Events, recorded => Assert.DoesNotContain(

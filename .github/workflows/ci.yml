@@ -34,6 +34,12 @@ jobs:
         run: dotnet format Laneway.Api.sln --verify-no-changes --no-restore
       - name: Build
         run: dotnet build Laneway.Api.sln --no-restore -c Release
+      - name: Pending model changes
+        env:
+          CONNECTIONSTRINGS__DEFAULTCONNECTION: Host=localhost;Database=laneway
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes --project Laneway.Api.csproj --no-build --configuration Release
 
   secret-scan:
     name: Secret scan

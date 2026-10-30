@@ -6,15 +6,20 @@ Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` w
 
 ## Build & format
 
-The check restores `Laneway.Api.sln`, runs `dotnet format` on it and builds it in Release.
+The check restores `Laneway.Api.sln`, runs `dotnet format` on it and builds it in Release. Then it asks EF whether the model differs from the latest migration's snapshot, and fails if it does.
 
 ```sh
 dotnet restore Laneway.Api.sln
 dotnet format Laneway.Api.sln --verify-no-changes --no-restore
 dotnet build Laneway.Api.sln --no-restore -c Release
+dotnet tool restore
+CONNECTIONSTRINGS__DEFAULTCONNECTION='Host=localhost;Database=laneway' \
+  dotnet ef migrations has-pending-model-changes --project Laneway.Api.csproj --no-build --configuration Release
 ```
 
-Every command names the `.sln`, because the repo root also holds `Laneway.Api.csproj` and `dotnet` won't pick between them.
+`dotnet ef` builds the app's host to find `ApplicationDbContext`, and `Program.cs` stops at startup without a connection string. The step passes a dummy one. EF compares the model to the snapshot in memory and never connects. The tool manifest pins `dotnet-ef`, so CI and your machine run the same version. Dependabot bumps it in the `aspnetcore-efcore` group, so it moves with the EF packages. Write `--configuration` in full, because `-c` means `--context` to `dotnet ef`.
+
+Every `dotnet` command names the `.sln`, because the repo root also holds `Laneway.Api.csproj` and `dotnet` won't pick between them. `dotnet ef` is the exception. It works on one project, so it names `Laneway.Api.csproj`.
 
 `global.json` pins the SDK, so CI and your machine load the same format and analyzer rules. If `dotnet --version` doesn't start with `10.0.4`, install that SDK band.
 
@@ -23,6 +28,7 @@ To fix a red run:
 - The format step failed. Run `dotnet format Laneway.Api.sln` and commit what it changes.
 - The build step failed on a warning. `TreatWarningsAsErrors` is on in `Directory.Build.props`, so any compiler warning fails the build. Fix the warning. The log names the file and line.
 - The build step failed on a CA rule. It shouldn't. `CodeAnalysisTreatWarningsAsErrors` is false, so CA warnings don't fail the build. If one does, someone changed the props.
+- The pending model changes step failed with `Changes have been made to the model since the last migration`. An entity or its configuration changed with no migration. Run `dotnet ef migrations add <Name>`, strip the BOM from the new `.cs` files so `dotnet format` passes, and commit the migration with the change.
 
 ## Secret scan
 

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 namespace Laneway.Api;
 
@@ -12,6 +12,7 @@ public sealed class BearerSchemeTransformer : IOpenApiDocumentTransformer, IOpen
         ArgumentNullException.ThrowIfNull(document);
 
         document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
         document.Components.SecuritySchemes[JwtBearerDefaults.AuthenticationScheme] = new OpenApiSecurityScheme
         {
             Type = SecuritySchemeType.Http,
@@ -28,14 +29,7 @@ public sealed class BearerSchemeTransformer : IOpenApiDocumentTransformer, IOpen
 
         if (!context.Description.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any())
         {
-            var scheme = new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = JwtBearerDefaults.AuthenticationScheme
-                }
-            };
+            var scheme = new OpenApiSecuritySchemeReference(JwtBearerDefaults.AuthenticationScheme, context.Document);
             operation.Security = [new OpenApiSecurityRequirement { [scheme] = [] }];
         }
 
