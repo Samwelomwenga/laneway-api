@@ -164,7 +164,7 @@ In a workflow with an alert job, a new job goes in that alert job's `needs` list
 
 ## Terraform alerting
 
-`.github/workflows/terraform-alerting.yml` runs on a push to `main` that touches `terraform/alerting/**`, every Monday at 06:00 UTC as a [drift check](#drift-check), and by hand from the Actions tab. It calls `.github/workflows/terraform.yml`, the one reusable workflow every Terraform root uses, with `root: alerting`. Runs for one root never overlap or cancel each other mid-run, so an apply waiting at the gate holds the next push back. GitHub keeps one waiting run per root. A newer push replaces a waiting one, which is safe because the newer run plans all of `main`. [docs/runbooks/terraform.md](runbooks/terraform.md) has the setup.
+`.github/workflows/terraform-alerting.yml` runs on a push to `main` that touches `terraform/alerting/**`, every Monday at 06:00 UTC as a [drift check](#drift-check), and by hand from the Actions tab. It calls `.github/workflows/terraform.yml`, the one reusable workflow every Terraform root uses, with `root: alerting`. Plan and apply runs for one root never overlap or cancel each other mid-run, so an apply waiting at the gate holds the next push back. GitHub keeps one waiting run per root. A newer push replaces a waiting one, which is safe because the newer run plans all of `main`. [docs/runbooks/terraform.md](runbooks/terraform.md) has the setup.
 
 The run has three jobs:
 
@@ -190,7 +190,7 @@ The Monday run sets `drift`, and so does a manual run with the `drift` box ticke
 
 A Dependabot provider bump changes `terraform/alerting/.terraform.lock.hcl`, so merging it starts a normal run that stops at the gate.
 
-The drift run shares the root's concurrency group, and GitHub keeps one waiting run per group. A drift run that starts while a push run waits replaces it, so run the workflow by hand once the drift check finishes. A push that lands while a drift run waits replaces the drift run, and that week has no drift check. A drift run also waits behind an `Apply` held at the gate.
+Drift runs have their own concurrency group, `terraform-alerting-drift`, so a drift run never replaces a waiting push run or waits behind an `Apply` held at the gate. The HCP state lock keeps a drift plan and an apply from running at once. A drift run that lands between `Plan` and an approved `Apply` reports the pending change as drift. Approve or reject the gate, then run the drift check again by hand.
 
 When it fires:
 

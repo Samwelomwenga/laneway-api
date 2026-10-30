@@ -17,7 +17,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: terraform-alerting
+  group: terraform-alerting${{ (github.event_name == 'schedule' || inputs.drift == true) && '-drift' || '' }}
   cancel-in-progress: false
 
 jobs:
