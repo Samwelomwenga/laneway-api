@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+.git
+tests/
+terraform/
+.scratch/
+supabase/
+http-files/
