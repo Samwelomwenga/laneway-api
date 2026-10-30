@@ -75,7 +75,7 @@ Rules:
   - Require conversation resolution before merging: on.
   - Allowed merge methods: squash only.
 - Require status checks to pass:
-  - Require branches to be up to date before merging: off. With it on, every merge forces every open PR to rebase and rerun. With it off, two PRs that pass alone can break main together. CI runs no tests, so it only catches a break that stops the build, and only on the next PR.
+  - Require branches to be up to date before merging: on. A PR's checks then run on the tree that lands, so two PRs that pass alone can't merge into a main that fails to build. The cost is that each merge makes every other open PR update its branch and rerun CI. A merge queue would batch that, but merge queues need an organization-owned repo, and this one is user-owned. PRs run no tests, so a test break still shows up only in `main.yml`, after the merge.
   - Add the seven checks from step 3 of the rollout. Pin each one to the GitHub Actions app, integration id `15368`. Then a commit status with the same name from some other source can't satisfy the check.
 - Require code scanning results:
   - Tool: CodeQL.
