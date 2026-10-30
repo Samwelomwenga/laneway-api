@@ -172,8 +172,18 @@ jobs:
       - name: Validate
         run: terraform -chdir=terraform/alerting validate
 
+  image:
+    name: Image build
+    permissions:
+      contents: read
+      security-events: write
+    uses: $/.github/workflows/image.yml
+    with:
+      push: false
+      attest: false
+
   notify:
-    needs: [build, secret-scan, dependencies, trivy, codeql, zizmor, terraform]
+    needs: [build, secret-scan, dependencies, trivy, codeql, zizmor, terraform, image]
     if: failure() && github.event.pull_request.head.repo.fork != true
     permissions: {}
     uses: $/.github/workflows/telegram-alert.yml
