@@ -148,13 +148,17 @@ To fix a red run, edit the PR title. The log lists what failed and shows valid e
 
 ## notify
 
-When any `CI` check fails, `notify` sends a Telegram message with the PR number, the PR title and a link to the run. It isn't a required check. It shows as skipped on a green run, and it never goes red. `PR title` sends no alert.
+When any `CI` check fails, `notify` sends one Telegram message. It isn't a required check. It shows as skipped on a green run, and it never goes red. `PR title` sends no alert, and a cancelled run sends nothing.
 
-`notify` reads `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Doppler syncs both to the repo's Actions secrets and Dependabot secrets, because a Dependabot run reads only Dependabot secrets. A PR from a fork gets no secrets, so `notify` skips the send without a word. On any other run, a missing secret prints `Telegram secrets missing, failure alert not sent` as a warning. If you see that warning, check the Doppler sync. [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) has the setup steps.
+`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. Today `ci.yml` is its only caller. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
 
-harden-runner blocks every host but `api.telegram.org` in this job, since it reads the Telegram bot token.
+A caller job uses `needs` plus `if: failure()`, passes `toJSON(needs)` and a `message` headline as inputs, and passes `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` by name. Never `secrets: inherit`. Titles and refs go in through `inputs` and reach the script through `env`, never through `${{ }}` inside `run:`. `ref` and `sha` are optional and default to the run's own ref name and SHA. `ci.yml` passes the PR number with the head branch, and the head SHA, because the run's own SHA is the merge commit.
 
-A new job in `ci.yml` goes in the `needs` list of `notify` too. Otherwise its failures send no alert.
+`telegram-alert.yml` reads both secrets. Doppler syncs them to the repo's Actions secrets and Dependabot secrets, because a Dependabot run reads only Dependabot secrets. A PR from a fork gets no secrets, so `notify` skips the call without a word. On any other run, a missing secret prints `Telegram secrets missing, failure alert not sent` as a warning. If you see that warning, check the Doppler sync. [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) has the setup steps. A failed send prints `Telegram alert failed to send`.
+
+The alert job has no checkout, and harden-runner blocks every host but `api.telegram.org`, since it holds the bot token.
+
+A new job in any workflow goes in the `needs` list of that workflow's alert job. Otherwise its failures send no alert.
 
 ## Local hooks
 
