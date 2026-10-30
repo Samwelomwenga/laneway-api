@@ -121,4 +121,4 @@ Step 7 of the rollout tests it. If no message arrives, check the `notify` log fo
 
 - After the build PR merges, open Insights, Dependency graph, Dependabot. The config must parse with no errors.
 - On the first Monday after that, check the PRs. Packages that match a group arrive in one PR per group: `aspnetcore-efcore`, `fluentvalidation`, `test` and `actions`. Other NuGet packages and SDK updates arrive one per PR. SDK titles start with `chore(deps):`, action titles with `ci(deps):`, and NuGet titles with `chore:` alone. Each PR passes the required checks.
-- No Dependabot PR may offer a major version of ASP.NET Core, EF Core, Npgsql or the SDK. Those ignores come out when Laneway moves to .NET 10.
+- No Dependabot PR may offer a major version of ASP.NET Core, EF Core, Npgsql or the SDK. Those ignores hold each major until a deliberate retarget PR moves Laneway to the next one.
