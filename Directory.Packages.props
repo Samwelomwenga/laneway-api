@@ -29,7 +29,7 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.20.1" />
     <PackageVersion Include="Scalar.AspNetCore" Version="1.2.42" />
     <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
-    <PackageVersion Include="Supabase.Storage" Version="8.1.1" />
+    <PackageVersion Include="Supabase.Storage" Version="8.5.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <PackageVersion Include="TimeZoneNames" Version="7.0.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
