@@ -25,7 +25,7 @@ OTEL_SERVICE_NAME=laneway-api
 OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=local
 ```
 
-Service name, environment, and host come only from `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. Log levels live under `Serilog:MinimumLevel` in `appsettings.json`. Serilog ignores `Logging:LogLevel`. [ADR 0011](docs/adr/0011-serilog-in-front-of-the-otel-sdk.md) explains the pipeline.
+Service name, environment, and host come only from `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. The service version comes from the assembly's informational version, unless `OTEL_RESOURCE_ATTRIBUTES` sets `service.version`. Log levels live under `Serilog:MinimumLevel` in `appsettings.json`. Serilog ignores `Logging:LogLevel`. [ADR 0011](docs/adr/0011-serilog-in-front-of-the-otel-sdk.md) explains the pipeline.
 
 Production ships to Grafana Cloud. [docs/runbooks/grafana.md](docs/runbooks/grafana.md) covers the stack, the tokens, the readers, and purging a leaked item. [docs/runbooks/alerting.md](docs/runbooks/alerting.md) covers the alert rules, their playbooks, and applying the Terraform in `terraform/alerting`.
 

@@ -1,6 +1,13 @@
 using System.Diagnostics;
 using System.Net;
+using System.Reflection;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using OpenTelemetry;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -127,6 +134,35 @@ public class TelemetryTests : ApiTests
             recorded.Tags,
             tag => tag.Value is string text && text.Contains("wanjiru", StringComparison.Ordinal)));
     }
+
+    [Fact]
+    public void Every_signal_ships_the_informational_version_as_service_version()
+    {
+        var version = typeof(Program).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+
+        Assert.All(ShippedVersions(Services), shipped => Assert.Equal(version, shipped));
+    }
+
+    [Fact]
+    public void A_service_version_in_otel_resource_attributes_wins()
+    {
+        using var factory = new ApiFactory("Host=localhost;Database=never_opened");
+        using var overridden = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("OTEL_RESOURCE_ATTRIBUTES", "service.version=9.9.9-env"));
+        overridden.CreateClient().Dispose();
+
+        Assert.All(ShippedVersions(overridden.Services), shipped => Assert.Equal("9.9.9-env", shipped));
+    }
+
+    private static IEnumerable<object?> ShippedVersions(IServiceProvider services) =>
+        new BaseProvider[]
+        {
+            services.GetRequiredService<TracerProvider>(),
+            services.GetRequiredService<MeterProvider>(),
+            services.GetRequiredService<LoggerProvider>()
+        }.Select(provider => provider.GetResource().Attributes
+            .SingleOrDefault(pair => pair.Key == "service.version").Value);
 
     private Task<HttpResponseMessage> SignInWithTheWrongPasswordAsync(string? userAgent = null) =>
         SendFromBrowserAsync(
