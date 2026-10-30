@@ -217,7 +217,7 @@ The release will read the verdict and refuse to build a commit whose `main.yml` 
 
 ### Tests
 
-The job runs the full suite, the same `dotnet test` you run locally. Testcontainers starts `postgres:18` in the runner's Docker. Storage comes from the local Supabase stack. The workflow pins the Supabase CLI version in its `supabase/setup-cli` step, and `supabase start -x` leaves out every service storage doesn't need, so only the database, Kong, storage-api and auth start. Storage runs fine without auth, but `supabase status` prints no keys while auth is stopped. The test step reads `API_URL` and `SERVICE_ROLE_KEY` from `supabase status -o env` and hands them to the tests as `Supabase__Url` and `Supabase__ServiceRoleKey`. They are the local stack's public demo keys, not secrets.
+The job runs the full suite, the same `dotnet test` you run locally. Testcontainers starts `postgres:18` in the runner's Docker. Storage comes from the local Supabase stack. The workflow pins the Supabase CLI version in its `supabase/setup-cli` step. `supabase start -x` leaves out every service storage doesn't need, so only the database, Kong, storage-api and auth (`gotrue`) start. Storage runs fine without `gotrue`, but `supabase status` prints no keys while it is stopped. The test step reads `API_URL` and `SERVICE_ROLE_KEY` from `supabase status -o env` and hands them to the tests as `Supabase__Url` and `Supabase__ServiceRoleKey`. They are the local stack's public demo keys, not secrets.
 
 The test step sets `DOTNET_USE_POLLING_FILE_WATCHER=1`. Every test host watches the appsettings files. Without polling, a full run uses up the inotify instances and the later tests fail in 1 ms each.
 
