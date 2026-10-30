@@ -6,3 +6,5 @@ terraform/
 .scratch/
 supabase/
 http-files/
+**/.env*
+**/secrets.json
