@@ -164,7 +164,7 @@ In a workflow with an alert job, a new job goes in that alert job's `needs` list
 
 ## Terraform alerting
 
-`.github/workflows/terraform-alerting.yml` runs on a push to `main` that touches `terraform/alerting/**`, and by hand from the Actions tab. It calls `.github/workflows/terraform.yml`, the one reusable workflow every Terraform root uses, with `root: alerting`. Runs for one root never overlap or cancel each other mid-run, so an apply waiting at the gate holds the next push back. GitHub keeps one waiting run per root. A newer push replaces a waiting one, which is safe because the newer run plans all of `main`. [docs/runbooks/terraform.md](runbooks/terraform.md) has the setup.
+`.github/workflows/terraform-alerting.yml` runs on a push to `main` that touches `terraform/alerting/**`, every Monday at 06:00 UTC as a [drift check](#drift-check), and by hand from the Actions tab. It calls `.github/workflows/terraform.yml`, the one reusable workflow every Terraform root uses, with `root: alerting`. Runs for one root never overlap or cancel each other mid-run, so an apply waiting at the gate holds the next push back. GitHub keeps one waiting run per root. A newer push replaces a waiting one, which is safe because the newer run plans all of `main`. [docs/runbooks/terraform.md](runbooks/terraform.md) has the setup.
 
 The run has three jobs:
 
@@ -183,6 +183,19 @@ To fix a red run:
 - `Plan` failed with a lock error. Another run or a local run holds the HCP state lock. Wait for it, or unlock the workspace in HCP once you're sure nothing is running.
 - `Apply` failed on `The change list moved since the Plan job`. Someone changed the resources between the two plans, often in the Grafana UI. Read both summaries, then run the workflow again by hand so `Plan` sees the new state.
 - `Apply` failed partway. Some resources changed and others didn't. HCP holds the state of what did change. Fix forward with a PR, or rerun the workflow by hand if the cause was outside the repo.
+
+### Drift check
+
+The Monday run sets `drift`, and so does a manual run with the `drift` box ticked. `Plan` runs `scripts/terraform-plan.sh alerting --drift`, which plans `main` with `-detailed-exitcode` in `alerting-plan`. The log and summary follow the same address-only rule. Any change, or any error, fails `Plan`. `Apply` never runs on a drift check, and `notify` sends `Terraform drift check failed for alerting`.
+
+A Dependabot provider bump changes `terraform/alerting/.terraform.lock.hcl`, so merging it starts a normal run that stops at the gate.
+
+The drift run shares the root's concurrency group, and GitHub keeps one waiting run per group. A drift run that starts while a push run waits replaces it, so run the workflow by hand once the drift check finishes. A push that lands while a drift run waits replaces the drift run, and that week has no drift check. A drift run also waits behind an `Apply` held at the gate.
+
+When it fires:
+
+- The summary lists changes. An output shows as `output.<name>`. Someone edited Grafana in the UI, or nobody applied a merged change. Read the addresses. To keep the code, run the workflow by hand without `drift` and approve the gate, which puts Grafana back. To keep the UI edit, copy it into `terraform/alerting` in a PR.
+- `Plan` failed with an error and no list. Read the red-run fixes above. A 401 usually means one of the three 90-day tokens expired, so the weekly run doubles as an expiry warning.
 
 ## Local hooks
 
