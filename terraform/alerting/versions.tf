@@ -1,5 +1,13 @@
 terraform {
-  required_version = ">= 1.9"
+  required_version = "1.15.8"
+
+  cloud {
+    organization = "laneway-samwelomwenga"
+
+    workspaces {
+      name = "laneway-alerting"
+    }
+  }
 
   required_providers {
     grafana = {
