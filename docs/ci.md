@@ -139,6 +139,8 @@ The `Image build` job in `ci.yml` has no steps of its own. It calls `.github/wor
 
 The workflow builds the `Dockerfile` for `linux/amd64` on a native runner and loads the image into the runner's Docker. The build includes the `migrations` stage, so a broken migration bundle turns the check red too. Buildx caches layers in the Actions cache, so a PR that only changes code skips the restore.
 
+The workflow's `version` input becomes the Dockerfile's `VERSION` build arg, and the publish stamps it on the assembly. The app reports it as `service.version` on every log, span and metric it exports. A PR build uses the default `0.0.0-pr`. A `service.version` in `OTEL_RESOURCE_ATTRIBUTES` wins over the stamped one.
+
 Then Trivy scans the loaded image twice, with its vulnerability and secret scanners.
 
 - The first run reports every high or critical finding, fixable or not, to code scanning under the `trivy-image` category. It never fails.
