@@ -146,9 +146,9 @@ dotnet husky exec .husky/csx/commit-lint.csx --args title.txt
 
 To fix a red run, edit the PR title. The log lists what failed and shows valid examples. No push needed.
 
-## notify / Send
+## notify
 
-When any `CI` check fails, the `notify` job sends one Telegram message. GitHub names its check `notify / Send`, after the caller job and the called job. It isn't a required check. It shows as skipped on a green run, and it never goes red. `PR title` sends no alert. A cancelled run sends nothing, even when a job failed before a newer push cancelled it.
+When any `CI` check fails, `notify` sends one Telegram message. It isn't a required check. It shows as a skipped `notify` on a green run, and it never goes red. When it runs, GitHub names the check `notify / Send`, after the caller job and the called job. `PR title` sends no alert. A cancelled run sends nothing, even when a job failed before a newer push cancelled it.
 
 `notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. Today `ci.yml` is its only caller. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
 

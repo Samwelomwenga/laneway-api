@@ -104,7 +104,7 @@ Restrict updates with no bypass would stop every merge, the owner's too. A bypas
 
 ## Doppler and Telegram
 
-The `notify / Send` section of [docs/ci.md](../ci.md#notify--send) says what the alert does and which two secrets it reads. Doppler holds them and syncs them to GitHub. The workflow never calls Doppler.
+The `notify` section of [docs/ci.md](../ci.md#notify) says what the alert does and which two secrets it reads. Doppler holds them and syncs them to GitHub. The workflow never calls Doppler.
 
 1. Create the bot. In Telegram, message `@BotFather`, send `/newbot` and keep the token it returns.
 2. Send `/start` to the bot from the chat that should get alerts. In a group, mention the bot instead, since a bot in privacy mode ignores plain group messages. Then open `https://api.telegram.org/bot<token>/getUpdates` and copy `message.chat.id`.
