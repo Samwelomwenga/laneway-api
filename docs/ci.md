@@ -131,6 +131,43 @@ To fix a red run:
 - Init failed on a provider version. Run `terraform -chdir=terraform/alerting init -upgrade -backend=false` and commit `.terraform.lock.hcl`.
 - Validate failed. The log names the file and line. A rule entry in `rules.tf` with a missing field fails here.
 
+## Image build / Build and scan
+
+The check builds Laneway's container image and scans it with Trivy. It runs on every PR, fork PRs included, with no path filter. GitHub names a check from a reusable workflow `<caller job> / <called job>`, so the `main` ruleset lists it as `Image build / Build and scan`.
+
+The `Image build` job in `ci.yml` has no steps of its own. It calls `.github/workflows/image.yml`, the one workflow that builds the image. The release will call it too, with push and attest on. On a PR both stay off, so nothing leaves the runner.
+
+The workflow builds the `Dockerfile` for `linux/amd64` on a native runner and loads the image into the runner's Docker. The build includes the `migrations` stage, so a broken migration bundle turns the check red too. Buildx caches layers in the Actions cache, so a PR that only changes code skips the restore.
+
+Then Trivy scans the loaded image twice, with its vulnerability and secret scanners.
+
+- The first run reports every high or critical finding, fixable or not, to code scanning under the `trivy-image` category. It never fails.
+- The second run is the gate. It fails on any high or critical finding that has a fix. A finding with no fixed version yet doesn't block, since nothing in this repo can fix it. It still shows in code scanning from the first run.
+
+The log shows only whether the gate passed and the image digest. Read the findings in the PR's annotations or in the Security tab, never in the log, since the repo is public.
+
+To run it locally:
+
+```sh
+docker build -t laneway-api:scan .
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed laneway-api:scan
+```
+
+To fix a red run:
+
+- The build failed. The log names the Dockerfile step. A failed `dotnet publish` fails the same way `Build & format` does. A failed `dotnet ef migrations bundle` means the migrations don't compile, or `Program.cs` stops before EF can build the host.
+- A vulnerable package in the app. Bump it, the same way as for `Vulnerable packages`.
+- A vulnerable package in the base image. Microsoft rebuilds the .NET images with OS fixes, and Dependabot bumps both digests in one `dotnet-images` PR each Monday. Dependabot sends no security updates for Docker images, so for an urgent fix, look up the new digest with `docker buildx imagetools inspect mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra` and edit the `FROM` line by hand.
+- A secret in the image. Treat it like a gitleaks finding in `Secret scan`. Rotate it, and check `.dockerignore` keeps the file out of the build.
+- You accept the finding. Add its ID to `.trivyignore` with an expiry date and a reason on the line above, like this:
+
+  ```text
+  # Reachable only through X, which Laneway doesn't call. Recheck when the base image moves.
+  CVE-2026-12345 exp:2026-12-31
+  ```
+
+  After the expiry date the gate fails on it again. Every entry needs both, so an accepted finding gets looked at again instead of staying hidden. `Trivy filesystem scan` reads the same file.
+
 ## PR title
 
 The check runs `.husky/csx/commit-lint.csx` on the PR title. Your `commit-msg` hook runs the same script on each commit message, so both follow one rule. A squash merge uses the PR title as the commit on main, which is why CI checks the title and not each commit.
