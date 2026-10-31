@@ -2,7 +2,7 @@
 
 PRs run no tests. A green PR means the code builds and passes the checks below. The full suite runs after the merge, on every push to main, as [main.yml](#mainyml) says. Run `dotnet test` before you push, so main doesn't go red.
 
-Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR, except [main.yml](#mainyml), whose jobs run after the merge, and [release.yml](#releaseyml), which runs on a tag. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
+Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR, except [main.yml](#mainyml), whose jobs run after the merge, [release.yml](#releaseyml), which runs on a tag, and [rescan.yml](#rescanyml), which runs on a schedule. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
 
 ## Build & format
 
@@ -199,7 +199,7 @@ To fix a red run, edit the PR title. The log lists what failed and shows valid e
 
 When any `CI` check fails, `notify` sends one Telegram message. It isn't a required check. It shows as a skipped `notify` on a green run, and it never goes red. When it runs, GitHub names the check `notify / Send`, after the caller job and the called job. `PR title` sends no alert. A cancelled run sends nothing, even when a job failed before a newer push cancelled it.
 
-`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. `ci.yml`, `main.yml` and `release.yml` call it. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
+`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. `ci.yml`, `main.yml`, `release.yml` and `rescan.yml` call it. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
 
 A caller job uses `needs` plus `if: failure()`, passes `toJSON(needs)` and a `message` headline as inputs, and passes `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` by name. Never `secrets: inherit`. Titles and refs go in through `inputs` and reach the script through `env`, never through `${{ }}` inside `run:`. `ref` and `sha` are optional and default to the run's own ref name and SHA. `ci.yml` passes the PR number with the head branch, and the head SHA, because the run's own SHA is the merge commit.
 
@@ -296,6 +296,25 @@ To fix a red run:
 - `Check main.yml passed on the commit` failed. Open the commit's `main.yml` run. If it was still going, wait for it to finish. If it was cancelled, rerun it. If it was red, fix main in a PR. Then tag with the next version.
 - The image job failed. Fix it like a red [Image build / Build and scan](#image-build--build-and-scan), in a PR, then tag with the next version.
 - `GitHub release` failed. The image is on GHCR already. Tag with the next version rather than writing the release by hand, so every release goes through the same steps.
+
+## rescan.yml
+
+Every Monday at 06:00 UTC, `.github/workflows/rescan.yml` scans the image in the latest GitHub release again, so a CVE published after the release still reaches you. It reads the digest from the release body, never from a tag or a GHCR listing, so it scans exactly what the deploy runs. It pulls that digest from GHCR and never rebuilds.
+
+The scan matches the gate in `image.yml`. Trivy runs twice with its vulnerability and secret scanners. The first run reports every high or critical finding to code scanning under `trivy-image`. The second fails on any high or critical finding with a fix. `.trivyignore` on main applies, as on a PR. The log shows only the tag, the digest and whether the gate passed. A failed run alerts as `Laneway release rescan failed`.
+
+Harden-runner blocks every host but GitHub, GHCR, and where Trivy gets its binary and its vulnerability DB. Trivy's DB cache is off, so the run downloads the DB each week and the Actions cache hosts stay off the list. If Trivy moves its DB to a new host, the run goes red with a blocked connection. Add the host to `allowed-endpoints`.
+
+To run it now, open Actions, `Rescan`, and use Run workflow.
+
+GitHub turns off scheduled workflows in a public repo after 60 days with no commits. If main goes quiet that long, the rescan stops without a word, and GitHub only emails about it. Turn it back on from the Actions tab, or push a commit.
+
+To fix a red run:
+
+- The gate failed. A fixable finding showed up in the released image. Read it in the Security tab under `trivy-image`. Fix it the way [Image build / Build and scan](#image-build--build-and-scan) says. A base image fix usually means merging Dependabot's `dotnet-images` PR. Then tag a new release. The next rescan reads the new release and goes green.
+- `Read the latest release` failed with `names no image digest`. The latest release has no `ghcr.io/...@sha256:...` line. It wasn't made by `release.yml`. Delete it, or tag a new release.
+- The pull failed. Check that the package is still public.
+- A connection was blocked. Harden-runner names the host. Add it to `allowed-endpoints` if it belongs to GitHub, GHCR or Trivy.
 
 ## Local hooks
 
