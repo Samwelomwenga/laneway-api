@@ -1,0 +1,86 @@
+name: Rescan
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: rescan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    name: Scan the latest release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    env:
+      TRIVY_QUIET: true
+      TRIVY_SKIP_VERSION_CHECK: true
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            raw.githubusercontent.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+            mirror.gcr.io:443
+            storage.googleapis.com:443
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the latest release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          read -r tag body < <(gh release view --repo "$GITHUB_REPOSITORY" --json tagName,body --jq '[.tagName, (.body | gsub("\\s"; " "))] | join(" ")')
+          image=$(grep -oE 'ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}' <<< "$body" | head -n 1)
+          if [[ -z "$image" ]]; then
+            echo "::error::Release $tag names no image digest"
+            exit 1
+          fi
+          echo "Rescanning $tag, image $image"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+      - name: Report findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.release.outputs.image }}
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-image.sarif
+          limit-severities-for-sarif: true
+          cache: 'false'
+      - name: Gate on fixable findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.release.outputs.image }}
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: sarif
+          output: trivy-gate.sarif
+          limit-severities-for-sarif: true
+          skip-setup-trivy: true
+          cache: 'false'
+      - uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        if: always() && hashFiles('trivy-image.sarif') != ''
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
