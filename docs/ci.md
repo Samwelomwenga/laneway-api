@@ -263,7 +263,7 @@ git push origin v0.1.0
 
 The workflow has four jobs.
 
-1. `Guards` fails unless the tag is exactly `vX.Y.Z`, the commit is on main (`git merge-base --is-ancestor`), and a `main.yml` run on that commit concluded `success`. It never waits. A missing, running or red run fails the release at once.
+1. `Guards` fails unless the tag is exactly `vX.Y.Z`, `git merge-base --is-ancestor` finds the commit on main, and a `main.yml` run on that commit concluded `success`. It never waits. A missing, running or red run fails the release at once.
 2. `Image` calls [image.yml](#image-build--build-and-scan) with push and attest on and the version without its `v`. The image gets the same build and Trivy gate as on a PR, then goes to GHCR as `1.2.3` and `sha-<short>`, with provenance and an SBOM attested. No other PR check runs again.
 3. `GitHub release` creates a release on the tag with GitHub's generated notes. The body names the image as `ghcr.io/<owner>/laneway-api@sha256:...`. The deploy reads that digest from the latest release and nothing else.
 4. `notify` sends a Telegram alert, `Laneway release failed`, when any job fails.
@@ -272,10 +272,10 @@ There is no environment gate. Only the admin can push the tag, and the build hol
 
 A tag is never moved or reused. A failed release burns its number, and the fix ships under the next one. What a failure leaves behind depends on where it stopped:
 
-- `Guards` failed. Nothing was built. The tag points at a commit with no image.
-- The Trivy gate failed. Nothing was pushed. The tag has no image.
+- `Guards` failed. The workflow built nothing. The tag points at a commit with no image.
+- The Trivy gate failed. The workflow pushed nothing. The tag has no image.
 - Attest failed. The image is on GHCR with no attestation. The deploy verifies the attestation before it pulls, so it refuses this image.
-- `GitHub release` failed. The image is pushed and attested, but no release names it, so the deploy never sees it.
+- `GitHub release` failed. The image is on GHCR with its attestations, but no release names it, so the deploy never sees it.
 
 To check a release's image by hand:
 
@@ -312,7 +312,7 @@ GitHub turns off scheduled workflows in a public repo after 60 days with no comm
 To fix a red run:
 
 - The gate failed. A fixable finding showed up in the released image. Read it in the Security tab under `trivy-image`. Fix it the way [Image build / Build and scan](#image-build--build-and-scan) says. A base image fix usually means merging Dependabot's `dotnet-images` PR. Then tag a new release. The next rescan reads the new release and goes green.
-- `Read the latest release` failed with `names no image digest`. The latest release has no `ghcr.io/...@sha256:...` line. It wasn't made by `release.yml`. Delete it, or tag a new release.
+- `Read the latest release` failed with `names no image digest`. The latest release has no `ghcr.io/...@sha256:...` line, so `release.yml` didn't write it. Delete it, or tag a new release.
 - The pull failed. Check that the package is still public.
 - A connection was blocked. Harden-runner names the host. Add it to `allowed-endpoints` if it belongs to GitHub, GHCR or Trivy.
 
