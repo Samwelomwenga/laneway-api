@@ -97,3 +97,15 @@ jobs:
           fi
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes \
             --notes "Image: \`ghcr.io/${GITHUB_REPOSITORY,,}@$DIGEST\`"
+
+  notify:
+    needs: [guards, image, release]
+    if: failure()
+    permissions: {}
+    uses: $/.github/workflows/telegram-alert.yml
+    with:
+      message: Laneway release failed
+      needs: ${{ toJSON(needs) }}
+    secrets:
+      telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
