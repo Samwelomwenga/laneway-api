@@ -135,7 +135,11 @@ To fix a red run:
 
 The check builds Laneway's container image and scans it with Trivy. It runs on every PR, fork PRs included, with no path filter. GitHub names a check from a reusable workflow `<caller job> / <called job>`, so the check reports as `Image build / Build and scan`. It isn't in the `main` ruleset yet.
 
-The `Image build` job in `ci.yml` has no steps of its own. It calls `.github/workflows/image.yml`, the one workflow that builds the image. The release will call it too, with push and attest on. On a PR both stay off, so nothing leaves the runner.
+The `Image build` job in `ci.yml` has no steps of its own. It calls `.github/workflows/image.yml`, the one workflow that builds the image. [release.yml](#releaseyml) calls it too, with push and attest on. On a PR both stay off, so nothing leaves the runner.
+
+`image.yml` declares no permissions. Its job takes whatever the caller job grants. GitHub checks a called workflow's permissions when the run starts, skipped steps included, so a `packages: write` in `image.yml` would make every PR grant it, and a fork PR can't. `Image build` grants `contents: read` and `security-events: write`. The release grants `packages`, `id-token` and `attestations` write on top. A new caller grants only what its run needs.
+
+With push on, the workflow tags the image Trivy scanned, pushes it to `ghcr.io/<owner>/laneway-api` as the version and as `sha-<short>`, and reads the registry digest back. It never tags `latest`. With attest on, `actions/attest` writes SLSA provenance for that digest, and a second call attaches a CycloneDX SBOM that Trivy makes from the same image. A pushed build skips the Actions cache, so no layer saved by a PR build ends up in a published image.
 
 The workflow builds the `Dockerfile` for `linux/amd64` on a native runner and loads the image into the runner's Docker. The build includes the `migrations` stage, so a broken migration bundle turns the check red too. Buildx caches layers in the Actions cache, so a PR that only changes code skips the restore.
 
