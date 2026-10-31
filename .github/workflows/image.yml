@@ -28,17 +28,12 @@ on:
         description: The image digest
         value: ${{ jobs.build.outputs.digest }}
 
-permissions: {}
-
 jobs:
   build:
     name: Build and scan
     runs-on: ${{ inputs.platform == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
-    permissions:
-      contents: read
-      security-events: write
     outputs:
-      digest: ${{ steps.build.outputs.digest }}
+      digest: ${{ steps.push.outputs.digest || steps.build.outputs.digest }}
     env:
       DOCKER_BUILD_RECORD_UPLOAD: false
       TRIVY_QUIET: true
@@ -62,8 +57,8 @@ jobs:
           push: false
           provenance: false
           sbom: false
-          cache-from: type=gha,scope=${{ inputs.platform }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.platform }}
+          cache-from: ${{ !inputs.push && format('type=gha,scope={0}', inputs.platform) || '' }}
+          cache-to: ${{ !inputs.push && format('type=gha,mode=max,scope={0}', inputs.platform) || '' }}
       - name: Report findings
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -92,7 +87,49 @@ jobs:
         with:
           sarif_file: trivy-image.sarif
           category: trivy-image
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        if: inputs.push
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Push
+        id: push
+        if: inputs.push
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          for tag in "$VERSION" "sha-${GITHUB_SHA::7}"; do
+            docker tag laneway-api:scan "$image:$tag"
+            docker push --quiet "$image:$tag"
+          done
+          digest=$(docker buildx imagetools inspect "$image:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: SBOM
+        if: inputs.push && inputs.attest
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: laneway-api:scan
+          format: cyclonedx
+          output: sbom.cdx.json
+          skip-setup-trivy: true
+      - name: Attest provenance
+        if: inputs.push && inputs.attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.push.outputs.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+      - name: Attest SBOM
+        if: inputs.push && inputs.attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.push.outputs.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          sbom-path: sbom.cdx.json
       - name: Digest
         env:
-          DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST: ${{ steps.push.outputs.digest || steps.build.outputs.digest }}
         run: echo "Image digest $DIGEST"
