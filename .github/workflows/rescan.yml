@@ -46,7 +46,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           read -r tag body < <(gh release view --repo "$GITHUB_REPOSITORY" --json tagName,body --jq '[.tagName, (.body | gsub("\\s"; " "))] | join(" ")')
-          image=$(grep -oE 'ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}' <<< "$body" | head -n 1)
+          image=$(grep -oE 'ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}' <<< "$body" | head -n 1 || true)
           if [[ -z "$image" ]]; then
             echo "::error::Release $tag names no image digest"
             exit 1
