@@ -84,3 +84,16 @@ jobs:
         with:
           sarif_file: trivy-image.sarif
           category: trivy-image
+
+  notify:
+    needs: [scan]
+    if: failure()
+    permissions: {}
+    uses: $/.github/workflows/telegram-alert.yml
+    with:
+      message: Laneway release rescan failed
+      needs: ${{ toJSON(needs) }}
+      ref: ${{ needs.scan.outputs.tag }}
+    secrets:
+      telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
