@@ -2,7 +2,7 @@
 
 PRs run no tests. A green PR means the code builds and passes the checks below. The full suite runs after the merge, on every push to main, as [main.yml](#mainyml) says. Run `dotnet test` before you push, so main doesn't go red.
 
-Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR, except [main.yml](#mainyml), whose jobs run after the merge. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
+Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR, except [main.yml](#mainyml), whose jobs run after the merge, and [release.yml](#releaseyml), which runs on a tag. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
 
 ## Build & format
 
@@ -199,11 +199,11 @@ To fix a red run, edit the PR title. The log lists what failed and shows valid e
 
 When any `CI` check fails, `notify` sends one Telegram message. It isn't a required check. It shows as a skipped `notify` on a green run, and it never goes red. When it runs, GitHub names the check `notify / Send`, after the caller job and the called job. `PR title` sends no alert. A cancelled run sends nothing, even when a job failed before a newer push cancelled it.
 
-`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. `ci.yml` and `main.yml` call it. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
+`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. `ci.yml`, `main.yml` and `release.yml` call it. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
 
 A caller job uses `needs` plus `if: failure()`, passes `toJSON(needs)` and a `message` headline as inputs, and passes `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` by name. Never `secrets: inherit`. Titles and refs go in through `inputs` and reach the script through `env`, never through `${{ }}` inside `run:`. `ref` and `sha` are optional and default to the run's own ref name and SHA. `ci.yml` passes the PR number with the head branch, and the head SHA, because the run's own SHA is the merge commit.
 
-The alert job's log prints its `env`, and `NEEDS` holds the outputs of every job in `needs`. No job in `ci.yml` or `main.yml` has outputs today. A caller whose jobs set outputs must keep secrets and plan text out of them.
+The alert job's log prints its `env`, and `NEEDS` holds the outputs of every job in `needs`. In `release.yml` those are the version and the image digest, both public. A caller whose jobs set outputs must keep secrets and plan text out of them.
 
 `telegram-alert.yml` reads both secrets. Doppler syncs them to the repo's Actions secrets and Dependabot secrets, because a Dependabot run reads only Dependabot secrets. A PR from a fork gets no secrets, so `notify` skips the call without a word. On any other run, a missing secret prints `Telegram secrets missing, failure alert not sent` as a warning. If you see that warning, check the Doppler sync. [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) has the setup steps. A failed send prints `Telegram alert failed to send`.
 
@@ -217,7 +217,7 @@ Every push to main runs `.github/workflows/main.yml`, the `Main` workflow. It ha
 
 Runs on main share the concurrency group `main` with `cancel-in-progress: false`, so a running job is never cut short. A new push waits for the run before it. GitHub keeps only one waiting run per group, though. If a third push lands while one run is going and one is waiting, GitHub cancels the waiting run, and that commit gets no verdict and no alert.
 
-The release will read the verdict and refuse to build a commit whose `main.yml` run isn't green. To release a commit whose run was cancelled, rerun that run from the Actions tab first.
+[release.yml](#releaseyml) reads the verdict and refuses to build a commit whose `main.yml` run isn't green. To release a commit whose run was cancelled, rerun that run from the Actions tab first.
 
 ### Tests
 
@@ -247,6 +247,55 @@ To fix a red run:
 The `CodeQL (SAST)` and `Trivy filesystem scan` jobs are copies of the ones in `ci.yml`. Change both files together. Their results give code scanning a main baseline. GitHub compares each PR's analysis to the latest one on main, so a PR shows only the alerts it adds. Trivy uploads under the same `trivy` category as on PRs.
 
 `CodeQL (SAST)` stays green with findings here too, so a new CodeQL alert on main shows only in the Security tab. A red Trivy job on main means a finding got merged, or a new advisory came out for a package main already uses. Fix it in a PR, with the steps under [Trivy filesystem scan](#trivy-filesystem-scan).
+
+## release.yml
+
+Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, the `Release` workflow. Nothing else releases. A merge doesn't, and the workflow has no `workflow_dispatch`. The `release-tags` ruleset lets only the repo admin create a `v*` tag, as [docs/runbooks/repo-setup.md](runbooks/repo-setup.md#ruleset-release-tags) says.
+
+Versions follow SemVer from `v0.1.0`. A major bump marks a breaking API change. There are no prerelease tags.
+
+To cut a release, tag a commit on main whose `main.yml` run is green, and push the tag:
+
+```sh
+git tag v0.1.0 <sha>
+git push origin v0.1.0
+```
+
+The workflow has four jobs.
+
+1. `Guards` fails unless the tag is exactly `vX.Y.Z`, the commit is on main (`git merge-base --is-ancestor`), and a `main.yml` run on that commit concluded `success`. It never waits. A missing, running or red run fails the release at once.
+2. `Image` calls [image.yml](#image-build--build-and-scan) with push and attest on and the version without its `v`. The image gets the same build and Trivy gate as on a PR, then goes to GHCR as `1.2.3` and `sha-<short>`, with provenance and an SBOM attested. No other PR check runs again.
+3. `GitHub release` creates a release on the tag with GitHub's generated notes. The body names the image as `ghcr.io/<owner>/laneway-api@sha256:...`. The deploy reads that digest from the latest release and nothing else.
+4. `notify` sends a Telegram alert, `Laneway release failed`, when any job fails.
+
+There is no environment gate. Only the admin can push the tag, and the build holds no secrets. Releases share the concurrency group `release` with `cancel-in-progress: false`, so a running release is never cut short.
+
+A tag is never moved or reused. A failed release burns its number, and the fix ships under the next one. What a failure leaves behind depends on where it stopped:
+
+- `Guards` failed. Nothing was built. The tag points at a commit with no image.
+- The Trivy gate failed. Nothing was pushed. The tag has no image.
+- Attest failed. The image is on GHCR with no attestation. The deploy verifies the attestation before it pulls, so it refuses this image.
+- `GitHub release` failed. The image is pushed and attested, but no release names it, so the deploy never sees it.
+
+To check a release's image by hand:
+
+```sh
+gh attestation verify oci://ghcr.io/<owner>/laneway-api@sha256:<digest> \
+  -R <owner>/laneway-api \
+  --signer-workflow <owner>/laneway-api/.github/workflows/image.yml
+```
+
+The signer is `image.yml`, not `release.yml`, because `image.yml` is the reusable workflow that built and attested the image.
+
+The GHCR package is public, so anyone can pull and verify it. GitHub can't make a public package private again.
+
+To fix a red run:
+
+- `Check the tag name` failed. The tag isn't `vX.Y.Z`. Tag the commit again with a valid name.
+- `Check the commit is on main` failed. The tag points at a branch commit. Merge the change first, then tag the merge commit on main with the next version.
+- `Check main.yml passed on the commit` failed. Open the commit's `main.yml` run. If it was still going, wait for it to finish. If it was cancelled, rerun it. If it was red, fix main in a PR. Then tag with the next version.
+- The image job failed. Fix it like a red [Image build / Build and scan](#image-build--build-and-scan), in a PR, then tag with the next version.
+- `GitHub release` failed. The image is on GHCR already. Tag with the next version rather than writing the release by hand, so every release goes through the same steps.
 
 ## Local hooks
 
