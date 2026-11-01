@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  guards:
+    name: Guards
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+      - name: Check the tag name
+        id: tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag $TAG is not vX.Y.Z"
+            exit 1
+          fi
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check the commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Commit ${GITHUB_SHA::7} is not on main"
+            exit 1
+          fi
+      - name: Check main.yml passed on the commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          green=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/main.yml/runs?head_sha=$GITHUB_SHA&event=push" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')
+          if [[ "$green" == 0 ]]; then
+            echo "::error::No green main.yml run on ${GITHUB_SHA::7}. A missing, running, or red run all fail here."
+            exit 1
+          fi
+
+  image:
+    name: Image
+    needs: guards
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      security-events: write
+    uses: $/.github/workflows/image.yml
+    with:
+      push: true
+      attest: true
+      version: ${{ needs.guards.outputs.version }}
+
+  release:
+    name: GitHub release
+    needs: [guards, image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: block
+          allowed-endpoints: api.github.com:443
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+        run: |
+          if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The image job returned no digest"
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes \
+            --notes "Image: \`ghcr.io/${GITHUB_REPOSITORY,,}@$DIGEST\`"
+
+  notify:
+    needs: [guards, image, release]
+    if: failure()
+    permissions: {}
+    uses: $/.github/workflows/telegram-alert.yml
+    with:
+      message: Laneway release failed
+      needs: ${{ toJSON(needs) }}
+    secrets:
+      telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
