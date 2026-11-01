@@ -8,6 +8,8 @@ Everything on this page lives in GitHub and Doppler settings, not in the repo. N
 
 The `main` ruleset requires nine checks by name. If a job's `name:` changes in a workflow and the ruleset still lists the old name, GitHub waits for a check that never reports. Every open PR stays blocked, this one included.
 
+A job that calls a reusable workflow reports as `<caller job> / <called job>`. `Image build / Build and scan` is the `Image build` job in `ci.yml` calling the `Build and scan` job in `image.yml`. Renaming either half renames the check, so a change to `image.yml` alone can block every PR.
+
 A PR runs the workflow from its own branch, so the rename PR reports the new name only. Rename in this order:
 
 1. Open the rename PR and wait for the new name to report.
