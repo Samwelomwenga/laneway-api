@@ -124,5 +124,10 @@ Step 7 of the rollout tests it. If no message arrives, check the `notify / Send`
 `.github/dependabot.yml` runs weekly on Mondays.
 
 - After the build PR merges, open Insights, Dependency graph, Dependabot. The config must parse with no errors.
-- On the first Monday after that, check the PRs. Packages that match a group arrive in one PR per group: `aspnetcore-efcore`, `fluentvalidation`, `test` and `actions`. Other NuGet packages and SDK updates arrive one per PR. SDK titles start with `chore(deps):`, action titles with `ci(deps):`, and NuGet titles with `chore:` alone. Each PR passes the required checks.
-- No Dependabot PR may offer a major version of ASP.NET Core, EF Core, Npgsql or the SDK. Those ignores hold each major until a deliberate retarget PR moves Laneway to the next one.
+- On the first Monday after that, check the PRs. Packages that match a group arrive in one PR per group: `aspnetcore-efcore`, `fluentvalidation`, `test`, `dotnet-images` and `actions`. `dotnet-images` is the `docker` entry's one group, and holds every base image in the `Dockerfile`. Other NuGet packages and SDK updates arrive one per PR. Each PR passes the required checks.
+- Titles start like this:
+  - NuGet, grouped or not: `chore:` alone. `include: scope` adds no scope to NuGet titles, so `chore: Bump Supabase.Storage ...` is correct.
+  - SDK: `chore(deps):`.
+  - Base images: `chore(deps):`, expected from the `docker` entry's settings. No base image PR has arrived yet, so check the first one.
+  - Actions: `ci(deps):`.
+- No Dependabot PR may offer a major version of ASP.NET Core, EF Core, Npgsql, the SDK or the base images. Those ignores hold each major until a deliberate retarget PR moves Laneway to the next one.
