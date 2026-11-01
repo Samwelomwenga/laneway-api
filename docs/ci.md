@@ -244,7 +244,9 @@ To fix a red run:
 
 ### Scans on main
 
-The `CodeQL (SAST)` and `Trivy filesystem scan` jobs are copies of the ones in `ci.yml`. Change both files together. Their results give code scanning a main baseline. GitHub compares each PR's analysis to the latest one on main, so a PR shows only the alerts it adds. Trivy uploads under the same `trivy` category as on PRs.
+The `CodeQL (SAST)` and `Trivy filesystem scan` jobs are copies of the ones in `ci.yml`. Change both files together. Their results give code scanning a main baseline. GitHub compares each PR's analysis to the latest one on main, so a PR shows only the alerts it adds. That needs the same category on both sides. Trivy uploads under `trivy` in both files. CodeQL uploads under `.github/workflows/main.yml:codeql` in both, the name GitHub gave main's first analysis.
+
+Never change the CodeQL category in only one file. Changing it in both doesn't help either, because main keeps its analyses under the old name. Code scanning then reports `1 configuration not found` on every PR and leaves `CodeQL` neutral. The code scanning rule in the `main` ruleset doesn't pass, and the PR can't merge. To rename it anyway, turn off that rule for the rename PR's merge. Then delete the old configuration under Security, Code scanning, Tool status.
 
 `CodeQL (SAST)` stays green with findings here too, so a new CodeQL alert on main shows only in the Security tab. A red Trivy job on main means a finding got merged, or a new advisory came out for a package main already uses. Fix it in a PR, with the steps under [Trivy filesystem scan](#trivy-filesystem-scan).
 
