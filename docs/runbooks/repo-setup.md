@@ -6,7 +6,7 @@ Everything on this page lives in GitHub and Doppler settings, not in the repo. N
 
 ## Renaming a check blocks every PR
 
-The `main` ruleset requires seven checks by name. If a job's `name:` changes in a workflow and the ruleset still lists the old name, GitHub waits for a check that never reports. Every open PR stays blocked, this one included.
+The `main` ruleset requires nine checks by name. If a job's `name:` changes in a workflow and the ruleset still lists the old name, GitHub waits for a check that never reports. Every open PR stays blocked, this one included.
 
 A PR runs the workflow from its own branch, so the rename PR reports the new name only. Rename in this order:
 
@@ -31,6 +31,8 @@ GitHub's evaluate mode for rulesets is Enterprise only, so there is no dry run. 
    - `CodeQL (SAST)`
    - `Workflow lint`
    - `PR title`
+   - `Terraform check`
+   - `Image build / Build and scan`
 4. Turn on the rest of the [repo settings](#repo-settings).
 5. Rewrite `DEfault_RULES` as the [`main` ruleset](#ruleset-main).
 6. Create the [`main-merge-lock` ruleset](#ruleset-main-merge-lock).
@@ -76,7 +78,7 @@ Rules:
   - Allowed merge methods: squash only.
 - Require status checks to pass:
   - Require branches to be up to date before merging: on. A PR's checks then run on the tree that lands, so two PRs that pass alone can't merge into a main that fails to build. The cost is that each merge makes every other open PR update its branch and rerun CI. A merge queue would batch that, but merge queues need an organization-owned repo, and this one is user-owned. PRs run no tests, so a test break still shows up only in `main.yml`, after the merge.
-  - Add the seven checks from step 3 of the rollout. Pin each one to the GitHub Actions app, integration id `15368`. Then a commit status with the same name from some other source can't satisfy the check.
+  - Add the nine checks from step 3 of the rollout. Pin each one to the GitHub Actions app, integration id `15368`. Then a commit status with the same name from some other source can't satisfy the check.
 - Require code scanning results:
   - Tool: CodeQL.
   - Alerts: errors. Security alerts: high or higher.

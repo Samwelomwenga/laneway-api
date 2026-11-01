@@ -115,7 +115,7 @@ To fix a red run:
 
 ## Terraform check
 
-The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on `terraform/alerting`. It holds no Grafana token and never runs `plan` or `apply`. The operator applies by hand, as [docs/runbooks/alerting.md](runbooks/alerting.md) says. It isn't in the `main` ruleset yet.
+The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on `terraform/alerting`. It holds no Grafana token and never runs `plan` or `apply`. The operator applies by hand, as [docs/runbooks/alerting.md](runbooks/alerting.md) says.
 
 To run it locally:
 
@@ -133,7 +133,7 @@ To fix a red run:
 
 ## Image build / Build and scan
 
-The check builds Laneway's container image and scans it with Trivy. It runs on every PR, fork PRs included, with no path filter. GitHub names a check from a reusable workflow `<caller job> / <called job>`, so the check reports as `Image build / Build and scan`. It isn't in the `main` ruleset yet.
+The check builds Laneway's container image and scans it with Trivy. It runs on every PR, fork PRs included, with no path filter. GitHub names a check from a reusable workflow `<caller job> / <called job>`, so the check reports as `Image build / Build and scan`.
 
 The `Image build` job in `ci.yml` has no steps of its own. It calls `.github/workflows/image.yml`, the one workflow that builds the image. The release will call it too, with push and attest on. On a PR both stay off, so nothing leaves the runner.
 
