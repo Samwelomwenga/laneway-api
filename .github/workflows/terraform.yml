@@ -38,6 +38,7 @@ jobs:
   plan:
     name: Plan
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: ${{ inputs.root }}-plan
     permissions:
       contents: read
@@ -81,6 +82,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.digest != 'none' && !inputs.drift
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: ${{ inputs.root }}
     permissions:
       contents: read
