@@ -342,6 +342,12 @@ To fix a red run:
 - A job hit its timeout, 15 minutes for `Plan` or 30 for `Apply`. A healthy `Plan` takes under a minute. The stop leaves the HCP lock held, so force unlock it. If `Apply` timed out, it may have created resources that HCP state doesn't hold. Check Grafana for them, delete them, then run the workflow again.
 - `Apply` failed on `The change list moved since the Plan job`. Someone changed the resources between the two plans, often in the Grafana UI. Read both summaries, then run the workflow again by hand so `Plan` sees the new state.
 - `Apply` failed partway. Some resources changed and others didn't. HCP holds the state of what did change. Fix forward with a PR, or rerun the workflow by hand if the cause was outside the repo.
+- `Apply` failed with `Failed to save state`. Terraform changed resources but couldn't upload the new state, so HCP holds a pending state version with nothing in it. Every later run then plans and hangs at the end, retrying `unable to unlock workspace while state version upload is still pending` until it times out. HCP has no way to discard a pending version, and only a newer state replaces it. To recover:
+  1. Fix the cause first, such as a host missing from `ALLOWED_ENDPOINTS`.
+  2. List what the apply created in Grafana. Delete each one, or import it once the state is clean.
+  3. Force unlock the workspace.
+  4. Write a state file with no resources, `"serial": 2` and a fresh `lineage`, and push it with `doppler run --project laneway-<root> --config prd -- terraform -chdir=terraform/<root> state push <file>`. This creates a finalized version that replaces the pending one.
+  5. Run the workflow by hand. `Plan` should finish in under a minute.
 
 ### Drift check
 

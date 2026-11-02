@@ -101,6 +101,8 @@ On 2026-10-29 every step passed. All twelve rule queries ran in Explore without 
 2. On `Laneway notify`, click Test. Email and Telegram each get a message.
 3. Write the date each one passed here.
 
+Both passed on 2026-11-02, after the first apply through CI.
+
 ## Once production is hosted
 
 Open a PR that sets the `production_hosted` default to `true` in `terraform/alerting/variables.tf`. The first production deploy does this once its health check passes. Once the PR merges and the apply goes through, logging stopped starts evaluating. The value stays out of Doppler.
