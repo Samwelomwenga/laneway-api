@@ -29,6 +29,4 @@ jobs:
     with:
       root: alerting
       drift: ${{ github.event_name == 'schedule' || inputs.drift == true }}
-    secrets:
-      telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+    secrets: inherit # zizmor: ignore[secrets-inherit] passing secrets by name leaves the called jobs' environment secrets empty, actions/runner#4453

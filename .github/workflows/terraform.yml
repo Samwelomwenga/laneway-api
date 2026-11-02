@@ -12,11 +12,6 @@ on:
         required: false
         type: boolean
         default: false
-    secrets:
-      telegram-bot-token:
-        required: false
-      telegram-chat-id:
-        required: false
 
 permissions: {}
 
@@ -30,6 +25,7 @@ env:
     lanewayapi.grafana.net:443
     objects.githubusercontent.com:443
     oncall-prod-eu-west-0.grafana.net:443
+    raw.githubusercontent.com:443
     registry.terraform.io:443
     release-assets.githubusercontent.com:443
     releases.hashicorp.com:443
@@ -130,5 +126,5 @@ jobs:
       message: Terraform ${{ inputs.drift && 'drift check' || 'plan or apply' }} failed for ${{ inputs.root }}
       needs: ${{ toJSON(needs) }}
     secrets:
-      telegram-bot-token: ${{ secrets.telegram-bot-token }}
-      telegram-chat-id: ${{ secrets.telegram-chat-id }}
+      telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}

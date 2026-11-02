@@ -201,7 +201,7 @@ When any `CI` check fails, `notify` sends one Telegram message. It isn't a requi
 
 `notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. `ci.yml`, `main.yml`, `release.yml`, `rescan.yml` and `terraform.yml` call it. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
 
-A caller job uses `needs` plus `if: failure()`, passes `toJSON(needs)` and a `message` headline as inputs, and passes `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` by name. Never `secrets: inherit`. Titles and refs go in through `inputs` and reach the script through `env`, never through `${{ }}` inside `run:`. `ref` and `sha` are optional and default to the run's own ref name and SHA. `ci.yml` passes the PR number with the head branch, and the head SHA, because the run's own SHA is the merge commit.
+A caller job uses `needs` plus `if: failure()`, passes `toJSON(needs)` and a `message` headline as inputs, and passes `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` by name. Never `secrets: inherit` on a call to `telegram-alert.yml`. Titles and refs go in through `inputs` and reach the script through `env`, never through `${{ }}` inside `run:`. `ref` and `sha` are optional and default to the run's own ref name and SHA. `ci.yml` passes the PR number with the head branch, and the head SHA, because the run's own SHA is the merge commit.
 
 The alert job's log prints its `env`, and `NEEDS` holds the outputs of every job in `needs`. In `release.yml` those are the version and the image digest, both public. A caller whose jobs set outputs must keep secrets and plan text out of them.
 
@@ -327,6 +327,8 @@ The run has three jobs:
 - `Plan` runs in the `alerting-plan` environment. It reads the Terraform version from `terraform/alerting/versions.tf`, loads the root's secrets with `doppler run`, and runs `scripts/terraform-plan.sh`. The log and the job summary show each changed address and its action, such as `create grafana_folder.laneway`. No attribute values appear, because the repo is public.
 - `Apply` runs in the `alerting` environment and waits for the operator to approve. It plans again, compares the change list with `Plan`'s, and fails if they differ. Then it applies that plan. No plan file leaves the runner. When `Plan` finds no changes, `Apply` shows as skipped.
 - `notify` sends one Telegram message, `Terraform plan or apply failed for alerting`, when either job fails. GitHub marks `Apply` failed when the operator rejects the gate or the gate times out, so those alert too. `notify` is skipped otherwise.
+
+The caller passes `secrets: inherit`. When a caller passes secrets by name, GitHub hands the called jobs an empty `DOPPLER_TOKEN` from their environment, as [actions/runner#4453](https://github.com/actions/runner/issues/4453) describes. The repo-level secrets it passes along are the two Telegram values, which `notify` needs anyway, and Doppler's project, config and environment names. Keep it that way. A new repo-level secret reaches `terraform.yml` too.
 
 Both jobs that hold the Doppler token run harden-runner with `egress-policy: block`. The runbook's [allowlist check](runbooks/terraform.md#check-the-egress-allowlist) says how to find a missing host.
 
