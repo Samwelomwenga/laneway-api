@@ -158,8 +158,8 @@ locals {
   ]
 
   sources = {
-    logs    = { uid = var.logs_datasource_uid, query = { queryType = "instant" } }
-    metrics = { uid = var.metrics_datasource_uid, query = { instant = true, range = false } }
+    logs    = { uid = var.logs_datasource_uid, query_type = "instant", query = { queryType = "instant" } }
+    metrics = { uid = var.metrics_datasource_uid, query_type = null, query = { instant = true, range = false } }
   }
 }
 
@@ -186,6 +186,7 @@ resource "grafana_rule_group" "laneway" {
       data {
         ref_id         = "A"
         datasource_uid = local.sources[rule.value.source].uid
+        query_type     = local.sources[rule.value.source].query_type
         relative_time_range {
           from = rule.value.range
           to   = 0
