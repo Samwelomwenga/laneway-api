@@ -2,10 +2,9 @@ name: Terraform alerting
 
 on:
   push:
-    branches: [main, ci/terraform-alerting-gate]
+    branches: [main]
     paths:
       - terraform/alerting/**
-      - .github/workflows/terraform*.yml
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
