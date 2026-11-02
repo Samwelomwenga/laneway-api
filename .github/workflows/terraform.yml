@@ -20,6 +20,7 @@ env:
     api.doppler.com:443
     api.github.com:443
     app.terraform.io:443
+    archivist.terraform.io:443
     cli.doppler.com:443
     github.com:443
     lanewayapi.grafana.net:443
