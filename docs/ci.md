@@ -338,7 +338,8 @@ To fix a red run:
 - `Plan` failed before init, at `doppler run`. The `DOPPLER_TOKEN` secret on the environment expired. Generate a new one and set it on both environments.
 - `Plan` failed on a provider error, such as a 401 from Grafana. The provider token in Doppler expired or lost a role. The error names the resource.
 - A step failed with a connection error to a host. harden-runner blocked it. Add the host to `ALLOWED_ENDPOINTS` at the top of `terraform.yml`.
-- `Plan` failed with a lock error. Another run or a local run holds the HCP state lock. Wait for it, or unlock the workspace in HCP once you're sure nothing is running.
+- `Plan` failed with a lock error. Another run or a local run holds the HCP state lock. Wait for it, or unlock the workspace in HCP once you're sure nothing is running. A lock left by a failed or cancelled run needs Force unlock, under the workspace's Settings, Locking.
+- A job hit its timeout, 15 minutes for `Plan` or 30 for `Apply`. A healthy `Plan` takes under a minute. The stop leaves the HCP lock held, so force unlock it. If `Apply` timed out, it may have created resources that HCP state doesn't hold. Check Grafana for them, delete them, then run the workflow again.
 - `Apply` failed on `The change list moved since the Plan job`. Someone changed the resources between the two plans, often in the Grafana UI. Read both summaries, then run the workflow again by hand so `Plan` sees the new state.
 - `Apply` failed partway. Some resources changed and others didn't. HCP holds the state of what did change. Fix forward with a PR, or rerun the workflow by hand if the cause was outside the repo.
 
