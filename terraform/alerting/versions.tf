@@ -2,7 +2,7 @@ terraform {
   required_version = "1.15.8"
 
   cloud {
-    organization = "laneway-samwelomwenga"
+    organization = "laneway"
 
     workspaces {
       name = "laneway-alerting"

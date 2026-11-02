@@ -11,7 +11,7 @@ HCP Terraform holds state and nothing else. Its workspaces run in local executio
 ## The HCP organization
 
 1. Sign up for HCP Terraform on the Free plan.
-2. Create an organization named `laneway-samwelomwenga`. Every root's `cloud` block names it.
+2. Create an organization named `laneway`. Every root's `cloud` block names it.
 
 ## A workspace per root
 
