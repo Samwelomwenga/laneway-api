@@ -115,7 +115,7 @@ To fix a red run:
 
 ## Terraform check
 
-The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on `terraform/alerting`. It holds no secrets, has no path filter, and never runs `plan` or `apply`. `init -backend=false` skips the `cloud` block, so it needs no HCP token. [Terraform alerting](#terraform-alerting) plans and applies after the merge. It isn't in the `main` ruleset yet.
+The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on `terraform/alerting`. It holds no secrets, has no path filter, and never runs `plan` or `apply`. `init -backend=false` skips the `cloud` block, so it needs no HCP token. [Terraform alerting](#terraform-alerting) plans and applies after the merge.
 
 To run it locally:
 
@@ -133,7 +133,7 @@ To fix a red run:
 
 ## Image build / Build and scan
 
-The check builds Laneway's container image and scans it with Trivy. It runs on every PR, fork PRs included, with no path filter. GitHub names a check from a reusable workflow `<caller job> / <called job>`, so the check reports as `Image build / Build and scan`. It isn't in the `main` ruleset yet.
+The check builds Laneway's container image and scans it with Trivy. It runs on every PR, fork PRs included, with no path filter. GitHub names a check from a reusable workflow `<caller job> / <called job>`, so the check reports as `Image build / Build and scan`.
 
 The `Image build` job in `ci.yml` has no steps of its own. It calls `.github/workflows/image.yml`, the one workflow that builds the image. [release.yml](#releaseyml) calls it too, with push and attest on. On a PR both stay off, so nothing leaves the runner.
 

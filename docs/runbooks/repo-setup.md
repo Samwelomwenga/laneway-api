@@ -6,7 +6,9 @@ Everything on this page lives in GitHub and Doppler settings, not in the repo. N
 
 ## Renaming a check blocks every PR
 
-The `main` ruleset requires seven checks by name. If a job's `name:` changes in a workflow and the ruleset still lists the old name, GitHub waits for a check that never reports. Every open PR stays blocked, this one included.
+The `main` ruleset requires nine checks by name. If a job's `name:` changes in a workflow and the ruleset still lists the old name, GitHub waits for a check that never reports. Every open PR stays blocked, this one included.
+
+A job that calls a reusable workflow reports as `<caller job> / <called job>`. `Image build / Build and scan` is the `Image build` job in `ci.yml` calling the `Build and scan` job in `image.yml`. Renaming either half renames the check, so a change to `image.yml` alone can block every PR.
 
 A PR runs the workflow from its own branch, so the rename PR reports the new name only. Rename in this order:
 
@@ -31,6 +33,8 @@ GitHub's evaluate mode for rulesets is Enterprise only, so there is no dry run. 
    - `CodeQL (SAST)`
    - `Workflow lint`
    - `PR title`
+   - `Terraform check`
+   - `Image build / Build and scan`
 4. Turn on the rest of the [repo settings](#repo-settings).
 5. Rewrite `DEfault_RULES` as the [`main` ruleset](#ruleset-main).
 6. Create the [`main-merge-lock` ruleset](#ruleset-main-merge-lock).
@@ -76,7 +80,7 @@ Rules:
   - Allowed merge methods: squash only.
 - Require status checks to pass:
   - Require branches to be up to date before merging: on. A PR's checks then run on the tree that lands, so two PRs that pass alone can't merge into a main that fails to build. The cost is that each merge makes every other open PR update its branch and rerun CI. A merge queue would batch that, but merge queues need an organization-owned repo, and this one is user-owned. PRs run no tests, so a test break still shows up only in `main.yml`, after the merge.
-  - Add the seven checks from step 3 of the rollout. Pin each one to the GitHub Actions app, integration id `15368`. Then a commit status with the same name from some other source can't satisfy the check.
+  - Add the nine checks from step 3 of the rollout. Pin each one to the GitHub Actions app, integration id `15368`. Then a commit status with the same name from some other source can't satisfy the check.
 - Require code scanning results:
   - Tool: CodeQL.
   - Alerts: errors. Security alerts: high or higher.
@@ -149,5 +153,10 @@ Step 7 of the rollout tests it. If no message arrives, check the `notify / Send`
 `.github/dependabot.yml` runs weekly on Mondays.
 
 - After the build PR merges, open Insights, Dependency graph, Dependabot. The config must parse with no errors.
-- On the first Monday after that, check the PRs. Packages that match a group arrive in one PR per group: `aspnetcore-efcore`, `fluentvalidation`, `test` and `actions`. Other NuGet packages, SDK updates, and Terraform provider updates arrive one per PR. Dependabot reads every folder under `terraform/`, so a new root needs no config edit. SDK and Terraform titles start with `chore(deps):`, action titles with `ci(deps):`, and NuGet titles with `chore:` alone. Each PR passes the required checks.
-- No Dependabot PR may offer a major version of ASP.NET Core, EF Core, Npgsql or the SDK. Those ignores hold each major until a deliberate retarget PR moves Laneway to the next one.
+- On the first Monday after that, check the PRs. Packages that match a group arrive in one PR per group: `aspnetcore-efcore`, `fluentvalidation`, `test`, `dotnet-images` and `actions`. `dotnet-images` is the `docker` entry's one group, and holds every base image in the `Dockerfile`. Other NuGet packages, SDK updates, and Terraform provider updates arrive one per PR. Dependabot reads every folder under `terraform/`, so a new root needs no config edit. Each PR passes the required checks.
+- Titles start like this:
+  - NuGet, grouped or not: `chore:` alone. `include: scope` adds no scope to NuGet titles, so `chore: Bump Supabase.Storage ...` is correct.
+  - SDK: `chore(deps):`.
+  - Base images and Terraform providers: `chore(deps):`, expected from their entries' settings. Neither has opened a PR yet, so check the first of each.
+  - Actions: `ci(deps):`.
+- No Dependabot PR may offer a major version of ASP.NET Core, EF Core, Npgsql, the SDK or the base images. Those ignores hold each major until a deliberate retarget PR moves Laneway to the next one.
