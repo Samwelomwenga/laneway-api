@@ -2,7 +2,7 @@
 
 PRs run no tests. A green PR means the code builds and passes the checks below. The full suite runs after the merge, on every push to main, as [main.yml](#mainyml) says. Run `dotnet test` before you push, so main doesn't go red.
 
-Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR, except [main.yml](#mainyml), whose jobs run after the merge. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
+Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR, except [main.yml](#mainyml), whose jobs run after the merge, [release.yml](#releaseyml), which runs on a tag, [rescan.yml](#rescanyml), which runs on a schedule, and [Terraform alerting](#terraform-alerting), which runs on `main` after a merge. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
 
 ## Build & format
 
@@ -115,7 +115,7 @@ To fix a red run:
 
 ## Terraform check
 
-The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on `terraform/alerting`. It holds no Grafana token and never runs `plan` or `apply`. The operator applies by hand, as [docs/runbooks/alerting.md](runbooks/alerting.md) says.
+The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on `terraform/alerting`. It holds no secrets, has no path filter, and never runs `plan` or `apply`. `init -backend=false` skips the `cloud` block, so it needs no HCP token. [Terraform alerting](#terraform-alerting) plans and applies after the merge.
 
 To run it locally:
 
@@ -135,7 +135,11 @@ To fix a red run:
 
 The check builds Laneway's container image and scans it with Trivy. It runs on every PR, fork PRs included, with no path filter. GitHub names a check from a reusable workflow `<caller job> / <called job>`, so the check reports as `Image build / Build and scan`.
 
-The `Image build` job in `ci.yml` has no steps of its own. It calls `.github/workflows/image.yml`, the one workflow that builds the image. The release will call it too, with push and attest on. On a PR both stay off, so nothing leaves the runner.
+The `Image build` job in `ci.yml` has no steps of its own. It calls `.github/workflows/image.yml`, the one workflow that builds the image. [release.yml](#releaseyml) calls it too, with push and attest on. On a PR both stay off, so nothing leaves the runner.
+
+`image.yml` declares no permissions. Its job takes whatever the caller job grants. GitHub checks a called workflow's permissions when the run starts, skipped steps included, so a `packages: write` in `image.yml` would make every PR grant it, and a fork PR can't. `Image build` grants `contents: read` and `security-events: write`. The release grants `packages`, `id-token` and `attestations` write on top. A new caller grants only what its run needs.
+
+With push on, the workflow tags the image Trivy scanned, pushes it to `ghcr.io/<owner>/laneway-api` as the version and as `sha-<short>`, and reads the registry digest back. It never tags `latest`. With attest on, `actions/attest` writes SLSA provenance for that digest, and a second call attaches a CycloneDX SBOM that Trivy makes from the same image. A pushed build skips the Actions cache, so no layer saved by a PR build ends up in a published image.
 
 The workflow builds the `Dockerfile` for `linux/amd64` on a native runner and loads the image into the runner's Docker. The build includes the `migrations` stage, so a broken migration bundle turns the check red too. Buildx caches layers in the Actions cache, so a PR that only changes code skips the restore.
 
@@ -195,11 +199,11 @@ To fix a red run, edit the PR title. The log lists what failed and shows valid e
 
 When any `CI` check fails, `notify` sends one Telegram message. It isn't a required check. It shows as a skipped `notify` on a green run, and it never goes red. When it runs, GitHub names the check `notify / Send`, after the caller job and the called job. `PR title` sends no alert. A cancelled run sends nothing, even when a job failed before a newer push cancelled it.
 
-`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. `ci.yml` and `main.yml` call it. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
+`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. `ci.yml`, `main.yml`, `release.yml`, `rescan.yml` and `terraform.yml` call it. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
 
-A caller job uses `needs` plus `if: failure()`, passes `toJSON(needs)` and a `message` headline as inputs, and passes `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` by name. Never `secrets: inherit`. Titles and refs go in through `inputs` and reach the script through `env`, never through `${{ }}` inside `run:`. `ref` and `sha` are optional and default to the run's own ref name and SHA. `ci.yml` passes the PR number with the head branch, and the head SHA, because the run's own SHA is the merge commit.
+A caller job uses `needs` plus `if: failure()`, passes `toJSON(needs)` and a `message` headline as inputs, and passes `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` by name. Never `secrets: inherit` on a call to `telegram-alert.yml`. Titles and refs go in through `inputs` and reach the script through `env`, never through `${{ }}` inside `run:`. `ref` and `sha` are optional and default to the run's own ref name and SHA. `ci.yml` passes the PR number with the head branch, and the head SHA, because the run's own SHA is the merge commit.
 
-The alert job's log prints its `env`, and `NEEDS` holds the outputs of every job in `needs`. No job in `ci.yml` or `main.yml` has outputs today. A caller whose jobs set outputs must keep secrets and plan text out of them.
+The alert job's log prints its `env`, and `NEEDS` holds the outputs of every job in `needs`. In `release.yml` those are the version and the image digest, both public. A caller whose jobs set outputs must keep secrets and plan text out of them.
 
 `telegram-alert.yml` reads both secrets. Doppler syncs them to the repo's Actions secrets and Dependabot secrets, because a Dependabot run reads only Dependabot secrets. A PR from a fork gets no secrets, so `notify` skips the call without a word. On any other run, a missing secret prints `Telegram secrets missing, failure alert not sent` as a warning. If you see that warning, check the Doppler sync. [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) has the setup steps. A failed send prints `Telegram alert failed to send`.
 
@@ -213,7 +217,7 @@ Every push to main runs `.github/workflows/main.yml`, the `Main` workflow. It ha
 
 Runs on main share the concurrency group `main` with `cancel-in-progress: false`, so a running job is never cut short. A new push waits for the run before it. GitHub keeps only one waiting run per group, though. If a third push lands while one run is going and one is waiting, GitHub cancels the waiting run, and that commit gets no verdict and no alert.
 
-The release will read the verdict and refuse to build a commit whose `main.yml` run isn't green. To release a commit whose run was cancelled, rerun that run from the Actions tab first.
+[release.yml](#releaseyml) reads the verdict and refuses to build a commit whose `main.yml` run isn't green. To release a commit whose run was cancelled, rerun that run from the Actions tab first.
 
 ### Tests
 
@@ -240,9 +244,123 @@ To fix a red run:
 
 ### Scans on main
 
-The `CodeQL (SAST)` and `Trivy filesystem scan` jobs are copies of the ones in `ci.yml`. Change both files together. Their results give code scanning a main baseline. GitHub compares each PR's analysis to the latest one on main, so a PR shows only the alerts it adds. Trivy uploads under the same `trivy` category as on PRs.
+The `CodeQL (SAST)` and `Trivy filesystem scan` jobs are copies of the ones in `ci.yml`. Change both files together. Their results give code scanning a main baseline. GitHub compares each PR's analysis to the latest one on main, so a PR shows only the alerts it adds. That needs the same category on both sides. Trivy uploads under `trivy` in both files. CodeQL uploads under `.github/workflows/main.yml:codeql` in both, the name GitHub gave main's first analysis.
+
+Never change the CodeQL category in only one file. Changing it in both doesn't help either, because main keeps its analyses under the old name. Code scanning then reports `1 configuration not found` on every PR and leaves `CodeQL` neutral. The code scanning rule in the `main` ruleset doesn't pass, and the PR can't merge. To rename it anyway, turn off that rule for the rename PR's merge. Then delete the old configuration under Security, Code scanning, Tool status.
 
 `CodeQL (SAST)` stays green with findings here too, so a new CodeQL alert on main shows only in the Security tab. A red Trivy job on main means a finding got merged, or a new advisory came out for a package main already uses. Fix it in a PR, with the steps under [Trivy filesystem scan](#trivy-filesystem-scan).
+
+## release.yml
+
+Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`, the `Release` workflow. Nothing else releases. A merge doesn't, and the workflow has no `workflow_dispatch`. The `release-tags` ruleset lets only the repo admin create a `v*` tag, as [docs/runbooks/repo-setup.md](runbooks/repo-setup.md#ruleset-release-tags) says.
+
+Versions follow SemVer from `v0.1.0`. A major bump marks a breaking API change. There are no prerelease tags.
+
+To cut a release, tag a commit on main whose `main.yml` run is green, and push the tag:
+
+```sh
+git tag v0.1.0 <sha>
+git push origin v0.1.0
+```
+
+The workflow has four jobs.
+
+1. `Guards` fails unless the tag is exactly `vX.Y.Z`, `git merge-base --is-ancestor` finds the commit on main, and a `main.yml` run on that commit concluded `success`. It never waits. A missing, running or red run fails the release at once.
+2. `Image` calls [image.yml](#image-build--build-and-scan) with push and attest on and the version without its `v`. The image gets the same build and Trivy gate as on a PR, then goes to GHCR as `1.2.3` and `sha-<short>`, with provenance and an SBOM attested. No other PR check runs again.
+3. `GitHub release` creates a release on the tag with GitHub's generated notes. The body names the image as `ghcr.io/<owner>/laneway-api@sha256:...`. The deploy reads that digest from the latest release and nothing else.
+4. `notify` sends a Telegram alert, `Laneway release failed`, when any job fails.
+
+There is no environment gate. Only the admin can push the tag, and the build holds no secrets. Releases share the concurrency group `release` with `cancel-in-progress: false`, so a running release is never cut short.
+
+A tag is never moved or reused. A failed release burns its number, and the fix ships under the next one. What a failure leaves behind depends on where it stopped:
+
+- `Guards` failed. The workflow built nothing. The tag points at a commit with no image.
+- The Trivy gate failed. The workflow pushed nothing. The tag has no image.
+- Attest failed. The image is on GHCR with no attestation. The deploy verifies the attestation before it pulls, so it refuses this image.
+- `GitHub release` failed. The image is on GHCR with its attestations, but no release names it, so the deploy never sees it.
+
+To check a release's image by hand:
+
+```sh
+gh attestation verify oci://ghcr.io/<owner>/laneway-api@sha256:<digest> \
+  -R <owner>/laneway-api \
+  --signer-workflow <owner>/laneway-api/.github/workflows/image.yml
+```
+
+The signer is `image.yml`, not `release.yml`, because `image.yml` is the reusable workflow that built and attested the image.
+
+The GHCR package is public, so anyone can pull and verify it. GitHub can't make a public package private again.
+
+To fix a red run:
+
+- `Check the tag name` failed. The tag isn't `vX.Y.Z`. Tag the commit again with a valid name.
+- `Check the commit is on main` failed. The tag points at a branch commit. Merge the change first, then tag the merge commit on main with the next version.
+- `Check main.yml passed on the commit` failed. Open the commit's `main.yml` run. If it was still going, wait for it to finish. If it was cancelled, rerun it. If it was red, fix main in a PR. Then tag with the next version.
+- The image job failed. Fix it like a red [Image build / Build and scan](#image-build--build-and-scan), in a PR, then tag with the next version.
+- `GitHub release` failed. The image is on GHCR already. Tag with the next version rather than writing the release by hand, so every release goes through the same steps.
+
+## rescan.yml
+
+Every Monday at 06:00 UTC, `.github/workflows/rescan.yml` scans the image in the latest GitHub release again, so a CVE published after the release still reaches you. It reads the digest from the release body, never from a tag or a GHCR listing, so it scans exactly what the deploy runs. It pulls that digest from GHCR and never rebuilds.
+
+The scan matches the gate in `image.yml`. Trivy runs twice with its vulnerability and secret scanners. The first run reports every high or critical finding to code scanning under `trivy-image`. The second fails on any high or critical finding with a fix. `.trivyignore` on main applies, as on a PR. The log shows only the tag, the digest and whether the gate passed. A failed run alerts as `Laneway release rescan failed`.
+
+Harden-runner blocks every host but GitHub, GHCR, and where Trivy gets its binary and its vulnerability DB. Trivy's DB cache is off, so the run downloads the DB each week and the Actions cache hosts stay off the list. If Trivy moves its DB to a new host, the run goes red with a blocked connection. Add the host to `allowed-endpoints`.
+
+To run it now, open Actions, `Rescan`, and use Run workflow.
+
+GitHub turns off scheduled workflows in a public repo after 60 days with no commits. If main goes quiet that long, the rescan stops without a word, and GitHub only emails about it. Turn it back on from the Actions tab, or push a commit.
+
+To fix a red run:
+
+- The gate failed. A fixable finding showed up in the released image. Read it in the Security tab under `trivy-image`. Fix it the way [Image build / Build and scan](#image-build--build-and-scan) says. A base image fix usually means merging Dependabot's `dotnet-images` PR. Then tag a new release. The next rescan reads the new release and goes green.
+- `Read the latest release` failed with `names no image digest`. The latest release has no `ghcr.io/...@sha256:...` line, so `release.yml` didn't write it. Delete it, or tag a new release.
+- The pull failed. Check that the package is still public.
+- A connection was blocked. Harden-runner names the host. Add it to `allowed-endpoints` if it belongs to GitHub, GHCR or Trivy.
+
+## Terraform alerting
+
+`.github/workflows/terraform-alerting.yml` runs on a push to `main` that touches `terraform/alerting/**`, every Monday at 06:00 UTC as a [drift check](#drift-check), and by hand from the Actions tab. It calls `.github/workflows/terraform.yml`, the one reusable workflow every Terraform root uses, with `root: alerting`. Plan and apply runs for one root never overlap or cancel each other mid-run, so an apply waiting at the gate holds the next push back. GitHub keeps one waiting run per root. A newer push replaces a waiting one, which is safe because the newer run plans all of `main`. [docs/runbooks/terraform.md](runbooks/terraform.md) has the setup.
+
+The run has three jobs:
+
+- `Plan` runs in the `alerting-plan` environment. It reads the Terraform version from `terraform/alerting/versions.tf`, loads the root's secrets with `doppler run`, and runs `scripts/terraform-plan.sh`. The log and the job summary show each changed address and its action, such as `create grafana_folder.laneway`. No attribute values appear, because the repo is public.
+- `Apply` runs in the `alerting` environment and waits for the operator to approve. It plans again, compares the change list with `Plan`'s, and fails if they differ. Then it applies that plan. No plan file leaves the runner. When `Plan` finds no changes, `Apply` shows as skipped.
+- `notify` sends one Telegram message, `Terraform plan or apply failed for alerting`, when either job fails. GitHub marks `Apply` failed when the operator rejects the gate or the gate times out, so those alert too. `notify` is skipped otherwise.
+
+The caller passes `secrets: inherit`. When a caller passes secrets by name, GitHub hands the called jobs an empty `DOPPLER_TOKEN` from their environment, as [actions/runner#4453](https://github.com/actions/runner/issues/4453) describes. The repo-level secrets it passes along are the two Telegram values, which `notify` needs anyway, and Doppler's project, config and environment names. Keep it that way. A new repo-level secret reaches `terraform.yml` too.
+
+Both jobs that hold the Doppler token run harden-runner with `egress-policy: block`. The runbook's [allowlist check](runbooks/terraform.md#check-the-egress-allowlist) says how to find a missing host.
+
+To fix a red run:
+
+- `Plan` failed at init with a 401. `TF_TOKEN_APP_TERRAFORM_IO` in Doppler expired or was revoked. Rotate it, as the runbook says.
+- `Plan` failed before init, at `doppler run`. The `DOPPLER_TOKEN` secret on the environment expired. Generate a new one and set it on both environments.
+- `Plan` failed on a provider error, such as a 401 from Grafana. The provider token in Doppler expired or lost a role. The error names the resource.
+- A step failed with a connection error to a host. harden-runner blocked it. Add the host to `ALLOWED_ENDPOINTS` at the top of `terraform.yml`.
+- `Plan` failed with a lock error. Another run or a local run holds the HCP state lock. Wait for it, or unlock the workspace in HCP once you're sure nothing is running. A lock left by a failed or cancelled run needs Force unlock, under the workspace's Settings, Locking.
+- A job hit its timeout, 15 minutes for `Plan` or 30 for `Apply`. A healthy `Plan` takes under a minute. The stop leaves the HCP lock held, so force unlock it. If `Apply` timed out, it may have created resources that HCP state doesn't hold. Check Grafana for them, delete them, then run the workflow again.
+- `Apply` failed on `The change list moved since the Plan job`. Someone changed the resources between the two plans, often in the Grafana UI. Read both summaries, then run the workflow again by hand so `Plan` sees the new state.
+- `Apply` failed partway. Some resources changed and others didn't. HCP holds the state of what did change. Fix forward with a PR, or rerun the workflow by hand if the cause was outside the repo.
+- `Apply` failed with `Failed to save state`. Terraform changed resources but couldn't upload the new state, so HCP holds a pending state version with nothing in it. Every later run then plans and hangs at the end, retrying `unable to unlock workspace while state version upload is still pending` until it times out. HCP has no way to discard a pending version, and only a newer state replaces it. To recover:
+  1. Fix the cause first, such as a host missing from `ALLOWED_ENDPOINTS`.
+  2. List what the apply created in Grafana. Delete each one, or import it once the state is clean.
+  3. Force unlock the workspace.
+  4. Write a state file with no resources, `"serial": 2` and a fresh `lineage`, and push it with `doppler run --project laneway-<root> --config prd -- terraform -chdir=terraform/<root> state push <file>`. This creates a finalized version that replaces the pending one.
+  5. Run the workflow by hand. `Plan` should finish in under a minute.
+
+### Drift check
+
+The Monday run sets `drift`, and so does a manual run with the `drift` box ticked. `Plan` runs `scripts/terraform-plan.sh alerting --drift`, which plans `main` with `-detailed-exitcode` in `alerting-plan`. The log and summary follow the same address-only rule. Any change, or any error, fails `Plan`. `Apply` never runs on a drift check, and `notify` sends `Terraform drift check failed for alerting`.
+
+A Dependabot provider bump changes `terraform/alerting/.terraform.lock.hcl`, so merging it starts a normal run that stops at the gate.
+
+Drift runs have their own concurrency group, `terraform-alerting-drift`, so a drift run never replaces a waiting push run or waits behind an `Apply` held at the gate. The HCP state lock keeps a drift plan and an apply from running at once. A drift run that lands between `Plan` and an approved `Apply` reports the pending change as drift. Approve or reject the gate, then run the drift check again by hand.
+
+When it fires:
+
+- The summary lists changes. An output shows as `output.<name>`. Someone edited Grafana in the UI, or nobody applied a merged change. Read the addresses. To keep the code, run the workflow by hand without `drift` and approve the gate, which puts Grafana back. To keep the UI edit, copy it into `terraform/alerting` in a PR.
+- `Plan` failed with an error and no list. Read the red-run fixes above. A 401 usually means one of the three 90-day tokens expired, so the weekly run doubles as an expiry warning.
 
 ## Local hooks
 

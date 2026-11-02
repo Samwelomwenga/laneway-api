@@ -106,6 +106,35 @@ Rules:
 
 Restrict updates with no bypass would stop every merge, the owner's too. A bypass on `main` would fix that, but it would also let the owner skip the required checks. So these two rules live here, where only the admin role gets past them, and only through a PR. Rulesets stack, so that PR still has to pass everything in `main`.
 
+## Ruleset `release-tags`
+
+Pushing a `v*` tag publishes a release, as the `release.yml` section of [docs/ci.md](../ci.md#releaseyml) says. This ruleset makes sure only the admin can push one, and that nobody moves or deletes one afterwards. Create it before the first tag.
+
+Create a new tag ruleset.
+
+- Name: `release-tags`.
+- Enforcement status: Active.
+- Target tags: include by pattern, `refs/tags/v*`.
+- Bypass list: the Repository admin role, in always mode. Tags don't go through PRs, so pull requests only mode would block the admin too.
+
+Rules:
+
+- Restrict creations.
+- Restrict updates.
+- Restrict deletions.
+
+A tag is never moved or reused, so the admin bypass is for creating tags, not changing them. To check the ruleset, have a collaborator without admin rights push a `v*` tag. GitHub must refuse it.
+
+## GHCR package
+
+The first release creates the `laneway-api` package on GHCR, linked to this repo. GitHub may create it private. The deploy and the weekly rescan pull it without a token, so it must be public.
+
+1. After the first release, open the repo's Packages, `laneway-api`, Package settings.
+2. Under Danger Zone, change the visibility to public.
+3. Run `docker pull ghcr.io/<owner>/laneway-api@sha256:<digest>` while logged out of GHCR. It must succeed.
+
+GitHub can't make a public package private again.
+
 ## Doppler and Telegram
 
 The `notify` section of [docs/ci.md](../ci.md#notify) says what the alert does and which two secrets it reads. Doppler holds them and syncs them to GitHub. The workflow never calls Doppler.
@@ -124,10 +153,10 @@ Step 7 of the rollout tests it. If no message arrives, check the `notify / Send`
 `.github/dependabot.yml` runs weekly on Mondays.
 
 - After the build PR merges, open Insights, Dependency graph, Dependabot. The config must parse with no errors.
-- On the first Monday after that, check the PRs. Packages that match a group arrive in one PR per group: `aspnetcore-efcore`, `fluentvalidation`, `test`, `dotnet-images` and `actions`. `dotnet-images` is the `docker` entry's one group, and holds every base image in the `Dockerfile`. Other NuGet packages and SDK updates arrive one per PR. Each PR passes the required checks.
+- On the first Monday after that, check the PRs. Packages that match a group arrive in one PR per group: `aspnetcore-efcore`, `fluentvalidation`, `test`, `dotnet-images` and `actions`. `dotnet-images` is the `docker` entry's one group, and holds every base image in the `Dockerfile`. Other NuGet packages, SDK updates, and Terraform provider updates arrive one per PR. Dependabot reads every folder under `terraform/`, so a new root needs no config edit. Each PR passes the required checks.
 - Titles start like this:
   - NuGet, grouped or not: `chore:` alone. `include: scope` adds no scope to NuGet titles, so `chore: Bump Supabase.Storage ...` is correct.
   - SDK: `chore(deps):`.
-  - Base images: `chore(deps):`, expected from the `docker` entry's settings. No base image PR has arrived yet, so check the first one.
+  - Base images and Terraform providers: `chore(deps):`, expected from their entries' settings. Neither has opened a PR yet, so check the first of each.
   - Actions: `ci(deps):`.
 - No Dependabot PR may offer a major version of ASP.NET Core, EF Core, Npgsql, the SDK or the base images. Those ignores hold each major until a deliberate retarget PR moves Laneway to the next one.

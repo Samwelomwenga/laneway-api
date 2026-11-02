@@ -1,5 +1,13 @@
 terraform {
-  required_version = ">= 1.9"
+  required_version = "1.15.8"
+
+  cloud {
+    organization = "laneway"
+
+    workspaces {
+      name = "laneway-alerting"
+    }
+  }
 
   required_providers {
     grafana = {
@@ -10,7 +18,6 @@ terraform {
 }
 
 provider "grafana" {
-  url                 = var.grafana_url
-  auth                = var.grafana_auth
-  oncall_access_token = var.oncall_access_token
+  url  = var.grafana_url
+  auth = var.grafana_auth
 }
