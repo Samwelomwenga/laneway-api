@@ -54,19 +54,21 @@ The CI bot can post these too. Make a separate chat for alerts, add the bot, and
 Make a Doppler project `laneway-alerting` with one config, `prd`. Keep it apart from `laneway-api`, so the app never holds a token that can change alerting. Add these in the dashboard, not the shell:
 
 ```sh
-TF_TOKEN_app_terraform_io=<HCP owners team token>
-TF_VAR_grafana_auth=<service account token>
-TF_VAR_operator_username=<the operator's Grafana username>
-TF_VAR_operator_email=<the operator's email>
-TF_VAR_telegram_bot_token=<bot token>
-TF_VAR_telegram_chat_id=<chat id>
+TF_TOKEN_APP_TERRAFORM_IO=<HCP owners team token>
+TF_VAR_GRAFANA_AUTH=<service account token>
+TF_VAR_OPERATOR_USERNAME=<the operator's Grafana username>
+TF_VAR_OPERATOR_EMAIL=<the operator's email>
+TF_VAR_TELEGRAM_BOT_TOKEN=<bot token>
+TF_VAR_TELEGRAM_CHAT_ID=<chat id>
 ```
+
+Doppler stores names in uppercase only. Terraform matches variable names exactly, so `scripts/terraform-plan.sh` lowercases each `TF_VAR_` name before it plans. A bare `terraform plan` under `doppler run` doesn't see them.
 
 [The Terraform runbook](terraform.md) says how to make the HCP token, the service token, and the two GitHub environments.
 
 ### Data source ids
 
-The rules query `grafanacloud-logs` and `grafanacloud-prom`, the uids Grafana Cloud gives its default data sources. A uid isn't the display name. Explore and the playbooks show the names, `grafanacloud-lanewayapi-logs` and `grafanacloud-lanewayapi-prom`. Open Connections, then Data sources, and check each one's uid in its URL. If they differ, set `TF_VAR_logs_datasource_uid` and `TF_VAR_metrics_datasource_uid` in Doppler.
+The rules query `grafanacloud-logs` and `grafanacloud-prom`, the uids Grafana Cloud gives its default data sources. A uid isn't the display name. Explore and the playbooks show the names, `grafanacloud-lanewayapi-logs` and `grafanacloud-lanewayapi-prom`. Open Connections, then Data sources, and check each one's uid in its URL. If they differ, set `TF_VAR_LOGS_DATASOURCE_UID` and `TF_VAR_METRICS_DATASOURCE_UID` in Doppler.
 
 Both uids are the defaults. The operator checked the prom one on 2026-10-29 and the logs one on 2026-10-30, so Doppler needs neither override.
 

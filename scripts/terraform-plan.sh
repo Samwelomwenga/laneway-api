@@ -14,6 +14,11 @@ case ${2:-} in
 esac
 dir="terraform/$root"
 
+for name in "${!TF_VAR_@}"; do
+  suffix=${name#TF_VAR_}
+  export "TF_VAR_${suffix,,}=${!name}"
+done
+
 plan_args=(-input=false -lock-timeout=5m -out=tfplan)
 if $drift; then
   plan_args+=(-detailed-exitcode)

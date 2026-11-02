@@ -176,7 +176,7 @@ Both jobs that hold the Doppler token run harden-runner with `egress-policy: blo
 
 To fix a red run:
 
-- `Plan` failed at init with a 401. `TF_TOKEN_app_terraform_io` in Doppler expired or was revoked. Rotate it, as the runbook says.
+- `Plan` failed at init with a 401. `TF_TOKEN_APP_TERRAFORM_IO` in Doppler expired or was revoked. Rotate it, as the runbook says.
 - `Plan` failed before init, at `doppler run`. The `DOPPLER_TOKEN` secret on the environment expired. Generate a new one and set it on both environments.
 - `Plan` failed on a provider error, such as a 401 from Grafana. The provider token in Doppler expired or lost a role. The error names the resource.
 - A step failed with a connection error to a host. harden-runner blocked it. Add the host to `ALLOWED_ENDPOINTS` at the top of `terraform.yml`.

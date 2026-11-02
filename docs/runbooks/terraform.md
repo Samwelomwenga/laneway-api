@@ -21,10 +21,10 @@ HCP Terraform holds state and nothing else. Its workspaces run in local executio
 
 ## The HCP token
 
-Terraform reads the HCP token from `TF_TOKEN_app_terraform_io`.
+Terraform reads the HCP token from `TF_TOKEN_app_terraform_io`. Doppler stores it as `TF_TOKEN_APP_TERRAFORM_IO`, and Terraform ignores case in the hostname part.
 
 1. In Organization settings, Teams, open `owners` and create a team token that expires in 90 days. The Free plan has only the owners team, so this token can do anything in the organization.
-2. Add it as `TF_TOKEN_app_terraform_io` in the root's Doppler config, such as `laneway-alerting` `prd`. Add it in the dashboard, not the shell.
+2. Add it as `TF_TOKEN_APP_TERRAFORM_IO` in the root's Doppler config, such as `laneway-alerting` `prd`. Add it in the dashboard, not the shell.
 
 Each root's Doppler config holds its own copy. The token never goes in a GitHub secret.
 
@@ -48,7 +48,7 @@ doppler run --project laneway-alerting --config prd -- terraform -chdir=terrafor
 doppler run --project laneway-alerting --config prd -- bash scripts/terraform-plan.sh alerting
 ```
 
-`scripts/terraform-plan.sh` is the same plan CI runs. It prints the addresses and actions and nothing else. It leaves `tfplan` in the root, which holds every secret in plain text. Git ignores it. Delete it when you're done. To read the full diff locally, run `terraform plan` in place of the script. Don't paste it anywhere public.
+`scripts/terraform-plan.sh` is the same plan CI runs. It prints the addresses and actions and nothing else. It leaves `tfplan` in the root, which holds every secret in plain text. Git ignores it. Delete it when you're done. To read the full diff locally, run `terraform -chdir=terraform/alerting show tfplan` after the script. Don't paste it anywhere public.
 
 Applying from a laptop works, but it skips the gate. Merge to `main` instead, and let CI apply.
 
@@ -67,8 +67,8 @@ Confirm the list with an audit run before a new root or provider first merges:
 
 The HCP team token, the Doppler service token, and the Grafana service account token share an expiry day. HCP emails the owners 30 and 7 days before its token expires, and that reminder covers all three. Rotate them together:
 
-1. Create a new HCP owners team token. Set it as `TF_TOKEN_app_terraform_io` in every root's Doppler config.
-2. Create a new Grafana service account token for `terraform-alerting`. Set it as `TF_VAR_grafana_auth` in `laneway-alerting` `prd`.
+1. Create a new HCP owners team token. Set it as `TF_TOKEN_APP_TERRAFORM_IO` in every root's Doppler config.
+2. Create a new Grafana service account token for `terraform-alerting`. Set it as `TF_VAR_GRAFANA_AUTH` in `laneway-alerting` `prd`.
 3. Generate a new Doppler service token for each root. Set it as `DOPPLER_TOKEN` on both of that root's GitHub environments.
 4. Run each root's workflow by hand from the Actions tab on `main`. `plan` must pass.
 5. Revoke the old tokens in HCP, Grafana and Doppler.
