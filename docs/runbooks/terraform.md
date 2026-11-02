@@ -63,6 +63,8 @@ Confirm the list with an audit run before a new root or provider first merges:
 3. Wait for `plan` to finish. Open the harden-runner insights link in its log and read the hosts it called.
 4. Put each host in `ALLOWED_ENDPOINTS`, drop the audit commit, and remove the branch from `<root>-plan`.
 
+The audit run covers `plan` only, because `apply` can't run on the branch. `apply` also uploads state to `archivist.terraform.io`, which `plan` never calls. That host is on the list already. A new provider may call hosts at apply time that the audit never sees. If an apply fails on a blocked host, it may leave resources in Grafana that HCP state doesn't hold. Find them, delete or import them, then run the workflow again.
+
 ## Rotate the tokens every 90 days
 
 The HCP team token, the Doppler service token, and the Grafana service account token share an expiry day. HCP emails the owners 30 and 7 days before its token expires, and that reminder covers all three. Rotate them together:
