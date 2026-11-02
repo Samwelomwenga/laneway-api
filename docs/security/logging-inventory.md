@@ -292,7 +292,7 @@ A failed sweep, drain, or poll keeps the batches it already finished, and the ne
 
 `ApiExceptionHandler` doesn't log the foreign-key 400 or the unique-violation 409. They're expected outcomes.
 
-On .NET 9, `ExceptionHandlerMiddleware` logs every exception before the handler runs, so `Program.cs` filters that category out. The filter costs two rarer entries from the same category. One says the response had already started, so the handler never ran. The other carries the exception when `ApiExceptionHandler` itself throws. In both cases Kestrel still logs the original exception. .NET 10 adds `SuppressDiagnosticsCallback`, which mutes only the duplicate, and the upgrade should swap the filter for it.
+On .NET 10, `ExceptionHandlerMiddleware` skips its own log and metrics whenever an `IExceptionHandler` returns true from `TryHandleAsync`. `ApiExceptionHandler` always does, so the middleware logs nothing for a handled exception and no config mutes its category. It still logs at Warning or above in the two cases the handler never finishes. One is a response that has already started. The other is `ApiExceptionHandler` throwing.
 
 ## Meter
 
@@ -337,13 +337,13 @@ Every environment runs the same pipeline, so Development ships what production s
 
 - `CanaryTests` plants a password, a typed email, a user agent, both tokens, and a path segment across the main flows. It fails if any of them reaches an exported log, span, or metric.
 - The allowlist check runs as every API test ends. It fails the test when a log or a `Laneway.*` counter ships a category, event, field, or tag this file doesn't list. It reads this file's tables, so a reshaped table fails the run with the section's name.
-- `SpanScrub` keeps the user agent, the connection string, the raw path, the query string, and exception text off spans. It drops `user_agent.original`, Npgsql's `db.connection_string`, the server span's `url.path` and `url.query`, and every status description. It rewrites the Pwned Passwords `url.full` to its template. When a span has an `exception` event and no `error.type`, it copies the event's `exception.type` into `error.type`.
+- `SpanScrub` keeps the user agent, the connection string, the raw path, the query string, and exception text off spans. It drops `user_agent.original`, Npgsql's `db.npgsql.data_source`, the server span's `url.path` and `url.query`, and every status description. It rewrites the Pwned Passwords `url.full` to its template.
 - `RequestScopeScrub` keeps the raw path off log events by dropping ASP.NET Core's `RequestPath` and `RequestId` scope fields. `ConnectionId` stays.
 - The `Include Error Detail` check stops the app at startup when `ConnectionStrings:DefaultConnection` sets it. That keeps Postgres's DETAIL field, which quotes row values, out of errors.
 - The mute check stops the app at startup when `Serilog:MinimumLevel`, `Serilog:MinimumLevel:Default`, an entry under `Serilog:MinimumLevel:Override`, or an entry under `Logging:OpenTelemetry:LogLevel` would drop Information from any `Laneway.*` category. Warning, Error, Fatal, Critical, and None all count, by name or by number. A `*` in an entry counts as reaching every category it could match. A muted default passes when a `Laneway` entry sets Information or lower, and Debug is always allowed. Framework categories stay free to set.
-- `BannedSymbols.txt` keeps unparameterized SQL and EF's parameter values out of spans and logs. It fails the API build on `FromSqlRaw`, `ExecuteSqlRaw`, `ExecuteSqlRawAsync`, `SqlQueryRaw`, and `EnableSensitiveDataLogging`, since spans keep `db.statement`. The test project may use raw SQL.
+- `BannedSymbols.txt` keeps unparameterized SQL and EF's parameter values out of spans and logs. It fails the API build on `FromSqlRaw`, `ExecuteSqlRaw`, `ExecuteSqlRawAsync`, `SqlQueryRaw`, and `EnableSensitiveDataLogging`, since spans keep `db.query.text`. The test project may use raw SQL.
 
-Our instrumentation never calls `RecordException`. Npgsql 9 still adds an `exception` event to a failed database span, with Postgres's primary message and a stack trace. No setting or processor can remove it. The `Include Error Detail` check keeps Postgres's DETAIL field out of that message. A primary message can still quote an input value, such as `invalid input syntax for type uuid`. Npgsql sends typed parameters, so that error is rare.
+Our instrumentation never calls `RecordException`. Npgsql still adds an `exception` event to a failed database span, with Postgres's primary message and a stack trace. The span's `error.type` is the SQLSTATE, such as `23505`. No setting or processor can remove it. The `Include Error Detail` check keeps Postgres's DETAIL field out of that message. A primary message can still quote an input value, such as `invalid input syntax for type uuid`. Npgsql sends typed parameters, so that error is rare.
 
 ## Request values
 

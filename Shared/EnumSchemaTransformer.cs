@@ -1,6 +1,6 @@
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.OpenApi;
-using Microsoft.OpenApi.Any;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 namespace Laneway.Api;
 
@@ -11,8 +11,8 @@ public sealed class EnumSchemaTransformer : IOpenApiSchemaTransformer
         var type = Nullable.GetUnderlyingType(context.JsonTypeInfo.Type) ?? context.JsonTypeInfo.Type;
         if (type.IsEnum)
         {
-            schema.Type = "string";
-            schema.Enum = Enum.GetNames(type).Select(IOpenApiAny (name) => new OpenApiString(name)).ToList();
+            schema.Type = JsonSchemaType.String;
+            schema.Enum = Enum.GetNames(type).Select(JsonNode (name) => JsonValue.Create(name)).ToList();
         }
 
         return Task.CompletedTask;

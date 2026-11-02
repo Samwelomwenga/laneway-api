@@ -75,7 +75,7 @@ Rules:
   - Require conversation resolution before merging: on.
   - Allowed merge methods: squash only.
 - Require status checks to pass:
-  - Require branches to be up to date before merging: off. With it on, every merge forces every open PR to rebase and rerun. With it off, two PRs that pass alone can break main together. CI runs no tests, so it only catches a break that stops the build, and only on the next PR.
+  - Require branches to be up to date before merging: on. A PR's checks then run on the tree that lands, so two PRs that pass alone can't merge into a main that fails to build. The cost is that each merge makes every other open PR update its branch and rerun CI. A merge queue would batch that, but merge queues need an organization-owned repo, and this one is user-owned. PRs run no tests, so a test break still shows up only in `main.yml`, after the merge.
   - Add the seven checks from step 3 of the rollout. Pin each one to the GitHub Actions app, integration id `15368`. Then a commit status with the same name from some other source can't satisfy the check.
 - Require code scanning results:
   - Tool: CodeQL.
@@ -102,6 +102,35 @@ Rules:
 
 Restrict updates with no bypass would stop every merge, the owner's too. A bypass on `main` would fix that, but it would also let the owner skip the required checks. So these two rules live here, where only the admin role gets past them, and only through a PR. Rulesets stack, so that PR still has to pass everything in `main`.
 
+## Ruleset `release-tags`
+
+Pushing a `v*` tag publishes a release, as the `release.yml` section of [docs/ci.md](../ci.md#releaseyml) says. This ruleset makes sure only the admin can push one, and that nobody moves or deletes one afterwards. Create it before the first tag.
+
+Create a new tag ruleset.
+
+- Name: `release-tags`.
+- Enforcement status: Active.
+- Target tags: include by pattern, `refs/tags/v*`.
+- Bypass list: the Repository admin role, in always mode. Tags don't go through PRs, so pull requests only mode would block the admin too.
+
+Rules:
+
+- Restrict creations.
+- Restrict updates.
+- Restrict deletions.
+
+A tag is never moved or reused, so the admin bypass is for creating tags, not changing them. To check the ruleset, have a collaborator without admin rights push a `v*` tag. GitHub must refuse it.
+
+## GHCR package
+
+The first release creates the `laneway-api` package on GHCR, linked to this repo. GitHub may create it private. The deploy and the weekly rescan pull it without a token, so it must be public.
+
+1. After the first release, open the repo's Packages, `laneway-api`, Package settings.
+2. Under Danger Zone, change the visibility to public.
+3. Run `docker pull ghcr.io/<owner>/laneway-api@sha256:<digest>` while logged out of GHCR. It must succeed.
+
+GitHub can't make a public package private again.
+
 ## Doppler and Telegram
 
 The `notify` section of [docs/ci.md](../ci.md#notify) says what the alert does and which two secrets it reads. Doppler holds them and syncs them to GitHub. The workflow never calls Doppler.
@@ -121,4 +150,4 @@ Step 7 of the rollout tests it. If no message arrives, check the `notify / Send`
 
 - After the build PR merges, open Insights, Dependency graph, Dependabot. The config must parse with no errors.
 - On the first Monday after that, check the PRs. Packages that match a group arrive in one PR per group: `aspnetcore-efcore`, `fluentvalidation`, `test` and `actions`. Other NuGet packages, SDK updates, and Terraform provider updates arrive one per PR. Dependabot reads every folder under `terraform/`, so a new root needs no config edit. SDK and Terraform titles start with `chore(deps):`, action titles with `ci(deps):`, and NuGet titles with `chore:` alone. Each PR passes the required checks.
-- No Dependabot PR may offer a major version of ASP.NET Core, EF Core, Npgsql or the SDK. Those ignores come out when Laneway moves to .NET 10.
+- No Dependabot PR may offer a major version of ASP.NET Core, EF Core, Npgsql or the SDK. Those ignores hold each major until a deliberate retarget PR moves Laneway to the next one.

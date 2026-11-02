@@ -1,6 +1,8 @@
+using System.Reflection;
 using Npgsql;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 
@@ -28,7 +30,12 @@ public static class TelemetryPipeline
             preserveStaticLogger: true,
             writeToProviders: true);
 
+        var version = typeof(TelemetryPipeline).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         var telemetry = builder.Services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource
+                .AddAttributes([new("service.version", version ?? "unknown")])
+                .AddEnvironmentVariableDetector())
             .WithLogging(configureBuilder: null, configureOptions: options => options.IncludeScopes = true)
             .WithTracing(tracing => tracing
                 .SetSampler(ParentlessClientDrop.Sampler)

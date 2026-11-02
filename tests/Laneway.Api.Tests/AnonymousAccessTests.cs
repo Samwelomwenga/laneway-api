@@ -113,6 +113,19 @@ public partial class AnonymousAccessTests : ApiTests
     }
 
     [Fact]
+    public async Task The_development_openapi_document_lists_enum_names_as_strings()
+    {
+        using var response = await SendAnonymousAsync(HttpMethod.Get, "/openapi/v1.json", null);
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var commenting = document.RootElement.GetProperty("components").GetProperty("schemas").GetProperty("BoardCommenting");
+        Assert.Equal("string", commenting.GetProperty("type").GetString());
+        Assert.Equal(
+            ["Disabled", "Members", "Observers", "Workspace", "Public"],
+            commenting.GetProperty("enum").EnumerateArray().Select(name => name.GetString()));
+    }
+
+    [Fact]
     public async Task The_development_api_reference_is_anonymous()
     {
         using var response = await SendAnonymousAsync(HttpMethod.Get, "/scalar/v1", null);
