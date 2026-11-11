@@ -27,6 +27,8 @@ Adding a member by an email with no verified user sends an invite email. Each us
 
 Outside Development, plain HTTP counts before it gets its `httpsRequired` 400.
 
+The health endpoints answer plain HTTP, so the deploy script can poll the container on loopback. They count under `anonymous` like any other anonymous request.
+
 ## CORS preflights
 
 The CORS middleware answers a preflight before the limiter runs, so preflights never count. A preflight carries no token, so the only way to count one is by IP. A browser sends one for most API calls, once per URL and method every 2 hours. Every user behind one office NAT would share a bucket, and once it ran out the browser would block the app for the whole office. A preflight touches no database and reaches no controller.
