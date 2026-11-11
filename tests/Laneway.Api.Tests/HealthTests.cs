@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -85,6 +86,30 @@ public class HealthTests : ApiTests
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         var line = Assert.Single(logs.GetSnapshot(), log => log.Id.Name == RequestLine.EventName);
         Assert.Equal(LogLevel.Error, line.Level);
+    }
+
+    [Fact]
+    public async Task A_passing_probe_ships_no_spans()
+    {
+        var client = PlainHttpClient();
+
+        using var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.DoesNotContain(ShippedSpans, span => span.GetTagItem("http.route") as string == "/health/ready");
+        Assert.DoesNotContain(ShippedSpans, span => span.TagObjects.Any(tag => tag.Value as string == "SELECT 1;"));
+    }
+
+    [Fact]
+    public async Task A_failing_probe_ships_its_server_span_as_an_error()
+    {
+        var client = PlainHttpClient(UnreachablePostgres);
+
+        using var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        var server = ServerSpan("/health/ready");
+        Assert.Equal(ActivityStatusCode.Error, server.Status);
     }
 
     private (HttpClient Client, FakeLogCollector Logs) PlainHttpHost(Action<IWebHostBuilder>? configure = null)

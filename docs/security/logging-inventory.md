@@ -99,6 +99,8 @@ Deliveries and copy jobs store their origin's `traceparent`, which is the span t
 
 Timed workers make a span only when a poll finds work. `DeliverySweep` and `CopyJobSweep` start a root span under their worker's source. `AuthSweeper`, `SessionSweeper`, `InviteSweeper`, and `PendingObjectDrainer` start one under `Laneway.Worker`. The sampler drops any database or HTTP client span with no parent, so an empty poll ships nothing. Its log entries, such as a failed poll, carry no trace id, and the category names the worker.
 
+A passing health probe ships no spans. `ProbeTraceDrop` clears the Recorded flag on every span under a `/health/live` or `/health/ready` request unless the span itself failed. A failed probe ships its server span with error status, and the failed Postgres span when there is one.
+
 ## Events
 
 Auth events log under the `Laneway.Auth` category. Each has a fixed event id. Every entry also carries the time, and inside a request the route, and `clientIp` when the request has an address.
