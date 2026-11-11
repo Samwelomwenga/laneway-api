@@ -19,7 +19,7 @@ public static class MessageSetup
         services.AddScoped<Messages>();
         services.AddScoped<DeliverySweep>();
         services.AddScoped<BrevoWebhook>();
-        services.AddDataProtection().SetApplicationName("Laneway.Api");
+        services.AddDataProtection().SetApplicationName("Laneway.Api").PersistKeysToDbContext<ApplicationDbContext>();
         services.AddScoped<InviteUnsubscribes>();
         services.AddSingleton<BrevoWebhookTokens>();
         services.AddHttpClient<IEmailProvider, BrevoEmail>(BrevoEmail.Configure).RemoveAllLoggers();
