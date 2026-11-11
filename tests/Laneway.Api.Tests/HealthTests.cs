@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Testing;
 using Xunit;
 
 namespace Laneway.Api.Tests;
@@ -59,6 +61,38 @@ public class HealthTests : ApiTests
         Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
     }
 
-    private HttpClient PlainHttpClient(Action<IWebHostBuilder>? configure = null) =>
-        ProductionHost(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("http://localhost") }, configure).Client;
+    [Fact]
+    public async Task A_passing_probe_logs_its_request_line_at_verbose()
+    {
+        var (client, logs) = PlainHttpHost(builder => builder.UseSetting(
+            "Serilog:MinimumLevel:Override:Serilog.AspNetCore.RequestLoggingMiddleware", "Verbose"));
+
+        using var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var line = Assert.Single(logs.GetSnapshot(), log => log.Id.Name == RequestLine.EventName);
+        Assert.Equal(LogLevel.Trace, line.Level);
+        Assert.Equal("200", line.GetStructuredStateValue("StatusCode"));
+    }
+
+    [Fact]
+    public async Task A_failing_probe_logs_its_request_line_at_error()
+    {
+        var (client, logs) = PlainHttpHost(UnreachablePostgres);
+
+        using var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        var line = Assert.Single(logs.GetSnapshot(), log => log.Id.Name == RequestLine.EventName);
+        Assert.Equal(LogLevel.Error, line.Level);
+    }
+
+    private (HttpClient Client, FakeLogCollector Logs) PlainHttpHost(Action<IWebHostBuilder>? configure = null)
+    {
+        var (client, services) = ProductionHost(
+            new WebApplicationFactoryClientOptions { BaseAddress = new Uri("http://localhost") }, configure);
+        return (client, services.GetFakeLogCollector());
+    }
+
+    private HttpClient PlainHttpClient(Action<IWebHostBuilder>? configure = null) => PlainHttpHost(configure).Client;
 }
