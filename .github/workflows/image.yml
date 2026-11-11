@@ -7,7 +7,7 @@ on:
         description: The one platform to build, on a native runner
         required: false
         type: string
-        default: linux/amd64
+        default: linux/arm64
       push:
         description: Push the image to GHCR after the scan passes
         required: false

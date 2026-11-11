@@ -141,7 +141,7 @@ The `Image build` job in `ci.yml` has no steps of its own. It calls `.github/wor
 
 With push on, the workflow tags the image Trivy scanned, pushes it to `ghcr.io/<owner>/laneway-api` as the version and as `sha-<short>`, and reads the registry digest back. It never tags `latest`. With attest on, `actions/attest` writes SLSA provenance for that digest, and a second call attaches a CycloneDX SBOM that Trivy makes from the same image. A pushed build skips the Actions cache, so no layer saved by a PR build ends up in a published image.
 
-The workflow builds the `Dockerfile` for `linux/amd64` on a native runner and loads the image into the runner's Docker. The build includes the `migrations` stage, so a broken migration bundle turns the check red too. Buildx caches layers in the Actions cache, so a PR that only changes code skips the restore.
+The workflow builds the `Dockerfile` for `linux/arm64`, the platform of the production VM. It builds on a native arm64 runner and loads the image into the runner's Docker. The build includes the `migrations` stage, so a broken migration bundle turns the check red too. Buildx caches layers in the Actions cache, so a PR that only changes code skips the restore.
 
 The workflow's `version` input becomes the Dockerfile's `VERSION` build arg, and the publish stamps it on the assembly. The app reports it as `service.version` on every log, span and metric it exports. A PR build uses the default `0.0.0-pr`. A `service.version` in `OTEL_RESOURCE_ATTRIBUTES` wins over the stamped one.
 
