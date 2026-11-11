@@ -24,7 +24,7 @@ public partial class AnonymousAccessTests : ApiTests
     }
 
     [Fact]
-    public async Task Only_the_anonymous_auth_routes_and_the_brevo_webhook_take_an_anonymous_request()
+    public async Task Only_the_anonymous_auth_routes_the_brevo_webhook_and_the_health_probes_take_an_anonymous_request()
     {
         var (client, services) = ProductionHost(OverHttps);
         var routes = Routes(services);
@@ -48,6 +48,8 @@ public partial class AnonymousAccessTests : ApiTests
         Assert.Equal(
             [
                 "GET /api/v1/auth/username-available",
+                "GET /health/live",
+                "GET /health/ready",
                 "POST /api/v1/auth/confirm-email-change",
                 "POST /api/v1/auth/forgot-password",
                 "POST /api/v1/auth/refresh",

@@ -63,11 +63,13 @@ Each request logs one line when it ends, under the `Laneway.Request` category. `
 
 | Id | Event | Level | Fields |
 |---|---|---|---|
-| 1 | `RequestCompleted` | Error for a 5xx or an unhandled exception, Warning over 1 second, otherwise Information | `RequestMethod`, `route`, `StatusCode`, `Elapsed`, `clientIp` when the request has an address, `sub` and `sid` when a valid access token signed it in, and `errorCodes` on a 4xx with an `ApiError` body |
+| 1 | `RequestCompleted` | Error for a 5xx or an unhandled exception, Verbose for a passing health probe, Warning over 1 second, otherwise Information | `RequestMethod`, `route`, `StatusCode`, `Elapsed`, `clientIp` when the request has an address, `sub` and `sid` when a valid access token signed it in, and `errorCodes` on a 4xx with an `ApiError` body |
 
 `RequestMethod` is `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `TRACE`, or `CONNECT`, and `other` for anything else. `route` is the endpoint's route template, such as `api/v1/WorkSpaces/{id}`, or `unmatched` when no endpoint matched. A 500 keeps the route of the endpoint that threw. `Elapsed` is in milliseconds. A token that fails, or names an ended session, leaves `sub` and `sid` off. `errorCodes` lists the distinct codes from the body's errors, sorted, such as `["required", "tooLong"]`. It holds only codes from the fixed set in `ErrorCodes`, never a field name, so a failed validation is on record as ASVS 16.3.3 asks without logging what the caller sent.
 
 A 4xx logs at Information. A 404 or 405 gets no event of its own, so this line is its only record.
+
+`/health/live` and `/health/ready` answer the deploy script, which polls every 2 seconds, and the uptime check. A passing probe logs at Verbose, below production's Information minimum, so it leaves no line. A failing one answers 503 and logs at Error.
 
 ## The client IP
 
@@ -96,6 +98,8 @@ Each request starts a fresh root trace. The API ignores an inbound `traceparent`
 Deliveries and copy jobs store their origin's `traceparent`, which is the span that added the row. `DeliveryWorker` starts a `DeliveryAttempt` span under the `Laneway.Message` source for each send attempt, and `CopyJobWorker` starts a `CopyJobAttempt` span under `Laneway.CopyJob`. Each attempt is its own root trace with a link to that origin, so a retry hours later doesn't stretch the request's trace. A row added outside a request has no `traceparent`, and its span has no link. Brevo webhooks are requests with their own traces and no link to a delivery.
 
 Timed workers make a span only when a poll finds work. `DeliverySweep` and `CopyJobSweep` start a root span under their worker's source. `AuthSweeper`, `SessionSweeper`, `InviteSweeper`, and `PendingObjectDrainer` start one under `Laneway.Worker`. The sampler drops any database or HTTP client span with no parent, so an empty poll ships nothing. Its log entries, such as a failed poll, carry no trace id, and the category names the worker.
+
+A passing health probe ships no spans. `ProbeTraceDrop` clears the Recorded flag on every span under a `/health/live` or `/health/ready` request unless the span itself failed. A failed probe ships its server span with error status, and the failed Postgres span when there is one.
 
 ## Events
 

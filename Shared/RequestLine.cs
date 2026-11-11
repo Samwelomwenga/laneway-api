@@ -106,11 +106,14 @@ public static class RequestLine
             : null;
 
     private static LogEventLevel Level(HttpContext context, double elapsedMs, Exception? exception) =>
-        exception is not null || context.Response.StatusCode >= StatusCodes.Status500InternalServerError
-            ? LogEventLevel.Error
-            : elapsedMs > SlowMs
-                ? LogEventLevel.Warning
-                : LogEventLevel.Information;
+        context.Response.StatusCode switch
+        {
+            _ when exception is not null => LogEventLevel.Error,
+            >= StatusCodes.Status500InternalServerError => LogEventLevel.Error,
+            < StatusCodes.Status400BadRequest when HealthProbes.IsProbe(context.Request.Path) => LogEventLevel.Verbose,
+            _ when elapsedMs > SlowMs => LogEventLevel.Warning,
+            _ => LogEventLevel.Information
+        };
 
     private static string Method(string method) =>
         Methods.TryGetValue(HttpMethods.GetCanonicalizedValue(method), out var known) ? known : OtherMethod;

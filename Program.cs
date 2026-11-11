@@ -148,6 +148,7 @@ if (new NpgsqlConnectionStringBuilder(connectionString).IncludeErrorDetail)
 builder.Services.AddDbContext<ApplicationDbContext>((services, options) => options
     .UseNpgsql(connectionString)
     .AddInterceptors(services.GetRequiredService<DeliveryCommitPoke>()));
+builder.Services.AddHealthProbes(connectionString);
 
 
 var app = builder.Build();
@@ -184,5 +185,6 @@ app.RefuseFailedBearerTokens();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthProbes();
 
 app.Run();

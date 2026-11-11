@@ -43,6 +43,7 @@ public static class TelemetryPipeline
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddNpgsql()
+                .AddProcessor<ProbeTraceDrop>()
                 .AddProcessor<SpanScrub>())
             .WithMetrics(metrics => metrics
                 .AddAspNetCoreInstrumentation()

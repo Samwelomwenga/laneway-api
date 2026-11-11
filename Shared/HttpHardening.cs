@@ -71,7 +71,7 @@ public static class HttpHardening
             ? app
             : app.Use(async (context, next) =>
             {
-                if (context.Request.IsHttps)
+                if (context.Request.IsHttps || HealthProbes.IsProbe(context.Request.Path))
                 {
                     await next(context);
                     return;
