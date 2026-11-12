@@ -115,21 +115,22 @@ To fix a red run:
 
 ## Terraform check
 
-The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on `terraform/alerting`. It holds no secrets, has no path filter, and never runs `plan` or `apply`. `init -backend=false` skips the `cloud` block, so it needs no HCP token. [Terraform alerting](#terraform-alerting) plans and applies after the merge.
+The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on every root under it. It holds no secrets, has no path filter, and never runs `plan` or `apply`. `init -backend=false` skips the `cloud` block, so it needs no HCP token. [Terraform alerting](#terraform-alerting) plans and applies after the merge.
 
 To run it locally:
 
 ```sh
 terraform -chdir=terraform fmt -check -recursive
-terraform -chdir=terraform/alerting init -backend=false
-terraform -chdir=terraform/alerting validate
+for root in terraform/*/; do
+  terraform -chdir="$root" init -backend=false && terraform -chdir="$root" validate || break
+done
 ```
 
 To fix a red run:
 
 - Format failed. Run `terraform -chdir=terraform fmt -recursive` and commit the result.
-- Init failed on a provider version. Run `terraform -chdir=terraform/alerting init -upgrade -backend=false` and commit `.terraform.lock.hcl`.
-- Validate failed. The log names the file and line. A rule entry in `rules.tf` with a missing field fails here.
+- Init failed on a provider version. Run `terraform -chdir=terraform/<root> init -upgrade -backend=false` on the failing root and commit its `.terraform.lock.hcl`.
+- Validate failed. The log names the file and line. In `alerting`, a rule entry in `rules.tf` with a missing field fails here.
 
 ## Image build / Build and scan
 
