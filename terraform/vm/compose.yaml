@@ -40,10 +40,10 @@ services:
     networks:
       - laneway
 
-  app:
-    image: ghcr.io/samwelomwenga/laneway-api@${LANEWAY_DIGEST:?}
+  api:
+    image: ghcr.io/samwelomwenga/laneway-api@${API_DIGEST:?}
     restart: unless-stopped
-    env_file: /var/lib/laneway/secrets/app.env
+    env_file: /var/lib/laneway/secrets/api.env
     environment:
       ForwardedHeaders__KnownProxies__0: *cloudflared-address
     ports:
