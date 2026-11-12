@@ -66,6 +66,16 @@ Doppler stores names in uppercase only. Terraform matches variable names exactly
 
 [The Terraform runbook](terraform.md) says how to make the HCP token, the service token, and the two GitHub environments.
 
+### Synthetic Monitoring
+
+The uptime check on `/health/ready` runs in Grafana Synthetic Monitoring. Terraform needs the plugin set up and a token for it.
+
+1. In the stack, open Testing & synthetics, then Synthetics. Click Get started to set up the plugin. It creates the stack's Synthetic Monitoring tenant.
+2. Open its Config page and generate an access token. Grafana shows it once.
+3. In the Doppler dashboard, project `laneway-alerting`, config `prd`, add it as `TF_VAR_SM_ACCESS_TOKEN`.
+
+The token doesn't expire. If it leaks, generate a new one on the same page and replace the Doppler value.
+
 ### Data source ids
 
 The rules query `grafanacloud-logs` and `grafanacloud-prom`, the uids Grafana Cloud gives its default data sources. A uid isn't the display name. Explore and the playbooks show the names, `grafanacloud-lanewayapi-logs` and `grafanacloud-lanewayapi-prom`. Open Connections, then Data sources, and check each one's uid in its URL. If they differ, set `TF_VAR_LOGS_DATASOURCE_UID` and `TF_VAR_METRICS_DATASOURCE_UID` in Doppler.
