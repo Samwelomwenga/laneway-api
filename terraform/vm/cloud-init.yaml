@@ -127,6 +127,9 @@ write_files:
       REGION=${region}
       LANEWAY_DB_DOPPLER_TOKEN_SECRET_ID=${vault_secret_ids.laneway_db_doppler_token}
       LANEWAY_API_DOPPLER_TOKEN_SECRET_ID=${vault_secret_ids.laneway_api_doppler_token}
+      OBJECT_STORAGE_NAMESPACE=${object_storage_namespace}
+      BACKUP_BUCKET=${backup_bucket_name}
+      BACKUP_AGE_RECIPIENT=${backup_age_recipient}
   - path: /usr/local/sbin/laneway-secrets
     permissions: "0700"
     content: |
@@ -135,6 +138,37 @@ write_files:
     permissions: "0755"
     content: |
       ${indent(6, laneway_deploy)}
+  - path: /usr/local/sbin/laneway-backup
+    permissions: "0700"
+    content: |
+      ${indent(6, laneway_backup)}
+  - path: /etc/systemd/system/laneway-backup.service
+    content: |
+      [Unit]
+      Description=Laneway nightly backup
+      Requires=docker.service
+      After=docker.service laneway.service
+      RequiresMountsFor=/var/lib/laneway
+      ConditionPathExists=/var/lib/laneway/images.env
+
+      [Service]
+      Type=oneshot
+      EnvironmentFile=/var/lib/laneway/secrets/backup.env
+      ExecStart=/usr/local/sbin/laneway-backup nightly
+      SyslogIdentifier=laneway-backup-output
+      StandardOutput=null
+      TimeoutStartSec=1h
+  - path: /etc/systemd/system/laneway-backup.timer
+    content: |
+      [Unit]
+      Description=Laneway nightly backup at 03:00 UTC
+
+      [Timer]
+      OnCalendar=*-*-* 03:00:00 UTC
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
   - path: /etc/sudoers.d/laneway-deploy
     permissions: "0440"
     content: |
@@ -186,3 +220,4 @@ runcmd:
   - [/usr/local/sbin/laneway-data-volume]
   - /usr/local/sbin/laneway-vendor-packages && /usr/local/sbin/laneway-tailscale-join && systemctl mask --now ssh.service ssh.socket
   - systemctl enable laneway.service && systemctl start --no-block laneway.service
+  - [systemctl, enable, --now, laneway-backup.timer]

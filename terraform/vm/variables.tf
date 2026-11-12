@@ -54,6 +54,17 @@ variable "backup_bucket_name" {
   default     = "laneway-backups"
 }
 
+variable "backup_age_recipient" {
+  description = "The age public key the VM encrypts dumps to. Its private key lives in Doppler laneway-backup and the password manager, never on the VM."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.backup_age_recipient == null || can(regex("^age1[02-9ac-hj-np-z]{58}$", var.backup_age_recipient))
+    error_message = "backup_age_recipient must be an age X25519 public key, age1 followed by 58 characters."
+  }
+}
+
 variable "laneway_db_doppler_token_secret_id" {
   description = "OCID of the Vault secret laneway-db-doppler-token. The operator creates it by hand."
   type        = string
