@@ -1,12 +1,13 @@
 # Terraform
 
-Each Terraform root is a folder under `terraform/`. Today there is one, `alerting`. This page covers what every root shares: where state lives, where secrets come from, how CI runs it, and the tokens that expire. [The alerting runbook](alerting.md) covers what only alerting needs. [docs/ci.md](../ci.md#terraform-alerting) says how to fix a red run.
+Each Terraform root is a folder under `terraform/`. Today there are two, `alerting` and `oci-bootstrap`. This page covers what every root shares: where state lives, where secrets come from, how CI runs it, and the tokens that expire. [The alerting runbook](alerting.md) covers what only alerting needs. [docs/ci.md](../ci.md#terraform-alerting) says how to fix a red run.
 
 | Root | HCP workspace | Doppler project | GitHub environments |
 |---|---|---|---|
 | `terraform/alerting` | `laneway-alerting` | `laneway-alerting`, config `prd` | `alerting-plan`, `alerting` |
+| `terraform/oci-bootstrap` | `laneway-oci-bootstrap` | `laneway-vm`, config `prd` | none, it runs only from the laptop |
 
-HCP Terraform holds state and nothing else. Its workspaces run in local execution mode, so `plan` and `apply` run on the operator's machine or on a GitHub runner, never on HCP. Secrets live in Doppler, one project per root. CI loads them at job time with `doppler run`. The state holds every secret the root's resources take, such as the Telegram bot token on a contact point. HCP encrypts it.
+HCP Terraform holds state and nothing else. Its workspaces run in local execution mode, so `plan` and `apply` run on the operator's machine or on a GitHub runner, never on HCP. Secrets live in Doppler, one project per root, except that `oci-bootstrap` shares `laneway-vm` with `terraform/vm`. CI loads them at job time with `doppler run`. The state holds every secret the root's resources take, such as the Telegram bot token on a contact point. HCP encrypts it.
 
 ## The HCP organization
 
@@ -51,6 +52,52 @@ doppler run --project laneway-alerting --config prd -- bash scripts/terraform-pl
 `scripts/terraform-plan.sh` is the same plan CI runs. It prints the addresses and actions and nothing else. It leaves `tfplan` in the root, which holds every secret in plain text. Git ignores it. Delete it when you're done. To read the full diff locally, run `terraform -chdir=terraform/alerting show tfplan` after the script. Don't paste it anywhere public.
 
 Applying from a laptop works, but it skips the gate. Merge to `main` instead, and let CI apply.
+
+## Apply oci-bootstrap from the laptop
+
+`terraform/oci-bootstrap` holds what lives at tenancy level or in IAM. That's the `laneway` compartment and a quota that leaves only the Always Free A1 allowance in it. It's also the identity domain app and trust that CI trades its GitHub token through, and the CI policy. Last, it holds the VM's dynamic group and that group's policies. CI can't change any of it. The CI principal manages everything inside the compartment and nothing outside it. So this root has no workflow, and the operator applies it by hand with a one-hour session token.
+
+It shares the `laneway-vm` Doppler project with `terraform/vm`, for the HCP token and the tenancy OCID. The Vault secret names, the backup bucket name, the token audience and the resource type are variables with defaults. `terraform/vm` repeats the same values. Neither root reads the other's state. The VM's policy grants `read secret-bundles` by secret name, so create the three Vault secrets with exactly the names in `vault_secret_names`. A secret under any other name stays unreadable to the VM.
+
+Before the first apply:
+
+1. Create the `laneway-oci-bootstrap` workspace as in [A workspace per root](#a-workspace-per-root).
+2. Create the Doppler project `laneway-vm` if it doesn't exist yet. Add the HCP token to its `prd` config as in [The HCP token](#the-hcp-token).
+3. Add `TF_VAR_TENANCY_OCID` to `laneway-vm` `prd`. The tenancy OCID is on the console's Tenancy details page.
+4. Install the OCI CLI on the laptop.
+
+To apply:
+
+1. Start a session. It opens the browser to sign in and writes a profile named `laneway` to `~/.oci/config`:
+
+   ```sh
+   oci session authenticate --region eu-frankfurt-1 --profile-name laneway
+   ```
+
+2. Plan. The script lowercases the `TF_VAR_` names Doppler hands it, so use it rather than a bare `terraform plan`:
+
+   ```sh
+   doppler run --project laneway-vm --config prd -- bash scripts/terraform-plan.sh oci-bootstrap
+   ```
+
+3. Read the list of changes. Run `terraform -chdir=terraform/oci-bootstrap show tfplan` for the full diff. Then apply the saved plan and delete it:
+
+   ```sh
+   doppler run --project laneway-vm --config prd -- terraform -chdir=terraform/oci-bootstrap apply tfplan
+   rm terraform/oci-bootstrap/tfplan
+   ```
+
+4. On the first apply, copy the app's client ID, client secret and domain URL into `laneway-vm` `prd`. The secret goes from the output straight into Doppler, never to the screen:
+
+   ```sh
+   doppler run --project laneway-vm --config prd -- terraform -chdir=terraform/oci-bootstrap output -raw token_exchange_client_secret | doppler secrets set OCI_TOKEN_EXCHANGE_CLIENT_SECRET --project laneway-vm --config prd
+   doppler run --project laneway-vm --config prd -- terraform -chdir=terraform/oci-bootstrap output -raw token_exchange_client_id | doppler secrets set OCI_TOKEN_EXCHANGE_CLIENT_ID --project laneway-vm --config prd
+   doppler run --project laneway-vm --config prd -- terraform -chdir=terraform/oci-bootstrap output -raw token_exchange_domain_url | doppler secrets set OCI_TOKEN_EXCHANGE_DOMAIN_URL --project laneway-vm --config prd
+   ```
+
+   If the secret output comes back empty, the provider didn't return it on create. Open Identity & Security, Domains, Default, Integrated applications, `laneway-terraform-ci`, OAuth configuration, and copy the secret from there.
+
+The session lasts an hour. If it runs out mid-apply, run `oci session refresh --profile laneway` and apply again with a fresh plan.
 
 ## Check the egress allowlist
 
