@@ -233,6 +233,6 @@ runcmd:
   - [systemctl, restart, systemd-journald]
   - [/usr/local/sbin/laneway-data-volume]
   - /usr/local/sbin/laneway-vendor-packages && /usr/local/sbin/laneway-tailscale-join && systemctl mask --now ssh.service ssh.socket
-  - [systemctl, enable, alloy.service]
+  - [systemctl, enable, --now, alloy.service]
   - systemctl enable laneway.service && systemctl start --no-block laneway.service
   - [systemctl, enable, --now, laneway-backup.timer]
