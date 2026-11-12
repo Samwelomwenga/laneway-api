@@ -367,10 +367,13 @@ When it fires:
 
 `.github/workflows/terraform-vm.yml` calls `terraform.yml` with `root: vm` on a push to `main` that touches `terraform/vm/**`, every Monday at 06:00 UTC as a drift check, and by hand. Everything in [Terraform alerting](#terraform-alerting) applies, with `vm-plan` and `vm` as the environments and Doppler `laneway-vm` `prd` as the secrets.
 
+An `Alloy check` job runs first, and the Terraform jobs wait for it. It runs `alloy fmt --test` and `alloy validate` on `terraform/vm/config.alloy` in a `grafana/alloy` container pinned by digest. cloud-init writes that file, so a typo that reached the VM would mean a replace to fix. `fmt` catches syntax and formatting, and `validate` catches a misspelled component or attribute.
+
 The caller also passes `id-token-audience: https://cloud.oracle.com`. Before each Terraform step, `scripts/github-id-token.sh` writes a fresh GitHub OIDC token with that audience to `$RUNNER_TEMP/id-token`, and the OCI provider trades it for a session token. Both callers grant `id-token: write`, because a called job can't ask for more than its caller gives. Alerting passes no audience, so its jobs never request a token.
 
 If it fails:
 
+- `Alloy check` failed. The log names the file, line, and column. Run the same check locally, with the image ref from `ALLOY_IMAGE` in `terraform-vm.yml`: `docker run --rm --volume "$PWD/terraform/vm:/config:ro" grafana/alloy:v1.21.3 fmt --test /config/config.alloy`. To rewrite the file, drop `:ro` and swap `fmt --test` for `fmt -w`.
 - `Plan` failed with a 401 or `NotAuthenticated` from the token exchange. The client secret in `laneway-vm` is wrong, someone regenerated it in the identity domain, or the trust's claim checks don't match. The trust checks `repository`, `ref`, `job_workflow_ref` and `aud`, so a run from any branch but `main` fails here by design.
 - `Plan` failed with `NotAuthorizedOrNotFound` on every resource. The exchange worked but the CI policy's `identityfederateddomainapp` condition didn't match. The fallback is an API key user in `oci-bootstrap`, with its key in `laneway-vm`.
 
