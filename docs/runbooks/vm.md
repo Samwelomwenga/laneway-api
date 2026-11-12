@@ -1,6 +1,6 @@
 # The VM
 
-Laneway runs on one Oracle Cloud A1 instance in Frankfurt, built by `terraform/vm`. This page covers the first build, a planned replace, the tailnet node swap, serial console break-glass, and rotating the secrets in OCI Vault. [The Terraform runbook](terraform.md) covers state, Doppler, and CI for every root. [The backup runbook](backup.md) covers the dumps and the database passwords.
+Laneway runs on one Oracle Cloud A1 instance in Frankfurt, built by `terraform/vm`. This page covers the Doppler keys the VM reads, the first build, a planned replace, the tailnet node swap, serial console break-glass, and rotating the secrets in OCI Vault. [The Terraform runbook](terraform.md) covers state, Doppler, and CI for every root. [The backup runbook](backup.md) covers the dumps and the database passwords. [The Cloudflare runbook](cloudflare.md) covers the Tunnel and R2, and [the Tailscale runbook](tailscale.md) covers the tailnet.
 
 The only way in is Tailscale SSH. The VM has no inbound port, `sshd` is masked, and no account has a password or an authorized key.
 
@@ -18,9 +18,63 @@ A replace loses the boot volume: Docker's image cache, the local journal, and an
 
 The data volume lives in one availability domain and has `prevent_destroy`, so the VM can't move to another one. A plan that changes `availability_domain` after the first build fails on the volume. A replace that runs out of capacity waits for capacity in the same domain.
 
+## The Doppler keys the VM reads
+
+On every deploy, `laneway-secrets` downloads `laneway-db` `prd` and `laneway-api` `prd` and splits them into one env file per consumer. Every key below must exist before the first deploy. Set each value in the Doppler dashboard, never in a ticket, a commit, or a shell that logs. No value may hold a single quote or a newline, because `laneway-secrets` refuses to render one.
+
+### `laneway-db` `prd`
+
+Make the project `laneway-db` with one config, `prd`. It holds what only Postgres, the migrator, and the backup job see.
+
+1. Generate three passwords, one at a time, with `openssl rand -hex 32`. Hex keeps `;` and `=` out of the connection strings.
+2. Add:
+
+   ```sh
+   POSTGRES_PASSWORD=<first password>
+   MIGRATOR_PASSWORD=<second password>
+   APP_PASSWORD=<third password>
+   MIGRATOR_CONNECTION=Host=postgres;Port=5432;Database=laneway;Username=laneway_migrator;Password=${MIGRATOR_PASSWORD}
+   ```
+
+   `laneway` is the database Compose creates through `POSTGRES_DB`, and the initdb script creates both roles with these passwords on an empty volume. Doppler resolves `${MIGRATOR_PASSWORD}`, so a rotation changes one key.
+3. Add the four `R2_` keys from [the Cloudflare runbook](cloudflare.md#the-token).
+
+The read-only service token for this config goes into OCI Vault in step 2 of [the first build](#the-first-build).
+
+### `laneway-api` `prd`
+
+This is the app's own config. Add:
+
+```sh
+CONNECTIONSTRINGS__DEFAULTCONNECTION=Host=postgres;Port=5432;Database=laneway;Username=laneway_app;Password=${laneway-db.prd.APP_PASSWORD}
+```
+
+The password is a reference into `laneway-db`, so it lives in one place. Leave `Include Error Detail` out. It puts row values into exception messages, and those reach the logs.
+
+The same config also holds:
+
+- `TUNNEL_TOKEN`, from [the Cloudflare runbook](cloudflare.md#the-tunnel).
+- `ALLOY_LOKI_URL`, `ALLOY_LOKI_USERNAME` and `ALLOY_LOKI_TOKEN`, from [the Grafana runbook](grafana.md#alloys-token).
+- the three `BREVO__` keys, from [the Brevo runbook](brevo.md#production).
+
+`laneway-secrets` keeps `TUNNEL_TOKEN`, every `ALLOY_` key and every `DOPPLER_` key out of `api.env`, so keep those names exact. Its read-only service token goes into OCI Vault beside the `laneway-db` one.
+
+### `laneway-backup` `prd`
+
+It holds the `age` private key that decrypts the backups. No service token ever exists for it, and nothing on the VM can read it. Make the project with one config, `prd`, then generate the key pair on the laptop. The private key goes from `age-keygen` into Doppler without touching disk, and the public key goes into `laneway-vm` for `terraform/vm`:
+
+```sh
+key=$(age-keygen 2>/dev/null | grep '^AGE-SECRET-KEY-')
+printf %s "$key" | doppler secrets set AGE_SECRET_KEY --project laneway-backup --config prd
+printf %s "$key" | age-keygen -y | doppler secrets set TF_VAR_BACKUP_AGE_RECIPIENT --project laneway-vm --config prd
+unset key
+```
+
+Then open `AGE_SECRET_KEY` in the Doppler dashboard and copy it into the password manager. If Doppler loses the project, that copy is the only way to read a backup.
+
 ## The first build
 
-Run it once, from the `terraform/vm` PR's branch, on the laptop. The `oci-bootstrap` apply and every `laneway-vm` key in [Plan terraform/vm from the laptop](terraform.md#plan-terraformvm-from-the-laptop) come first, except the three Vault secret OCIDs, which step 2 creates.
+Run it once, from the `terraform/vm` PR's branch, on the laptop. The `oci-bootstrap` apply and every `laneway-vm` key in [Plan terraform/vm from the laptop](terraform.md#plan-terraformvm-from-the-laptop) come first, except the three Vault secret OCIDs, which step 2 creates. So do the Doppler keys above and [the Tailscale setup](tailscale.md).
 
 Start a session and point the OCI CLI at it for the whole shell:
 
@@ -57,7 +111,7 @@ export OCI_CLI_PROFILE=laneway OCI_CLI_AUTH=security_token
    vault_secret laneway-vm-tailscale-client-secret TF_VAR_TAILSCALE_CLIENT_SECRET_SECRET_ID
    ```
 
-   Paste the read-only service tokens for `laneway-db` `prd` and `laneway-api` `prd` at the first two prompts, and the Tailscale OAuth client secret at the third. Give both Doppler tokens the shared expiry day in [the Terraform runbook](terraform.md#rotate-the-tokens-every-90-days). A failed create stops before Doppler, so it never blanks a key.
+   Generate each read-only service token as in step 1 of [The two Doppler tokens](#the-two-doppler-tokens). Paste the tokens for `laneway-db` `prd` and `laneway-api` `prd` at the first two prompts, and the Tailscale OAuth client secret at the third. Give both Doppler tokens the shared expiry day in [the Terraform runbook](terraform.md#rotate-the-tokens-every-90-days). A failed create stops before Doppler, so it never blanks a key.
 
 3. Terminate the placeholder A1 instance in the console, with "Permanently delete the attached boot volume" ticked. Then delete the VCN the launch wizard made for it. The placeholder holds the whole free A1 allowance, so the full apply can't launch while it runs.
 
