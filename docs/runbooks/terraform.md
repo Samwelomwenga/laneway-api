@@ -1,6 +1,6 @@
 # Terraform
 
-Each Terraform root is a folder under `terraform/`. Today there are three: `alerting`, `oci-bootstrap` and `vm`. This page covers what every root shares: where state lives, where secrets come from, how CI runs it, and the tokens that expire. [The alerting runbook](alerting.md) covers what only alerting needs. [docs/ci.md](../ci.md#terraform-alerting) says how to fix a red run.
+Each Terraform root is a folder under `terraform/`. Today there are three: `alerting`, `oci-bootstrap` and `vm`. This page covers what every root shares: where state lives, where secrets come from, how CI runs it, and the tokens that expire. [The alerting runbook](alerting.md) covers what only alerting needs. [The VM runbook](vm.md) covers what only `terraform/vm` needs. [docs/ci.md](../ci.md#terraform-alerting) says how to fix a red run.
 
 | Root | HCP workspace | Doppler project | GitHub environments |
 |---|---|---|---|
@@ -136,14 +136,15 @@ The audit run covers `plan` only, because `apply` can't run on the branch. `appl
 
 ## Rotate the tokens every 90 days
 
-The HCP team token, the Doppler service token, and the Grafana service account token share an expiry day. HCP emails the owners 30 and 7 days before its token expires, and that reminder covers all three. Rotate them together:
+The HCP team token, the Doppler service tokens, the Grafana service account token, and the two Doppler tokens in OCI Vault share an expiry day. HCP emails the owners 30 and 7 days before its token expires, and that reminder covers them all. Rotate them together:
 
 1. Create a new HCP owners team token. Set it as `TF_TOKEN_APP_TERRAFORM_IO` in every root's Doppler config.
 2. Create a new Grafana service account token for `terraform-alerting`. Set it as `TF_VAR_GRAFANA_AUTH` in `laneway-alerting` `prd`.
 3. Generate a new Doppler service token for each root. Set it as `DOPPLER_TOKEN` on both of that root's GitHub environments.
-4. Run each root's workflow by hand from the Actions tab on `main`. `plan` must pass.
-5. Revoke the old tokens in HCP, Grafana and Doppler.
-6. Write the new expiry day here.
+4. Rotate the `laneway-db` and `laneway-api` tokens in Vault, as in [the VM runbook](vm.md#the-two-doppler-tokens).
+5. Run each root's workflow by hand from the Actions tab on `main`. `plan` must pass.
+6. Revoke the old HCP and Grafana tokens and the old root Doppler tokens. Step 4 already revoked the old Vault ones.
+7. Write the new expiry day here.
 
 Rotation stays manual. Automating it would need a Doppler personal token and a GitHub PAT, and both are stronger and live longer than the tokens they rotate.
 
