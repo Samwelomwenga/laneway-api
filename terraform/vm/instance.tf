@@ -25,6 +25,7 @@ locals {
     laneway_secrets          = file("${path.module}/laneway-secrets.sh")
     laneway_deploy           = file("${path.module}/laneway-deploy.sh")
     laneway_backup           = file("${path.module}/laneway-backup.sh")
+    alloy_config             = file("${path.module}/config.alloy")
   }))
 }
 
