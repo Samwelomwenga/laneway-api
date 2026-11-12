@@ -127,8 +127,7 @@ write_files:
 
       auth_key=$(printf %s "$content" | base64 -d)
       tailscale up --auth-key="$auth_key?ephemeral=false&preauthorized=true" \
-        --advertise-tags=tag:laneway-vm --hostname=laneway
-      tailscale set --ssh
+        --advertise-tags=tag:laneway-vm --hostname=laneway --ssh
 
 runcmd:
   - [systemctl, restart, systemd-journald]
