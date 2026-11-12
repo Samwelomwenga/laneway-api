@@ -35,6 +35,7 @@ write_files:
         "site=download.docker.com";
         "site=pkgs.tailscale.com";
         "site=apt.grafana.com";
+        "site=packages.doppler.com";
       };
       Unattended-Upgrade::Automatic-Reboot "true";
       Unattended-Upgrade::Automatic-Reboot-Time "04:00";
@@ -52,15 +53,17 @@ write_files:
       fetch https://download.docker.com/linux/ubuntu/gpg /etc/apt/keyrings/docker.asc
       fetch "https://pkgs.tailscale.com/stable/ubuntu/$VERSION_CODENAME.noarmor.gpg" /etc/apt/keyrings/tailscale.gpg
       fetch https://apt.grafana.com/gpg.key /etc/apt/keyrings/grafana.asc
+      fetch https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key /etc/apt/keyrings/doppler.asc
 
       echo "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable" >/etc/apt/sources.list.d/docker.list
       echo "deb [arch=$arch signed-by=/etc/apt/keyrings/tailscale.gpg] https://pkgs.tailscale.com/stable/ubuntu $VERSION_CODENAME main" >/etc/apt/sources.list.d/tailscale.list
       echo "deb [arch=$arch signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main" >/etc/apt/sources.list.d/grafana.list
+      echo "deb [arch=$arch signed-by=/etc/apt/keyrings/doppler.asc] https://packages.doppler.com/public/cli/deb/debian any-version main" >/etc/apt/sources.list.d/doppler.list
 
       apt-get -o DPkg::Lock::Timeout=600 update
       DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y \
         docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
-        tailscale alloy
+        tailscale alloy doppler
 
   - path: /usr/local/sbin/laneway-data-volume
     permissions: "0755"
@@ -113,6 +116,15 @@ write_files:
     permissions: "0755"
     content: |
       ${indent(6, postgres_initdb)}
+  - path: /etc/laneway/vm.env
+    content: |
+      REGION=${region}
+      LANEWAY_DB_DOPPLER_TOKEN_SECRET_ID=${vault_secret_ids.laneway_db_doppler_token}
+      LANEWAY_API_DOPPLER_TOKEN_SECRET_ID=${vault_secret_ids.laneway_api_doppler_token}
+  - path: /usr/local/sbin/laneway-secrets
+    permissions: "0700"
+    content: |
+      ${indent(6, laneway_secrets)}
   - path: /etc/systemd/system/laneway.service
     content: |
       [Unit]

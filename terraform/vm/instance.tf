@@ -48,6 +48,7 @@ resource "oci_core_instance" "vm" {
       bootstrap_oci_cli_digest = var.bootstrap_oci_cli_digest
       compose                  = file("${path.module}/compose.yaml")
       postgres_initdb          = file("${path.module}/postgres-initdb.sh")
+      laneway_secrets          = file("${path.module}/laneway-secrets.sh")
     }))
   }
 
