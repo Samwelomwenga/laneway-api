@@ -109,6 +109,7 @@ Add these to `laneway-vm` `prd` once `oci-bootstrap` is applied:
 - `TF_VAR_COMPARTMENT_ID`, from `terraform -chdir=terraform/oci-bootstrap output -raw compartment_id`.
 - `OCI_TOKEN_EXCHANGE_CLIENT_ID`, `OCI_TOKEN_EXCHANGE_CLIENT_SECRET` and `OCI_TOKEN_EXCHANGE_DOMAIN_URL`, from the last step of the `oci-bootstrap` apply. The provider reads them from the environment.
 - `TF_VAR_LANEWAY_DB_DOPPLER_TOKEN_SECRET_ID`, `TF_VAR_LANEWAY_API_DOPPLER_TOKEN_SECRET_ID` and `TF_VAR_TAILSCALE_CLIENT_SECRET_SECRET_ID`, the OCIDs of the three Vault secrets, once the operator creates them. Until all three are set, a plan that includes the instance fails its precondition. A later change to them changes `user_data` and replaces the VM.
+- `TF_VAR_BACKUP_AGE_RECIPIENT`, the `age1...` public key whose private key is `AGE_SECRET_KEY` in `laneway-backup` `prd`. The plan fails its precondition without it, and a later change replaces the VM. [The backup runbook](backup.md) says how the VM uses it.
 
 Start a session as in [Apply oci-bootstrap from the laptop](#apply-oci-bootstrap-from-the-laptop), then plan with `auth` switched to the session token:
 
