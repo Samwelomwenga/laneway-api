@@ -11,6 +11,21 @@ locals {
     laneway_api_doppler_token = var.laneway_api_doppler_token_secret_id
     tailscale_client_secret   = var.tailscale_client_secret_secret_id
   }
+
+  user_data = base64gzip(templatefile("${path.module}/cloud-init.yaml", {
+    vault_secret_ids         = local.vault_secret_ids
+    data_volume_device       = local.data_volume_device
+    region                   = var.region
+    object_storage_namespace = data.oci_objectstorage_namespace.tenancy.namespace
+    backup_bucket_name       = oci_objectstorage_bucket.backups.name
+    backup_age_recipient     = var.backup_age_recipient
+    bootstrap_oci_cli_digest = var.bootstrap_oci_cli_digest
+    compose                  = file("${path.module}/compose.yaml")
+    postgres_initdb          = file("${path.module}/postgres-initdb.sh")
+    laneway_secrets          = file("${path.module}/laneway-secrets.sh")
+    laneway_deploy           = file("${path.module}/laneway-deploy.sh")
+    laneway_backup           = file("${path.module}/laneway-backup.sh")
+  }))
 }
 
 resource "oci_core_instance" "vm" {
@@ -41,26 +56,18 @@ resource "oci_core_instance" "vm" {
   }
 
   metadata = {
-    user_data = base64encode(templatefile("${path.module}/cloud-init.yaml", {
-      vault_secret_ids         = local.vault_secret_ids
-      data_volume_device       = local.data_volume_device
-      region                   = var.region
-      object_storage_namespace = data.oci_objectstorage_namespace.tenancy.namespace
-      backup_bucket_name       = oci_objectstorage_bucket.backups.name
-      backup_age_recipient     = var.backup_age_recipient
-      bootstrap_oci_cli_digest = var.bootstrap_oci_cli_digest
-      compose                  = file("${path.module}/compose.yaml")
-      postgres_initdb          = file("${path.module}/postgres-initdb.sh")
-      laneway_secrets          = file("${path.module}/laneway-secrets.sh")
-      laneway_deploy           = file("${path.module}/laneway-deploy.sh")
-      laneway_backup           = file("${path.module}/laneway-backup.sh")
-    }))
+    user_data = local.user_data
   }
 
   lifecycle {
     precondition {
       condition     = alltrue([for id in values(local.vault_secret_ids) : id != null])
       error_message = "Create the three Vault secrets and set their OCIDs before the full apply. A later change to user_data replaces the VM."
+    }
+
+    precondition {
+      condition     = length(local.user_data) <= 32000
+      error_message = "OCI caps instance metadata at 32,000 bytes, and the gzipped user_data is ${length(local.user_data)}."
     }
 
     precondition {
