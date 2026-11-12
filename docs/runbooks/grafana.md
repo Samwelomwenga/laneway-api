@@ -58,7 +58,7 @@ Alloy on the VM ships the [host sources](../security/logging-inventory.md#host-s
 
 1. In the Cloud Portal, under Security, open Access Policies and create a policy named `laneway-vm-alloy`, with its realm set to the `lanewayapi` stack.
 2. Give it `logs:write` and nothing else.
-3. Add a token to it named `laneway-vm-alloy-prd`. Copy it now.
+3. Add a token to it named `laneway-vm-alloy-prd`, expiring on the shared rotation day in [the Terraform runbook](terraform.md#rotate-the-tokens-every-90-days). Copy it now.
 4. On the stack's Loki card, click Details. Copy the URL and the User. The push URL is that URL plus `/loki/api/v1/push`.
 5. In the Doppler dashboard, project `laneway-api`, config `prd`, add:
 

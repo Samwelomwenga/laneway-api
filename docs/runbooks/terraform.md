@@ -136,15 +136,40 @@ The audit run covers `plan` only, because `apply` can't run on the branch. `appl
 
 ## Rotate the tokens every 90 days
 
-The HCP team token, the Doppler service tokens, the Grafana service account token, and the two Doppler tokens in OCI Vault share an expiry day. HCP emails the owners 30 and 7 days before its token expires, and that reminder covers them all. Rotate them together:
+Every token Laneway's infrastructure holds is in this table. The ones marked 90 days share one expiry day, and the Tunnel token gets rotated on that day too. HCP emails the owners 30 and 7 days before its token expires, and that reminder covers them all. The rest never expire, and their vendors offer no expiry to set, so rotate them only if they leak, with the runbook in the last column.
+
+| Token | Lives in | Expires | Rotate with |
+|---|---|---|---|
+| HCP owners team token | `TF_TOKEN_APP_TERRAFORM_IO` in every root's Doppler config | 90 days | step 1 below |
+| Grafana service account token, `terraform-alerting` | `TF_VAR_GRAFANA_AUTH` in `laneway-alerting` `prd` | 90 days | step 2 below |
+| Doppler service token per root | `DOPPLER_TOKEN` on both of the root's GitHub environments | 90 days | step 3 below |
+| Doppler read-only tokens for `laneway-db` `prd` and `laneway-api` `prd` | OCI Vault | 90 days | [the VM runbook](vm.md#the-two-doppler-tokens) |
+| Cloudflare Tunnel token | `TUNNEL_TOKEN` in `laneway-api` `prd` | never, but rotated every 90 days | [the Cloudflare runbook](cloudflare.md#the-tunnel-token) |
+| Cloudflare R2 token, `laneway-backup` | `R2_*` in `laneway-db` `prd` | 90 days | [the Cloudflare runbook](cloudflare.md#the-r2-token) |
+| Grafana access policy token, `laneway-vm-alloy-prd` | `ALLOY_LOKI_TOKEN` in `laneway-api` `prd` | 90 days | [the Grafana runbook](grafana.md#alloys-token) |
+| Grafana access policy token, `laneway-api-prd` | `OTEL_EXPORTER_OTLP_HEADERS` in `laneway-api` `prd` | never | [the Grafana runbook](grafana.md#the-apps-token) |
+| Telegram bot token | `TF_VAR_TELEGRAM_BOT_TOKEN` in `laneway-alerting` `prd`, and the repo's Actions secrets | never | `/revoke` to `@BotFather`, then [Doppler and Telegram](repo-setup.md#doppler-and-telegram) |
+| Grafana Synthetic Monitoring token | `TF_VAR_SM_ACCESS_TOKEN` in `laneway-alerting` `prd` | never | [the alerting runbook](alerting.md#synthetic-monitoring) |
+| OCI token exchange client secret | `OCI_TOKEN_EXCHANGE_CLIENT_SECRET` in `laneway-vm` `prd` | never | a new secret on the `laneway-terraform-ci` app's OAuth configuration |
+| Tailscale OAuth client secret, `laneway-vm` | OCI Vault | never | [the VM runbook](vm.md#the-tailscale-client-secret) |
+| Brevo API key, `laneway-api-prd` | `BREVO__APIKEY` in `laneway-api` `prd` | never | a new key in Brevo, then a redeploy |
+| Brevo webhook bearer token | Laneway's transactional webhook in Brevo | 1 year | [the Brevo runbook](brevo.md#rotate-the-token) |
+| Brevo webhook signing key | `BREVO__WEBHOOKSIGNINGKEY` in `laneway-api` `prd` | never | [the Brevo runbook](brevo.md#if-a-token-leaks) |
+| `age` private key | `AGE_SECRET_KEY` in `laneway-backup` `prd`, and the password manager | never | a new key pair, which replaces the VM and leaves old dumps on the old key |
+
+Tailscale's deploy credential is workload identity federation, so it has no secret to rotate.
+
+On the 90-day rotation day:
 
 1. Create a new HCP owners team token. Set it as `TF_TOKEN_APP_TERRAFORM_IO` in every root's Doppler config.
 2. Create a new Grafana service account token for `terraform-alerting`. Set it as `TF_VAR_GRAFANA_AUTH` in `laneway-alerting` `prd`.
 3. Generate a new Doppler service token for each root. Set it as `DOPPLER_TOKEN` on both of that root's GitHub environments.
-4. Rotate the `laneway-db` and `laneway-api` tokens in Vault, as in [the VM runbook](vm.md#the-two-doppler-tokens).
-5. Run each root's workflow by hand from the Actions tab on `main`. `plan` must pass.
-6. Revoke the old HCP and Grafana tokens and the old root Doppler tokens. Step 4 already revoked the old Vault ones.
-7. Write the new expiry day here.
+4. Create a new Alloy token on the `laneway-vm-alloy` access policy, expiring on the next rotation day. Set it as `ALLOY_LOKI_TOKEN` in `laneway-api` `prd`.
+5. Refresh the Tunnel token and create a new R2 token, as in [the Cloudflare runbook](cloudflare.md#rotating-the-tokens). Stop before each one's redeploy step, since step 6 redeploys once for all of them.
+6. Rotate the `laneway-db` and `laneway-api` tokens in Vault, as in [the VM runbook](vm.md#the-two-doppler-tokens). Its redeploy also picks up the Alloy, Tunnel, and R2 tokens.
+7. Run each root's workflow by hand from the Actions tab on `main`. `plan` must pass.
+8. Revoke the old HCP, Grafana, Alloy, and R2 tokens and the old root Doppler tokens. Step 6 already revoked the old Vault ones, and the Tunnel refresh retired the old Tunnel token.
+9. Write the new expiry day here.
 
 Rotation stays manual. Automating it would need a Doppler personal token and a GitHub PAT, and both are stronger and live longer than the tokens they rotate.
 
