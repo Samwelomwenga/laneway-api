@@ -103,8 +103,34 @@ write_files:
       esac
 
       mountpoint -q /mnt/data || mount /mnt/data
-      install -d -m 0755 /mnt/data/laneway
+      install -d -m 0755 /mnt/data/laneway /mnt/data/postgres
       mountpoint -q /var/lib/laneway || mount /var/lib/laneway
+
+  - path: /etc/laneway/compose.yaml
+    content: |
+      ${indent(6, compose)}
+  - path: /etc/laneway/postgres-initdb.sh
+    permissions: "0755"
+    content: |
+      ${indent(6, postgres_initdb)}
+  - path: /etc/systemd/system/laneway.service
+    content: |
+      [Unit]
+      Description=Laneway Compose project
+      Requires=docker.service
+      Wants=network-online.target
+      After=docker.service network-online.target
+      RequiresMountsFor=/mnt/data /var/lib/laneway
+      ConditionPathExists=/var/lib/laneway/images.env
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      TimeoutStartSec=15min
+      ExecStart=/usr/bin/docker compose --file /etc/laneway/compose.yaml --env-file /var/lib/laneway/images.env up --detach
+
+      [Install]
+      WantedBy=multi-user.target
 
   - path: /usr/local/sbin/laneway-tailscale-join
     permissions: "0755"
@@ -133,3 +159,4 @@ runcmd:
   - [systemctl, restart, systemd-journald]
   - [/usr/local/sbin/laneway-data-volume]
   - /usr/local/sbin/laneway-vendor-packages && /usr/local/sbin/laneway-tailscale-join && systemctl mask --now ssh.service ssh.socket
+  - systemctl enable laneway.service && systemctl start --no-block laneway.service

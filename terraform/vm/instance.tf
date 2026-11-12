@@ -46,6 +46,8 @@ resource "oci_core_instance" "vm" {
       data_volume_device       = local.data_volume_device
       region                   = var.region
       bootstrap_oci_cli_digest = var.bootstrap_oci_cli_digest
+      compose                  = file("${path.module}/compose.yaml")
+      postgres_initdb          = file("${path.module}/postgres-initdb.sh")
     }))
   }
 
