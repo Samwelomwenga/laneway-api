@@ -4,6 +4,7 @@ data "oci_identity_availability_domains" "all" {
 
 locals {
   availability_domain = data.oci_identity_availability_domains.all.availability_domains[var.availability_domain - 1].name
+  data_volume_device  = "/dev/oracleoci/oraclevdb"
 
   vault_secret_ids = {
     laneway_db_doppler_token  = var.laneway_db_doppler_token_secret_id
@@ -41,7 +42,10 @@ resource "oci_core_instance" "vm" {
 
   metadata = {
     user_data = base64encode(templatefile("${path.module}/cloud-init.yaml", {
-      vault_secret_ids = local.vault_secret_ids
+      vault_secret_ids         = local.vault_secret_ids
+      data_volume_device       = local.data_volume_device
+      region                   = var.region
+      bootstrap_oci_cli_digest = var.bootstrap_oci_cli_digest
     }))
   }
 

@@ -71,3 +71,14 @@ variable "tailscale_client_secret_secret_id" {
   type        = string
   default     = null
 }
+
+variable "bootstrap_oci_cli_digest" {
+  description = "The linux/arm64 ghcr.io/oracle/oci-cli digest first boot uses to read the Tailscale secret. Bump it by hand only if that image breaks. A new value replaces the VM."
+  type        = string
+  default     = "sha256:46295a1de0d4bd5855c0402f5d01baf57d5b6f7acce0b87ad9e6dcfbbeafc21a"
+
+  validation {
+    condition     = can(regex("^sha256:[0-9a-f]{64}$", var.bootstrap_oci_cli_digest))
+    error_message = "bootstrap_oci_cli_digest must look like sha256: followed by 64 hex digits."
+  }
+}

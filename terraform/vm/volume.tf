@@ -17,6 +17,6 @@ resource "oci_core_volume_attachment" "data" {
   attachment_type = "paravirtualized"
   instance_id     = oci_core_instance.vm.id
   volume_id       = oci_core_volume.data.id
-  device          = "/dev/oracleoci/oraclevdb"
+  device          = local.data_volume_device
   display_name    = "laneway-data"
 }
