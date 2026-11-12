@@ -49,6 +49,7 @@ resource "oci_core_instance" "vm" {
       compose                  = file("${path.module}/compose.yaml")
       postgres_initdb          = file("${path.module}/postgres-initdb.sh")
       laneway_secrets          = file("${path.module}/laneway-secrets.sh")
+      laneway_deploy           = file("${path.module}/laneway-deploy.sh")
     }))
   }
 

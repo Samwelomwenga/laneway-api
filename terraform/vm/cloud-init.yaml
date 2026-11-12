@@ -7,6 +7,12 @@ packages:
   - jq
   - rclone
 
+users:
+  - default
+  - name: deploy
+    shell: /bin/bash
+    lock_passwd: true
+
 write_files:
   - path: /etc/docker/daemon.json
     content: |
@@ -125,6 +131,14 @@ write_files:
     permissions: "0700"
     content: |
       ${indent(6, laneway_secrets)}
+  - path: /usr/local/bin/laneway-deploy
+    permissions: "0755"
+    content: |
+      ${indent(6, laneway_deploy)}
+  - path: /etc/sudoers.d/laneway-deploy
+    permissions: "0440"
+    content: |
+      deploy ALL=(root) NOPASSWD: /usr/local/bin/laneway-deploy
   - path: /etc/systemd/system/laneway.service
     content: |
       [Unit]
