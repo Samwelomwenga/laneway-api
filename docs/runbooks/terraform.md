@@ -52,6 +52,8 @@ doppler run --project laneway-alerting --config prd -- bash scripts/terraform-pl
 
 `scripts/terraform-plan.sh` is the same plan CI runs. It prints the addresses and actions and nothing else. It leaves `tfplan` in the root, which holds every secret in plain text. Git ignores it. Delete it when you're done. To read the full diff locally, run `terraform -chdir=terraform/alerting show tfplan` after the script. Don't paste it anywhere public.
 
+The script also passes `-target=<address>` and `-replace=<address>` through to `terraform plan`. The VM's first build and a forced replace use them.
+
 Applying from a laptop works, but it skips the gate. Merge to `main` instead, and let CI apply.
 
 ## Apply oci-bootstrap from the laptop
