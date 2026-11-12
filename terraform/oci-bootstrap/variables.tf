@@ -20,7 +20,7 @@ variable "repository" {
 }
 
 variable "ci_audience" {
-  description = "The audience the Terraform jobs request on their GitHub OIDC token. terraform/vm uses the same value."
+  description = "The audience the Terraform jobs request on their GitHub OIDC token. terraform-vm.yml passes the same value."
   type        = string
   default     = "https://cloud.oracle.com"
 }
