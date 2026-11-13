@@ -9,6 +9,18 @@ variable "grafana_auth" {
   sensitive   = true
 }
 
+variable "sm_url" {
+  description = "Synthetic Monitoring API for the stack's region. The stack runs in prod-eu-west-0."
+  type        = string
+  default     = "https://synthetic-monitoring-api-eu-west.grafana.net"
+}
+
+variable "sm_access_token" {
+  description = "Synthetic Monitoring access token from the plugin's Config page."
+  type        = string
+  sensitive   = true
+}
+
 variable "operator_username" {
   description = "The operator's Grafana username, the one person on the rota."
   type        = string
@@ -40,7 +52,7 @@ variable "metrics_datasource_uid" {
 }
 
 variable "production_hosted" {
-  description = "Whether production runs somewhere. Until it does, the logging stopped and backup rules stay paused, or logging stopped and no backup in 26 hours would fire all day."
+  description = "Whether production runs somewhere. Until it does, the uptime check stays disabled and every rule that needs a running VM stays paused. Logging stopped and no backup in 26 hours would fire all day."
   type        = bool
   default     = false
 }

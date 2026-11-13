@@ -4,6 +4,7 @@ locals {
   logs    = "{service_name=\"laneway-api\", deployment_environment_name=\"production\"}"
   backups = "{service_name=\"laneway-backup\", deployment_environment_name=\"production\"}"
   metrics = "deployment_environment_name=\"production\""
+  uptime  = "job=\"${grafana_synthetic_monitoring_check.ready.job}\""
 
   groups = {
     "Every minute" = 60
@@ -154,6 +155,19 @@ locals {
       expr          = "sum(count_over_time(${local.backups} |= \"result=failed\" [5m]))"
       range         = 300
       fires_when    = { type = "gt", params = [0] }
+      no_data_state = "OK"
+      paused        = !var.production_hosted
+    },
+    {
+      group         = "Every minute"
+      title         = "Uptime check failing"
+      playbook      = "uptime-check-failing"
+      tier          = "page"
+      summary       = "Under half the uptime probe runs on /health/ready passed in 10 minutes. The public API may be down."
+      source        = "metrics"
+      expr          = "sum(increase(probe_all_success_sum{${local.uptime}}[10m])) / sum(increase(probe_all_success_count{${local.uptime}}[10m]))"
+      range         = 600
+      fires_when    = { type = "lt", params = [0.5] }
       no_data_state = "OK"
       paused        = !var.production_hosted
     },
