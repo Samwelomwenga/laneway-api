@@ -12,17 +12,18 @@ The Tunnel is remote-managed. Its routes live in the dashboard, and the VM holds
 2. Name it `laneway`.
 3. On the install page, pick Docker. The command it shows ends in `--token <token>`. Copy the token alone. Skip the install, since the VM runs the connector.
 4. In the Doppler dashboard, project `laneway-api`, config `prd`, add it as `TUNNEL_TOKEN`. `laneway-secrets` writes it alone into `cloudflared.env` and keeps it out of `api.env`.
-5. Back in the wizard, add a public hostname:
+5. Open the tunnel's Routes tab and click Add published application:
 
    | Field | Value |
    |---|---|
    | Subdomain | `laneway-api` |
    | Domain | `samwelomwenga.com` |
    | Path | empty |
-   | Service type | `HTTP` |
-   | URL | `api:8080` |
+   | Service URL | `http://api:8080` |
 
-   Leave every Additional application setting at its default. Cloudflare creates a proxied CNAME for the host in the zone's DNS.
+   The scheme in the Service URL is the service type. Keep it `http://`, not the `https://` the placeholder shows. The API serves plain HTTP on the Compose network, so an `https://` URL makes `cloudflared` attempt TLS to Kestrel and every request fails.
+
+   Leave every other setting at its default. Cloudflare creates a proxied CNAME for the host in the zone's DNS. If the save fails because a record exists, delete the old `laneway-api` record in DNS and save again.
 
 The Tunnel shows Inactive until the first deploy starts `cloudflared`. Then it shows Healthy, and `https://laneway-api.samwelomwenga.com/health/ready` answers `Healthy`.
 
