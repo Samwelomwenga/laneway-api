@@ -68,6 +68,20 @@ updates:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
 
+  - package-ecosystem: docker-compose
+    directory: "/deploy/vm"
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: terraform
     directories:
       - "/terraform/*"

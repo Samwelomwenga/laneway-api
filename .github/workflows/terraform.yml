@@ -12,19 +12,30 @@ on:
         required: false
         type: boolean
         default: false
+      id-token-audience:
+        description: Audience of a GitHub OIDC token written before each Terraform step, for roots whose provider trades it, such as vm
+        required: false
+        type: string
+        default: ''
 
 permissions: {}
 
 env:
   ALLOWED_ENDPOINTS: >-
+    *.identity.oraclecloud.com:443
+    *.kms.eu-frankfurt-1.oraclecloud.com:443
     api.doppler.com:443
     api.github.com:443
     app.terraform.io:443
     archivist.terraform.io:443
     cli.doppler.com:443
     github.com:443
+    iaas.eu-frankfurt-1.oraclecloud.com:443
+    identity.eu-frankfurt-1.oci.oraclecloud.com:443
+    kms.eu-frankfurt-1.oraclecloud.com:443
     lanewayapi.grafana.net:443
     objects.githubusercontent.com:443
+    objectstorage.eu-frankfurt-1.oraclecloud.com:443
     oncall-prod-eu-west-0.grafana.net:443
     raw.githubusercontent.com:443
     registry.terraform.io:443
@@ -42,6 +53,7 @@ jobs:
     environment: ${{ inputs.root }}-plan
     permissions:
       contents: read
+      id-token: write
     outputs:
       digest: ${{ steps.plan.outputs.digest }}
       version: ${{ steps.version.outputs.version }}
@@ -69,11 +81,17 @@ jobs:
           terraform_version: ${{ steps.version.outputs.version }}
           terraform_wrapper: false
       - uses: dopplerhq/cli-action@4819d808ab99e5cde19a0637a16536a4038fad73 # v4.0.1
+      - name: Request the OIDC token
+        if: inputs.id-token-audience != ''
+        env:
+          AUDIENCE: ${{ inputs.id-token-audience }}
+        run: bash scripts/github-id-token.sh "$AUDIENCE" "$RUNNER_TEMP/id-token"
       - name: Plan
         id: plan
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           DRIFT: ${{ inputs.drift && '--drift' || '' }}
+          OCI_WORKLOAD_IDENTITY_TOKEN_PATH: ${{ runner.temp }}/id-token
           ROOT: ${{ inputs.root }}
         run: doppler run -- bash scripts/terraform-plan.sh "$ROOT" ${DRIFT:+"$DRIFT"}
 
@@ -86,6 +104,7 @@ jobs:
     environment: ${{ inputs.root }}
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
@@ -99,10 +118,16 @@ jobs:
           terraform_version: ${{ needs.plan.outputs.version }}
           terraform_wrapper: false
       - uses: dopplerhq/cli-action@4819d808ab99e5cde19a0637a16536a4038fad73 # v4.0.1
+      - name: Request the OIDC token
+        if: inputs.id-token-audience != ''
+        env:
+          AUDIENCE: ${{ inputs.id-token-audience }}
+        run: bash scripts/github-id-token.sh "$AUDIENCE" "$RUNNER_TEMP/id-token"
       - name: Plan again
         id: plan
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          OCI_WORKLOAD_IDENTITY_TOKEN_PATH: ${{ runner.temp }}/id-token
           ROOT: ${{ inputs.root }}
         run: doppler run -- bash scripts/terraform-plan.sh "$ROOT"
       - name: Compare with the approved plan
@@ -114,9 +139,15 @@ jobs:
             echo "::error::The change list moved since the Plan job. Compare both lists in the job summaries, then rerun the workflow."
             exit 1
           fi
+      - name: Request the OIDC token
+        if: inputs.id-token-audience != ''
+        env:
+          AUDIENCE: ${{ inputs.id-token-audience }}
+        run: bash scripts/github-id-token.sh "$AUDIENCE" "$RUNNER_TEMP/id-token"
       - name: Apply
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          OCI_WORKLOAD_IDENTITY_TOKEN_PATH: ${{ runner.temp }}/id-token
           ROOT: ${{ inputs.root }}
         run: doppler run -- terraform -chdir="terraform/$ROOT" apply -input=false -lock-timeout=5m tfplan > /dev/null
 

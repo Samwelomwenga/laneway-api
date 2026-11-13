@@ -18,6 +18,17 @@ Production ships to one Grafana Cloud stack, `lanewayapi`, on the free tier, in 
 - A 500 always shows as an `UnexpectedError` line. Application Observability's Exceptions tab lists only spans with an `exception` event, which only Npgsql adds. Sentry isn't used.
 - The free tier doesn't record who read what, and tamper evidence is access control, not cryptographic. [ADR 0004](../adr/0004-auth-targets-asvs-l2-with-exceptions.md#1642-logs-protected-from-access-and-edits-l2) lists both as exceptions.
 
+## Host sources
+
+On the VM, Grafana Alloy reads the systemd journal and ships six sources to the same stack's Loki push endpoint, not the OTLP gateway. Its token holds `logs:write` alone, so revoking it leaves the app's telemetry running. Every line carries `deployment_environment_name="production"` and one of the `service_name` values below. Alloy drops any line that matches none of them, so the rest of the journal stays on the VM. The config is `terraform/vm/config.alloy`, and the `Alloy check` job in `terraform-vm.yml` runs `alloy fmt` and `alloy validate` on it before any plan.
+
+- `laneway-boot`: the `api` container's stderr, journal identifier `laneway-api-1` at priority `err`. Only startup failures and Serilog's own errors go there. The container's stdout never ships. The identifier matches exactly, so a `laneway-ui-1` container would not ship either.
+- `laneway-cloudflared`: the `cloudflared` container, identifier `laneway-cloudflared-1`, at `--loglevel info`. Debug lines never exist, since nothing turns them on.
+- `laneway-postgres`: the `postgres` container, identifier `laneway-postgres-1`. `log_error_verbosity=terse` leaves out DETAIL, HINT, QUERY, and CONTEXT, which can quote row values. `log_min_error_statement=panic` leaves out the STATEMENT line, and `log_connections=off` leaves out connection lines. As a backstop, Alloy drops any line that starts with `DETAIL:` or `STATEMENT:`, either at the start or after the first `] `, where the default `%m [%p] ` prefix ends.
+- `laneway-deploy`: `laneway-deploy`'s status lines and its `result=` line, identifier `laneway-deploy` exactly. Docker and efbundle output go under `laneway-deploy-output`, and `laneway-secrets` writes its errors under `laneway-secrets`. Neither ships.
+- `laneway-backup`: the backup job's status lines and `result=` lines, identifier `laneway-backup` exactly. `pg_dump`, `pg_restore`, `age`, `rclone`, and OCI CLI output go under `laneway-backup-output` and never ship. Neither tag ever holds the dump, a connection string, or a key.
+- `laneway-host`: kernel lines that hold `invoked oom-killer`, `oom-kill:`, or `Out of memory`, and `unattended-upgrade` lines that mention a reboot. cloud-init turns on `Unattended-Upgrade::SyslogEnable` so those reach the journal. The rest of the kernel log, the OOM killer's memory and task tables, and the package lists stay local.
+
 ## Alerting
 
 Grafana alerts the operator from these logs and counters. OWASP A09 asks for alert thresholds and a playbook per alert. Every rule but log usage reads production alone. Every threshold is a starting guess, retuned once real traffic exists. [The alerting runbook](../runbooks/alerting.md) has the queries and the thresholds.
