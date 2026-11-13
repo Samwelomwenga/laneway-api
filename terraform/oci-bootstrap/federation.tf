@@ -27,6 +27,11 @@ resource "oci_identity_domains_app" "ci" {
   based_on_template {
     value = "CustomWebAppTemplateId"
   }
+
+  lifecycle {
+    # OCI adds the OCITags extension schema to the app after create.
+    ignore_changes = [schemas]
+  }
 }
 
 resource "oci_identity_domains_identity_propagation_trust" "github_actions" {
