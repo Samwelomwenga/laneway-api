@@ -17,5 +17,7 @@ resource "oci_limits_quota" "always_free_shapes" {
     "zero compute-memory quotas in compartment ${local.compartment_name}",
     "set compute-core quota standard-a1-core-count to 2 in compartment ${local.compartment_name}",
     "set compute-memory quota standard-a1-memory-count to 12 in compartment ${local.compartment_name}",
+    "set compute-core quota standard-a1-core-regional-count to 2 in compartment ${local.compartment_name}",
+    "set compute-memory quota standard-a1-memory-regional-count to 12 in compartment ${local.compartment_name}",
   ]
 }
