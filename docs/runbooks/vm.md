@@ -61,13 +61,26 @@ The same config also holds:
 
 ### `laneway-backup` `prd`
 
-It holds the `age` private key that decrypts the backups. No service token ever exists for it, and nothing on the VM can read it. Make the project with one config, `prd`, then generate the key pair on the laptop. The private key goes from `age-keygen` into Doppler without touching disk, and the public key goes into `laneway-vm` for `terraform/vm`:
+It holds the `age` private key that decrypts the backups. No service token ever exists for it, and nothing on the VM can read it. Make the project with one config, `prd`, then generate the key pair on the laptop. Install `age` first, with `sudo dnf install age` on Fedora. The private key goes from `age-keygen` into Doppler without touching disk, and the public key goes into `laneway-vm` for `terraform/vm`:
 
 ```sh
 key=$(age-keygen 2>/dev/null | grep '^AGE-SECRET-KEY-')
-printf %s "$key" | doppler secrets set AGE_SECRET_KEY --project laneway-backup --config prd
-printf %s "$key" | age-keygen -y | doppler secrets set TF_VAR_BACKUP_AGE_RECIPIENT --project laneway-vm --config prd
+if [ -n "$key" ]; then
+  printf %s "$key" | doppler secrets set AGE_SECRET_KEY --project laneway-backup --config prd >/dev/null
+  printf %s "$key" | age-keygen -y | doppler secrets set TF_VAR_BACKUP_AGE_RECIPIENT --project laneway-vm --config prd >/dev/null
+else
+  echo 'age-keygen gave no key. Is age installed?'
+fi
 unset key
+```
+
+`doppler secrets set` prints the value it saved, so `>/dev/null` keeps the private key off the screen. Without the `if`, a missing `age-keygen` saves two empty strings.
+
+Check that the two halves match. It prints `ok`:
+
+```sh
+echo ok | age -r "$(doppler secrets get TF_VAR_BACKUP_AGE_RECIPIENT --project laneway-vm --config prd --plain)" \
+  | age -d -i <(doppler secrets get AGE_SECRET_KEY --project laneway-backup --config prd --plain)
 ```
 
 Then open `AGE_SECRET_KEY` in the Doppler dashboard and copy it into the password manager. If Doppler loses the project, that copy is the only way to read a backup.
