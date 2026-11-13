@@ -159,7 +159,7 @@ curl --silent https://checkip.amazonaws.com
 - `egress=ok` prints. Compose's network is a user-defined bridge like `egress-check`, so this shows Docker's rules let containers out beside OCI's FORWARD REJECT rule.
 - The address `checkip` prints matches `terraform -chdir=terraform/vm output -raw public_ip` on the laptop. That's the reserved IP, attached.
 
-Tick each of the five in the PR. Don't paste the IP. A brand-new VM starts no containers until the first deploy, so `docker ps` is empty for now.
+Tick each of the five in the PR. Don't paste the IP. A brand-new VM starts no containers until the first deploy, so `docker ps` is empty for now. Alloy is inactive too. Its unit waits for `alloy.env`, which the first deploy writes.
 
 ### Handing over to CI
 
