@@ -35,6 +35,8 @@ Grafana alerts the operator from these logs and counters. OWASP A09 asks for ale
 | Admin granted | `Laneway.Access` `MemberAdded` or `MemberRoleChanged` with `role` Admin | notify | [admin-granted.md](../runbooks/alerts/admin-granted.md) |
 | Made public | `Laneway.Access` `VisibilityChanged` to Public | notify | [made-public.md](../runbooks/alerts/made-public.md) |
 | Logging stopped | No Data on `dotnet.process.cpu.count` | page | [logging-stopped.md](../runbooks/alerts/logging-stopped.md) |
+| Backup failed | `laneway-backup` `result=failed` from the VM | notify | [backup-failed.md](../runbooks/alerts/backup-failed.md) |
+| No backup in 26 hours | No `laneway-backup` `result=ok` from the VM in 26 hours | notify | [no-backup-in-26-hours.md](../runbooks/alerts/no-backup-in-26-hours.md) |
 | Log usage | `bytes_over_time` over the whole stack | notify | [log-usage.md](../runbooks/alerts/log-usage.md) |
 
 Two contact points carry them. `Laneway page` goes to Grafana IRM, which pushes to the operator's phone and emails after 15 minutes without an ack, and to Telegram. `Laneway notify` goes to email and Telegram. A rule whose query fails sends Grafana's `DatasourceError`, which goes to `Laneway notify`.

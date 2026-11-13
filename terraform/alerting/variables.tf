@@ -40,7 +40,7 @@ variable "metrics_datasource_uid" {
 }
 
 variable "production_hosted" {
-  description = "Whether production runs somewhere. Until it does, the logging stopped rule stays paused, or it would page all day."
+  description = "Whether production runs somewhere. Until it does, the logging stopped and backup rules stay paused, or logging stopped and no backup in 26 hours would fire all day."
   type        = bool
   default     = false
 }
