@@ -80,9 +80,9 @@ Only a real deployment needs these steps. In the existing Brevo account:
 3. Keep IP blocking on, and allow the host's outbound IP. For the VM, that's its reserved IP, from `terraform -chdir=terraform/vm output -raw public_ip`. A replace keeps it.
 4. Create an API key named `laneway-api-prd`. In the Doppler dashboard, project `laneway-api`, config `prd`, store it as `BREVO__APIKEY`, with `BREVO__SENDEREMAIL` beside it. Never put either in `ci`, which syncs every secret to GitHub.
 5. Add a fresh `BREVO__WEBHOOKSIGNINGKEY` to `laneway-api` `prd` with `openssl rand -base64 32`. Never copy dev's.
-6. Once the API has a public URL, add a transactional webhook pointing at `https://<api host>/api/v1/webhooks/brevo`. Tick hard bounce, spam, blocked, and unsubscribed. Nothing else. Set its bearer to a token minted from the `prd` config.
-6. Set `WebApp:BaseUrl` and `Cors:AllowedOrigins` to the real web app origin.
-7. Check the plan's sending limit. 300 a day won't cover Production for long.
-8. Give the API a Data Protection key ring that survives a restart and that every instance shares. The unsubscribe link in an invite email is the address, protected with those keys. The API keeps them in `~/.aspnet/DataProtection-Keys` by default, so a container with no volume there makes new keys on every start, and every unsubscribe link already sent then answers 400 `invalidToken`.
+6. Once the first deploy answers, add a transactional webhook pointing at `https://laneway-api.samwelomwenga.com/api/v1/webhooks/brevo`. Tick hard bounce, spam, blocked, and unsubscribed. Nothing else. Set its bearer to a token minted from the `prd` config.
+7. `appsettings.Production.json` sets `WebApp:BaseUrl` and `Cors:AllowedOrigins` to `https://laneway-app.samwelomwenga.com`. Change both there if the web app moves.
+8. Check the plan's sending limit. 300 a day won't cover Production for long.
+9. Keep the Data Protection key ring in Postgres, where `MessageSetup` puts it. The unsubscribe link in an invite email is the address, protected with those keys. Keys kept anywhere a container recreate wipes would turn every unsubscribe link already sent into a 400 `invalidToken`.
 
 An event the webhook doesn't handle logs `WebhookEventIgnored`. If those show up, someone ticked an extra box in step 6.
