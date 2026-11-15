@@ -4,7 +4,7 @@ Tier: notify. The threshold is a starting guess. Retune it once real nights have
 
 ## What fired
 
-`laneway-backup` on the VM wrote `result=failed`. The script writes that line whenever a run ends without uploading the dump to both buckets. The nightly run starts at 03:00 UTC. The predeploy run starts inside `laneway-deploy` before the migration, and a failed predeploy dump stops that deploy with `error=predeploy-dump-failed` under `laneway-deploy`. The rule stays paused until `production_hosted` is true in the Terraform.
+`laneway-backup` on the VM wrote `result=failed`. The script writes that line whenever a run ends without uploading the dump to both buckets. The nightly run starts at 03:00 UTC. The predeploy run starts inside `laneway-deploy` before the migration, and a failed predeploy dump stops that deploy with `error=predeploy-dump-failed` under `laneway-deploy`. The rule pauses whenever `production_hosted` is false in the Terraform.
 
 ## The first query to run
 

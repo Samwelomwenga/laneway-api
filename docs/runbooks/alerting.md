@@ -123,7 +123,20 @@ Both passed on 2026-11-02, after the first apply through CI.
 
 ## Once production is hosted
 
-Open a PR that sets the `production_hosted` default to `true` in `terraform/alerting/variables.tf`. The first production deploy does this once its health check passes. Once the PR merges and the apply goes through, logging stopped starts evaluating. The value stays out of Doppler.
+The `production_hosted` default in `terraform/alerting/variables.tf` is `true`. The value stays out of Doppler. The flip turned on five things: logging stopped, backup failed, no backup in 26 hours, the uptime check, and uptime check failing. Nothing in `terraform/vm` or the app reads the flag.
+
+Before the flip, the operator checked production by hand. Each check passed on the date beside it:
+
+- The request log's `clientIp` is the caller's address, not cloudflared's. 2026-11-15.
+- Responses carry `Strict-Transport-Security`. 2026-11-15.
+- A Brevo webhook event reaches `/api/v1/webhooks/brevo`. 2026-11-15, a hard bounce from a sign-up to an address that does not exist.
+- The first nightly backup lands in OCI and R2. 2026-11-15.
+- The first restore from R2 succeeds on the laptop, with its time and dump age in [the restore log](backup.md#restore-log). 2026-11-15.
+- Alloy ships its six sources and nothing else. 2026-11-15, with a marked test line for each `laneway-host` match.
+- A forced Postgres error reaches Loki with no `STATEMENT:` line. 2026-11-15.
+- One ad hoc run of the uptime check passes from both probes. 2026-11-15.
+
+If production goes down on purpose for more than 10 minutes, set the default back to `false` first. Otherwise logging stopped and uptime check failing page, and no backup in 26 hours notifies the next day.
 
 ## Changing a rule
 

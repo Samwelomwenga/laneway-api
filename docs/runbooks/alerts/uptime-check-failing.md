@@ -4,7 +4,7 @@ Tier: page. The threshold is a starting guess. Retune it once real traffic exist
 
 ## What fired
 
-Under half the Synthetic Monitoring runs against `https://laneway-api.samwelomwenga.com/health/ready` passed in the last 10 minutes. London and North Virginia each probe every 120 seconds, so the window holds about 10 runs. A run passes on a 200 with the body `Healthy` within 5 seconds, over TLS and IPv4. `/health/ready` answers `Healthy` only when the API reaches Postgres within 2 seconds. So this fires when the Tunnel is down, the API is down, or the API can't reach Postgres. One probe region failing alone keeps the ratio near half and doesn't fire. A deploy that rolls back inside a few minutes doesn't either. The check stays disabled and the rule paused until `production_hosted` is true in the Terraform.
+Under half the Synthetic Monitoring runs against `https://laneway-api.samwelomwenga.com/health/ready` passed in the last 10 minutes. London and North Virginia each probe every 120 seconds, so the window holds about 10 runs. A run passes on a 200 with the body `Healthy` within 5 seconds, over TLS and IPv4. `/health/ready` answers `Healthy` only when the API reaches Postgres within 2 seconds. So this fires when the Tunnel is down, the API is down, or the API can't reach Postgres. One probe region failing alone keeps the ratio near half and doesn't fire. A deploy that rolls back inside a few minutes doesn't either. The check turns off and the rule pauses whenever `production_hosted` is false in the Terraform.
 
 ## The first query to run
 

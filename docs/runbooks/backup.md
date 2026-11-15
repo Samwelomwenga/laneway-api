@@ -112,6 +112,7 @@ You need Docker, `age`, `rclone`, and the Doppler CLI logged in with access to `
 
 | Date | Dump | Dump age | Restore time | Newest migration | Notes |
 |---|---|---|---|---|---|
+| 2026-11-15 | `daily/laneway-20261115T220008Z.dump.age` | 2 minutes | 9.7 s | `20261111131016_AddDataProtectionKeys` | First restore. No users yet, so users, boards, and cards are 0 and keys is 1. rclone ran from the `rclone/rclone` container. |
 
 ## Rotating a database password
 
