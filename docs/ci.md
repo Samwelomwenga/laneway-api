@@ -306,7 +306,7 @@ To fix a red run:
 
 `.github/workflows/deploy.yml`, the `Deploy` workflow, puts a release on the VM. [release.yml](#releaseyml) calls it after every release. To deploy or roll back by hand, open Actions, `Deploy`, Run workflow, keep `main` as the branch, and enter the tag. A dispatch from any other branch fails at once. Rolling back is a deploy of the older tag. It rolls back the API image only. The other three digests always come from the run's commit, which for a dispatch is `main`.
 
-The `Deploy` job runs in the `production` environment, which allows `main` and `v*` tags and has no reviewer. It shares the concurrency group `deploy` with `cancel-in-progress: false`, so a second deploy waits for the first. It stops after 15 minutes. Harden-runner audits egress and blocks nothing yet. The first deploy's insights list the Tailscale hosts a `block` list would need.
+The `Deploy` job runs in the `production` environment, which allows `main` and `v*` tags and has no reviewer. It shares the concurrency group `deploy` with `cancel-in-progress: false`, so a second deploy waits for the first. It stops after 15 minutes.
 
 1. `Read the release` fails unless the tag is `vX.Y.Z` and has a release. It takes the `ghcr.io/<owner>/laneway-api@sha256:...` digest from the release notes.
 2. `Verify the attestation` runs `gh attestation verify` on that digest with `--signer-workflow` set to `image.yml` and `--source-ref` set to the tag. An image built anywhere else, or from another tag, fails here.
@@ -318,6 +318,8 @@ The log shows only the script's status lines: `step=`, `secrets=rendered`, any `
 
 A failure sends one Telegram alert, `Laneway deploy of <tag> failed, result=<value>`. A success sends nothing.
 
+Harden-runner blocks every host but GitHub, GHCR, Tailscale, and the trust roots for the attestation. `api.github.com`, `github.com`, `ghcr.io`, and `tmaproduction.blob.core.windows.net`, GitHub's attestation store, serve the release, the image, and its attestation. `tuf-repo.github.com` and `tuf-repo-cdn.sigstore.dev` give `gh attestation verify` its trust roots. Tailscale gets `*.tailscale.com:443`, plus `controlplane.tailscale.com:80`, which its client also calls. SSH goes to `VM_TAILNET_IP` on port 22. Block mode refuses UDP, so the runner can't reach the VM directly and must use a Tailscale DERP relay over TCP 443.
+
 To fix a red run, read the `result=` value:
 
 - `deployed` never fails the job.
@@ -327,6 +329,7 @@ To fix a red run, read the `result=` value:
 - `rollback-failed`, exit 30. The previous digests failed their health check too, or there were none, as on the first deploy. The API is down. Go in over Tailscale SSH and read both journal tags.
 - `failed`, exit 1. The script stopped before the swap, on a bad digest, a pull, Postgres not healthy, a held lock, or the predeploy dump. The `error=` line above it names which. The old release still serves.
 - `unknown`. The job failed before the script printed anything. A red `Read the release` or `Verify the attestation` means the tag or its image is wrong. A red Tailscale step means the federation credential, its tag, or the tailnet policy changed, as [the Tailscale runbook](runbooks/tailscale.md#the-deploy-jobs-credential) says. A 403 from the token exchange means the credential's subject doesn't match the job's token. A ping that times out means the VM is down or its tailnet IP moved, as [the node swap](runbooks/vm.md#the-tailnet-node-swap) covers.
+- A connection was blocked. Harden-runner names the host in the job's annotations. Add it to `allowed-endpoints` in `deploy.yml` if Tailscale, GitHub, or Sigstore owns it. A ping that times out with no host named can mean the DERP relay's address was blocked, since Tailscale may dial a relay by IP with no DNS lookup for the wildcard to match.
 
 ## rescan.yml
 

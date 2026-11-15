@@ -44,7 +44,17 @@ jobs:
     steps:
       - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
         with:
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            ${{ vars.VM_TAILNET_IP }}:22
+            *.tailscale.com:443
+            api.github.com:443
+            controlplane.tailscale.com:80
+            ghcr.io:443
+            github.com:443
+            tmaproduction.blob.core.windows.net:443
+            tuf-repo-cdn.sigstore.dev:443
+            tuf-repo.github.com:443
       - name: Check the run
         if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
         env:
