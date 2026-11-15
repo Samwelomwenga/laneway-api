@@ -21,15 +21,22 @@ A merge to `main` that touches `terraform/alerting` plans it in CI. The apply wa
 | [Admin granted](alerts/admin-granted.md) | LogQL, `MemberAdded` or `MemberRoleChanged` with `role` Admin | any in 5 min | notify |
 | [Made public](alerts/made-public.md) | LogQL, `VisibilityChanged` to Public | any in 5 min | notify |
 | [Logging stopped](alerts/logging-stopped.md) | No Data on `dotnet.process.cpu.count` | no data for 10 min | page |
+| [Backup failed](alerts/backup-failed.md) | LogQL, `laneway-backup` `result=failed` | any in 5 min | notify |
+| [Uptime check failing](alerts/uptime-check-failing.md) | Synthetic Monitoring `probe_all_success` on `/health/ready` | under 50% of runs pass in 10 min | page |
+| [No backup in 26 hours](alerts/no-backup-in-26-hours.md) | LogQL `absent_over_time`, `laneway-backup` `result=ok` | none in 26 hours, checked hourly | notify |
 | [Log usage](alerts/log-usage.md) | LogQL `bytes_over_time`, whole stack | over 1.33 GB in a day | notify |
 
-Every rule filters on `deployment_environment_name="production"`, except log usage. The cap covers the whole stack, staging included, so that rule counts every stream. Every threshold is a starting guess.
+Every rule filters on `deployment_environment_name="production"`, except log usage. The cap covers the whole stack, staging included, so that rule counts every stream. Uptime check failing filters on its check's `job`, `laneway-api-ready`, because Synthetic Monitoring metrics carry no environment label. Every threshold is a starting guess.
 
 A rule whose query fails sends Grafana's `DatasourceError` alert, which routes to notify whatever the rule's tier. The notification policy groups by rule for 5 minutes, so a storm of 500s sends one page.
 
 Log usage uses the fallback rule, not the Cost Management usage alert. The Terraform provider has no resource for Cost Management alerts, so the built-in one would live only in the UI. The rule counts line bytes, so it reads lower than the billed figure.
 
 Logging stopped stays paused while `production_hosted` is false. Nothing runs in production before hosting exists, so the rule would page all day.
+
+The two backup rules stay paused on the same flag. Backups that run on the VM before the flip may not reach Loki, so no backup in 26 hours could fire on its first hourly check. Both read the `laneway-backup` journal tag that Alloy ships from the VM. [The backup runbook](backup.md#logs) lists its `error=` values.
+
+The uptime check probes `https://laneway-api.samwelomwenga.com/health/ready` from London and North Virginia every 120 seconds, about 43,200 runs a month. A run passes on a 200 with the body `Healthy` within 5 seconds, over TLS and IPv4. Its own alerting stays off, `alert_sensitivity = "none"`, so uptime check failing is the only rule that reads it. The rule pages when under half the last 10 minutes' runs passed. One broken probe region keeps the ratio near half, and a quick rollback passes again inside the window, so neither pages. The check stays disabled and the rule paused while `production_hosted` is false. The provider reaches Synthetic Monitoring at `sm_url`, which defaults to `https://synthetic-monitoring-api-eu-west-2.grafana.net`. That host comes from the plugin's `apiHost` setting, not from the stack's region. The provider's own region table maps this stack to `eu-west`, which answers `403 tenant is disabled`. If `apiHost` ever changes, set `TF_VAR_SM_URL` in Doppler to match.
 
 ## Before the first apply
 
@@ -60,6 +67,7 @@ TF_VAR_OPERATOR_USERNAME=<the operator's Grafana username>
 TF_VAR_OPERATOR_EMAIL=<the operator's email>
 TF_VAR_TELEGRAM_BOT_TOKEN=<bot token>
 TF_VAR_TELEGRAM_CHAT_ID=<chat id>
+TF_VAR_SM_ACCESS_TOKEN=<Synthetic Monitoring token, see below>
 ```
 
 Doppler stores names in uppercase only. Terraform matches variable names exactly, so `scripts/terraform-plan.sh` lowercases each `TF_VAR_` name before it plans. A bare `terraform plan` under `doppler run` doesn't see them.

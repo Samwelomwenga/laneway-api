@@ -2,7 +2,9 @@ locals {
   playbooks = "https://github.com/Samwelomwenga/laneway-api/blob/main/docs/runbooks/alerts"
 
   logs    = "{service_name=\"laneway-api\", deployment_environment_name=\"production\"}"
+  backups = "{service_name=\"laneway-backup\", deployment_environment_name=\"production\"}"
   metrics = "deployment_environment_name=\"production\""
+  uptime  = "job=\"${grafana_synthetic_monitoring_check.ready.job}\""
 
   groups = {
     "Every minute" = 60
@@ -141,6 +143,45 @@ locals {
       range         = 600
       fires_when    = { type = "lt", params = [1] }
       no_data_state = "Alerting"
+      paused        = !var.production_hosted
+    },
+    {
+      group         = "Every minute"
+      title         = "Backup failed"
+      playbook      = "backup-failed"
+      tier          = "notify"
+      summary       = "A database backup on the VM failed. The error= line before result=failed names the step."
+      source        = "logs"
+      expr          = "sum(count_over_time(${local.backups} |= \"result=failed\" [5m]))"
+      range         = 300
+      fires_when    = { type = "gt", params = [0] }
+      no_data_state = "OK"
+      paused        = !var.production_hosted
+    },
+    {
+      group         = "Every minute"
+      title         = "Uptime check failing"
+      playbook      = "uptime-check-failing"
+      tier          = "page"
+      summary       = "Under half the uptime probe runs on /health/ready passed in 10 minutes. The public API may be down."
+      source        = "metrics"
+      expr          = "sum(increase(probe_all_success_sum{${local.uptime}}[10m])) / sum(increase(probe_all_success_count{${local.uptime}}[10m]))"
+      range         = 600
+      fires_when    = { type = "lt", params = [0.5] }
+      no_data_state = "OK"
+      paused        = !var.production_hosted
+    },
+    {
+      group         = "Hourly"
+      title         = "No backup in 26 hours"
+      playbook      = "no-backup-in-26-hours"
+      tier          = "notify"
+      summary       = "No database backup on the VM has succeeded in 26 hours. The nightly dump runs at 03:00 UTC."
+      source        = "logs"
+      expr          = "absent_over_time(${local.backups} |= \"result=ok\" [26h])"
+      range         = 93600
+      fires_when    = { type = "gt", params = [0] }
+      no_data_state = "OK"
       paused        = !var.production_hosted
     },
     {

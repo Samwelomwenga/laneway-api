@@ -31,7 +31,7 @@ On the VM, Grafana Alloy reads the systemd journal and ships six sources to the 
 
 ## Alerting
 
-Grafana alerts the operator from these logs and counters. OWASP A09 asks for alert thresholds and a playbook per alert. Every rule but log usage reads production alone. Every threshold is a starting guess, retuned once real traffic exists. [The alerting runbook](../runbooks/alerting.md) has the queries and the thresholds.
+Grafana alerts the operator from these logs and counters. OWASP A09 asks for alert thresholds and a playbook per alert. Every rule but log usage reads production alone. The uptime check probes the production hostname, so its rule filters on the check's `job` instead. Every threshold is a starting guess, retuned once real traffic exists. [The alerting runbook](../runbooks/alerting.md) has the queries and the thresholds.
 
 | Rule | Source | Tier | Playbook |
 |---|---|---|---|
@@ -46,6 +46,9 @@ Grafana alerts the operator from these logs and counters. OWASP A09 asks for ale
 | Admin granted | `Laneway.Access` `MemberAdded` or `MemberRoleChanged` with `role` Admin | notify | [admin-granted.md](../runbooks/alerts/admin-granted.md) |
 | Made public | `Laneway.Access` `VisibilityChanged` to Public | notify | [made-public.md](../runbooks/alerts/made-public.md) |
 | Logging stopped | No Data on `dotnet.process.cpu.count` | page | [logging-stopped.md](../runbooks/alerts/logging-stopped.md) |
+| Backup failed | `laneway-backup` `result=failed` from the VM | notify | [backup-failed.md](../runbooks/alerts/backup-failed.md) |
+| Uptime check failing | Synthetic Monitoring `probe_all_success` on `/health/ready`, from London and North Virginia | page | [uptime-check-failing.md](../runbooks/alerts/uptime-check-failing.md) |
+| No backup in 26 hours | No `laneway-backup` `result=ok` from the VM in 26 hours | notify | [no-backup-in-26-hours.md](../runbooks/alerts/no-backup-in-26-hours.md) |
 | Log usage | `bytes_over_time` over the whole stack | notify | [log-usage.md](../runbooks/alerts/log-usage.md) |
 
 Two contact points carry them. `Laneway page` goes to Grafana IRM, which pushes to the operator's phone and emails after 15 minutes without an ack, and to Telegram. `Laneway notify` goes to email and Telegram. A rule whose query fails sends Grafana's `DatasourceError`, which goes to `Laneway notify`.
