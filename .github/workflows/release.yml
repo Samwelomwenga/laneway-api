@@ -95,6 +95,20 @@ jobs:
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes \
             --notes "Image: \`ghcr.io/${GITHUB_REPOSITORY,,}@$DIGEST\`"
 
+  deploy:
+    name: Deploy
+    needs: release
+    permissions:
+      contents: read
+      attestations: read
+      id-token: write
+    uses: $/.github/workflows/deploy.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
   notify:
     needs: [guards, image, release]
     if: failure()

@@ -1,0 +1,139 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to deploy, such as v1.2.3
+        required: true
+        type: string
+    secrets:
+      TELEGRAM_BOT_TOKEN:
+        required: false
+      TELEGRAM_CHAT_ID:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to deploy or roll back to, such as v1.2.3
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://laneway-api.samwelomwenga.com
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      attestations: read
+      id-token: write
+    outputs:
+      result: ${{ steps.deploy.outputs.result }}
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - name: Check the run
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          echo "::error::Dispatch the deploy from main, not $REF"
+          exit 1
+      - name: Read the release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag $TAG is not vX.Y.Z"
+            exit 1
+          fi
+          if ! body=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body); then
+            echo "::error::Tag $TAG has no release"
+            exit 1
+          fi
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          digest=$(grep -oE "${image//./\\.}@sha256:[0-9a-f]{64}" <<< "$body" | head -n 1 || true)
+          if [[ -z "$digest" ]]; then
+            echo "::error::Release $TAG names no $image digest"
+            exit 1
+          fi
+          digest=${digest#*@}
+          echo "Deploying $TAG, image $image@$digest"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Verify the attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          IMAGE: ${{ steps.release.outputs.image }}
+          DIGEST: ${{ steps.release.outputs.digest }}
+        run: |
+          gh attestation verify "oci://$IMAGE@$DIGEST" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/image.yml" \
+            --source-ref "refs/tags/$TAG" > /dev/null
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: deploy/vm
+      - name: Read the other digests
+        id: pins
+        run: |
+          for service in postgres cloudflared oci-cli; do
+            image=$(yq -r ".services.\"$service\".image" deploy/vm/compose.images.yml)
+            digest=${image#*@}
+            if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error::compose.images.yml pins no digest for $service"
+              exit 1
+            fi
+            echo "$service=$digest" >> "$GITHUB_OUTPUT"
+          done
+      - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          oauth-client-id: ${{ vars.TS_DEPLOY_CLIENT_ID }}
+          audience: ${{ vars.TS_DEPLOY_AUDIENCE }}
+          tags: tag:ci
+          ping: ${{ vars.VM_TAILNET_IP }}
+          use-cache: 'false'
+      - name: Run laneway-deploy
+        id: deploy
+        env:
+          VM_TAILNET_IP: ${{ vars.VM_TAILNET_IP }}
+          API: ${{ steps.release.outputs.digest }}
+          POSTGRES: ${{ steps.pins.outputs.postgres }}
+          CLOUDFLARED: ${{ steps.pins.outputs.cloudflared }}
+          OCI_CLI: ${{ steps.pins.outputs.oci-cli }}
+        run: |
+          log="$RUNNER_TEMP/deploy.log"
+          code=0
+          tailscale ssh "deploy@$VM_TAILNET_IP" \
+            sudo /usr/local/bin/laneway-deploy "$API" "$POSTGRES" "$CLOUDFLARED" "$OCI_CLI" 2>&1 | tee "$log" ||
+            code=${PIPESTATUS[0]}
+          result=$(sed -n 's/^result=//p' "$log" | tail -n 1)
+          echo "result=${result:-unknown}" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+  notify:
+    needs: deploy
+    if: failure()
+    permissions: {}
+    uses: $/.github/workflows/telegram-alert.yml
+    with:
+      message: Laneway deploy of ${{ inputs.tag }} failed, result=${{ needs.deploy.outputs.result || 'unknown' }}
+      needs: ${{ toJSON(needs) }}
+      ref: ${{ inputs.tag }}
+    secrets:
+      telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}

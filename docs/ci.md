@@ -2,7 +2,7 @@
 
 PRs run no tests. A green PR means the code builds and passes the checks below. The full suite runs after the merge, on every push to main, as [main.yml](#mainyml) says. Run `dotnet test` before you push, so main doesn't go red.
 
-Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR, except [main.yml](#mainyml), whose jobs run after the merge, [release.yml](#releaseyml), which runs on a tag, [rescan.yml](#rescanyml), which runs on a schedule, and [Terraform alerting](#terraform-alerting) and [Terraform vm](#terraform-vm), which run on `main` after a merge. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
+Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR. These sections are the exceptions: [main.yml](#mainyml) runs after the merge, [release.yml](#releaseyml) on a tag, [deploy.yml](#deployyml) on a release or a dispatch, [rescan.yml](#rescanyml) on a schedule, and [Terraform alerting](#terraform-alerting) and [Terraform vm](#terraform-vm) on `main` after a merge. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
 
 ## Build & format
 
@@ -200,11 +200,11 @@ To fix a red run, edit the PR title. The log lists what failed and shows valid e
 
 When any `CI` check fails, `notify` sends one Telegram message. It isn't a required check. It shows as a skipped `notify` on a green run, and it never goes red. When it runs, GitHub names the check `notify / Send`, after the caller job and the called job. `PR title` sends no alert. A cancelled run sends nothing, even when a job failed before a newer push cancelled it.
 
-`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. `ci.yml`, `main.yml`, `release.yml`, `rescan.yml` and `terraform.yml` call it. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
+`notify` has no steps of its own. It calls `.github/workflows/telegram-alert.yml`, the one alert path for every workflow. `ci.yml`, `main.yml`, `release.yml`, `deploy.yml`, `rescan.yml` and `terraform.yml` call it. The message holds a headline, the workflow name, the failed jobs, the ref, the short SHA, and a link to the run. Nothing else goes in it, so no plan output, findings, or PR title ever reach the chat.
 
 A caller job uses `needs` plus `if: failure()`, passes `toJSON(needs)` and a `message` headline as inputs, and passes `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` by name. Never `secrets: inherit` on a call to `telegram-alert.yml`. Titles and refs go in through `inputs` and reach the script through `env`, never through `${{ }}` inside `run:`. `ref` and `sha` are optional and default to the run's own ref name and SHA. `ci.yml` passes the PR number with the head branch, and the head SHA, because the run's own SHA is the merge commit.
 
-The alert job's log prints its `env`, and `NEEDS` holds the outputs of every job in `needs`. In `release.yml` those are the version and the image digest, both public. A caller whose jobs set outputs must keep secrets and plan text out of them.
+The alert job's log prints its `env`, and `NEEDS` holds the outputs of every job in `needs`. In `release.yml` those are the version and the image digest, and in `deploy.yml` the `result=` value, all public. A caller whose jobs set outputs must keep secrets and plan text out of them.
 
 `telegram-alert.yml` reads both secrets. Doppler syncs them to the repo's Actions secrets and Dependabot secrets, because a Dependabot run reads only Dependabot secrets. A PR from a fork gets no secrets, so `notify` skips the call without a word. On any other run, a missing secret prints `Telegram secrets missing, failure alert not sent` as a warning. If you see that warning, check the Doppler sync. [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) has the setup steps. A failed send prints `Telegram alert failed to send`.
 
@@ -264,12 +264,13 @@ git tag v0.1.0 <sha>
 git push origin v0.1.0
 ```
 
-The workflow has four jobs.
+The workflow has five jobs.
 
 1. `Guards` fails unless the tag is exactly `vX.Y.Z`, `git merge-base --is-ancestor` finds the commit on main, and a `main.yml` run on that commit concluded `success`. It never waits. A missing, running or red run fails the release at once.
 2. `Image` calls [image.yml](#image-build--build-and-scan) with push and attest on and the version without its `v`. The image gets the same build and Trivy gate as on a PR, then goes to GHCR as `1.2.3` and `sha-<short>`, with provenance and an SBOM attested. No other PR check runs again.
-3. `GitHub release` creates a release on the tag with GitHub's generated notes. The body names the image as `ghcr.io/<owner>/laneway-api@sha256:...`. The deploy reads that digest from the latest release and nothing else.
-4. `notify` sends a Telegram alert, `Laneway release failed`, when any job fails.
+3. `GitHub release` creates a release on the tag with GitHub's generated notes. The body names the image as `ghcr.io/<owner>/laneway-api@sha256:...`. The deploy reads that digest from the release's notes and nothing else.
+4. `Deploy` calls [deploy.yml](#deployyml) with the tag, so the release goes to the VM.
+5. `notify` sends a Telegram alert, `Laneway release failed`, when any job before `Deploy` fails. A failed deploy sends its own alert.
 
 There is no environment gate. Only the admin can push the tag, and the build holds no secrets. Releases share the concurrency group `release` with `cancel-in-progress: false`, so a running release is never cut short.
 
@@ -279,6 +280,7 @@ A tag is never moved or reused. A failed release burns its number, and the fix s
 - The Trivy gate failed. The workflow pushed nothing. The tag has no image.
 - Attest failed. The image is on GHCR with no attestation. The deploy verifies the attestation before it pulls, so it refuses this image.
 - `GitHub release` failed. The image is on GHCR with its attestations, but no release names it, so the deploy never sees it.
+- `Deploy` failed. The release is complete, and [deploy.yml](#deployyml) says what the VM is running.
 
 To check a release's image by hand:
 
@@ -299,6 +301,32 @@ To fix a red run:
 - `Check main.yml passed on the commit` failed. Open the commit's `main.yml` run. If it was still going, wait for it to finish. If it was cancelled, rerun it. If it was red, fix main in a PR. Then tag with the next version.
 - The image job failed. Fix it like a red [Image build / Build and scan](#image-build--build-and-scan), in a PR, then tag with the next version.
 - `GitHub release` failed. The image is on GHCR already. Tag with the next version rather than writing the release by hand, so every release goes through the same steps.
+
+## deploy.yml
+
+`.github/workflows/deploy.yml`, the `Deploy` workflow, puts a release on the VM. [release.yml](#releaseyml) calls it after every release. To deploy or roll back by hand, open Actions, `Deploy`, Run workflow, keep `main` as the branch, and enter the tag. A dispatch from any other branch fails at once. Rolling back is a deploy of the older tag. It rolls back the API image only. The other three digests always come from the run's commit, which for a dispatch is `main`.
+
+The `Deploy` job runs in the `production` environment, which allows `main` and `v*` tags and has no reviewer. It shares the concurrency group `deploy` with `cancel-in-progress: false`, so a second deploy waits for the first. It stops after 15 minutes. Harden-runner audits egress and blocks nothing yet. The first deploy's insights list the Tailscale hosts a `block` list would need.
+
+1. `Read the release` fails unless the tag is `vX.Y.Z` and has a release. It takes the `ghcr.io/<owner>/laneway-api@sha256:...` digest from the release notes.
+2. `Verify the attestation` runs `gh attestation verify` on that digest with `--signer-workflow` set to `image.yml` and `--source-ref` set to the tag. An image built anywhere else, or from another tag, fails here.
+3. `Read the other digests` takes the Postgres, `cloudflared` and OCI CLI digests from `deploy/vm/compose.images.yml` at the run's commit.
+4. The Tailscale action joins the tailnet as an ephemeral `tag:ci` node through workload identity federation. It reads the repo variables `TS_DEPLOY_CLIENT_ID` and `TS_DEPLOY_AUDIENCE`, and pings `VM_TAILNET_IP` until the VM answers.
+5. `Run laneway-deploy` runs `sudo /usr/local/bin/laneway-deploy` with the four digests over Tailscale SSH as `deploy`. The script's exit code is the job's result.
+
+The log shows only the script's status lines: `step=`, `secrets=rendered`, any `error=` or `warning=`, and last, `result=<value>`. Docker, Postgres and efbundle output stay in the VM's journal under `laneway-deploy-output`. The runner never checks health itself. The script polls `/health/ready` on the VM.
+
+A failure sends one Telegram alert, `Laneway deploy of <tag> failed, result=<value>`. A success sends nothing.
+
+To fix a red run, read the `result=` value:
+
+- `deployed` never fails the job.
+- `rolled-back`, exit 20. The new release failed its health check, and the previous digests are serving again. Migrations stay applied. Read the API's logs in Grafana under `laneway-boot`, fix it, and release again.
+- `migration-failed`, exit 10. efbundle failed while the old release kept serving. Nothing else changed. Read `journalctl -t laneway-deploy-output -b` on the VM.
+- `secrets-failed`, exit 11. `laneway-secrets` couldn't read Doppler. Nothing changed. [The VM runbook](runbooks/vm.md#the-two-doppler-tokens) covers an expired token.
+- `rollback-failed`, exit 30. The previous digests failed their health check too, or there were none, as on the first deploy. The API is down. Go in over Tailscale SSH and read both journal tags.
+- `failed`, exit 1. The script stopped before the swap, on a bad digest, a pull, Postgres not healthy, a held lock, or the predeploy dump. The `error=` line above it names which. The old release still serves.
+- `unknown`. The job failed before the script printed anything. A red `Read the release` or `Verify the attestation` means the tag or its image is wrong. A red Tailscale step means the federation credential, its tag, or the tailnet policy changed, as [the Tailscale runbook](runbooks/tailscale.md#the-deploy-jobs-credential) says. A ping that times out means the VM is down or its tailnet IP moved, as [the node swap](runbooks/vm.md#the-tailnet-node-swap) covers.
 
 ## rescan.yml
 
