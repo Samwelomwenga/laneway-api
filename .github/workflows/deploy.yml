@@ -26,6 +26,9 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
     environment:
       name: production
       url: https://laneway-api.samwelomwenga.com

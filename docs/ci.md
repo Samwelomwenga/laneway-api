@@ -312,7 +312,7 @@ The `Deploy` job runs in the `production` environment, which allows `main` and `
 2. `Verify the attestation` runs `gh attestation verify` on that digest with `--signer-workflow` set to `image.yml` and `--source-ref` set to the tag. An image built anywhere else, or from another tag, fails here.
 3. `Read the other digests` takes the Postgres, `cloudflared` and OCI CLI digests from `deploy/vm/compose.images.yml` at the run's commit.
 4. The Tailscale action joins the tailnet as an ephemeral `tag:ci` node through workload identity federation. It reads the repo variables `TS_DEPLOY_CLIENT_ID` and `TS_DEPLOY_AUDIENCE`, and pings `VM_TAILNET_IP` until the VM answers.
-5. `Run laneway-deploy` runs `sudo /usr/local/bin/laneway-deploy` with the four digests over Tailscale SSH as `deploy`. The script's exit code is the job's result.
+5. `Run laneway-deploy` runs `sudo /usr/local/bin/laneway-deploy` with the four digests over Tailscale SSH as `deploy`. The script's exit code is the job's result. The job sets `shell: bash`, which adds `pipefail`, so the `tee` that copies the log can't hide the exit code.
 
 The log shows only the script's status lines: `step=`, `secrets=rendered`, any `error=` or `warning=`, and last, `result=<value>`. Docker, Postgres and efbundle output stay in the VM's journal under `laneway-deploy-output`. The runner never checks health itself. The script polls `/health/ready` on the VM.
 
@@ -326,7 +326,7 @@ To fix a red run, read the `result=` value:
 - `secrets-failed`, exit 11. `laneway-secrets` couldn't read Doppler. Nothing changed. [The VM runbook](runbooks/vm.md#the-two-doppler-tokens) covers an expired token.
 - `rollback-failed`, exit 30. The previous digests failed their health check too, or there were none, as on the first deploy. The API is down. Go in over Tailscale SSH and read both journal tags.
 - `failed`, exit 1. The script stopped before the swap, on a bad digest, a pull, Postgres not healthy, a held lock, or the predeploy dump. The `error=` line above it names which. The old release still serves.
-- `unknown`. The job failed before the script printed anything. A red `Read the release` or `Verify the attestation` means the tag or its image is wrong. A red Tailscale step means the federation credential, its tag, or the tailnet policy changed, as [the Tailscale runbook](runbooks/tailscale.md#the-deploy-jobs-credential) says. A ping that times out means the VM is down or its tailnet IP moved, as [the node swap](runbooks/vm.md#the-tailnet-node-swap) covers.
+- `unknown`. The job failed before the script printed anything. A red `Read the release` or `Verify the attestation` means the tag or its image is wrong. A red Tailscale step means the federation credential, its tag, or the tailnet policy changed, as [the Tailscale runbook](runbooks/tailscale.md#the-deploy-jobs-credential) says. A 403 from the token exchange means the credential's subject doesn't match the job's token. A ping that times out means the VM is down or its tailnet IP moved, as [the node swap](runbooks/vm.md#the-tailnet-node-swap) covers.
 
 ## rescan.yml
 

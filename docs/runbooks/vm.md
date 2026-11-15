@@ -56,6 +56,10 @@ The same config also holds:
 - `TUNNEL_TOKEN`, from [the Cloudflare runbook](cloudflare.md#the-tunnel).
 - `ALLOY_LOKI_URL`, `ALLOY_LOKI_USERNAME` and `ALLOY_LOKI_TOKEN`, from [the Grafana runbook](grafana.md#alloys-token).
 - the three `BREVO__` keys, from [the Brevo runbook](brevo.md#production).
+- `AUTH__SIGNINGKEYS__0__ID` and `AUTH__SIGNINGKEYS__0__KEY`, which sign access tokens. The ID is a public label such as `prd-2026-11`, sent as each token's `kid`. Make the key with `openssl rand -base64 32 | doppler secrets set AUTH__SIGNINGKEYS__0__KEY --project laneway-api --config prd > /dev/null`, so it never shows on screen. It must decode to at least 32 bytes. Never copy dev's.
+- `SUPABASE__URL` and `SUPABASE__SERVICEROLEKEY`, from the `laneway-prd` Supabase project in Frankfurt. Its private `attachments` bucket has a 10 MB limit, as in `supabase/config.toml`. Use the legacy `service_role` JWT, which the API sends as both `apikey` and `Bearer`.
+
+The API refuses to start without the signing keys, the Supabase keys, or the `BREVO__` keys.
 
 `laneway-secrets` keeps `TUNNEL_TOKEN`, every `ALLOY_` key and every `DOPPLER_` key out of `api.env`, so keep those names exact. Its read-only service token goes into OCI Vault beside the `laneway-db` one.
 
@@ -196,7 +200,7 @@ The trust accepts only `main`'s OIDC token, so a PR can't run a CI plan, and the
    ```
 
 3. Add the reserved IP to Brevo's Authorised IPs, as step 3 of [Brevo's Production steps](brevo.md#production) says. Without it, every email from the VM fails.
-4. Check every key in [the Doppler keys the VM reads](#the-doppler-keys-the-vm-reads) is set, the three `BREVO__` keys included. The API refuses to start without them.
+4. Check every key in [the Doppler keys the VM reads](#the-doppler-keys-the-vm-reads) is set. A missing one the API needs fails the health check, and the first deploy ends with `result=rollback-failed`.
 
 Then dispatch the release tag:
 
