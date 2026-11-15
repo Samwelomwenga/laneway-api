@@ -1,6 +1,6 @@
 # The VM
 
-Laneway runs on one Oracle Cloud A1 instance in Frankfurt, built by `terraform/vm`. This page covers the Doppler keys the VM reads, the first build, a planned replace, the tailnet node swap, serial console break-glass, and rotating the secrets in OCI Vault. [The Terraform runbook](terraform.md) covers state, Doppler, and CI for every root. [The backup runbook](backup.md) covers the dumps and the database passwords. [The Cloudflare runbook](cloudflare.md) covers the Tunnel and R2, and [the Tailscale runbook](tailscale.md) covers the tailnet.
+Laneway runs on one Oracle Cloud A1 instance in Frankfurt, built by `terraform/vm`. This page covers the Doppler keys the VM reads, the first build, deploys, a planned replace, the tailnet node swap, serial console break-glass, and rotating the secrets in OCI Vault. [The Terraform runbook](terraform.md) covers state, Doppler, and CI for every root. [The backup runbook](backup.md) covers the dumps and the database passwords. [The Cloudflare runbook](cloudflare.md) covers the Tunnel and R2, and [the Tailscale runbook](tailscale.md) covers the tailnet.
 
 The only way in is Tailscale SSH. The VM has no inbound port, `sshd` is masked, and no account has a password or an authorized key.
 
@@ -174,6 +174,39 @@ Tick each of the five in the PR. Don't paste the IP. A brand-new VM starts no co
 4. Record in the PR the hosts the `Plan` job's harden-runner insights link lists. CI owns the root from here.
 
 The trust accepts only `main`'s OIDC token, so a PR can't run a CI plan, and the egress audit in the Terraform runbook can't authenticate from a branch. The OCI hosts in `ALLOWED_ENDPOINTS` came from the provider's endpoints. The first run on `main` is the check.
+
+## Deploys
+
+[deploy.yml](../ci.md#deployyml) deploys every release, and a dispatch from `main` deploys or rolls back to any tag. Before the first one:
+
+1. Create the `production` environment and limit it to `main` and `v*` tags. The Tailscale credential trusts only this environment's jobs.
+
+   ```sh
+   gh api -X PUT repos/Samwelomwenga/laneway-api/environments/production \
+     --input - <<< '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
+   gh api -X POST repos/Samwelomwenga/laneway-api/environments/production/deployment-branch-policies -f name=main -f type=branch
+   gh api -X POST repos/Samwelomwenga/laneway-api/environments/production/deployment-branch-policies -f name='v*' -f type=tag
+   ```
+
+2. Set the two repo variables from the `laneway-deploy` credential in [the Tailscale runbook](tailscale.md#the-deploy-jobs-credential). Neither is secret.
+
+   ```sh
+   gh variable set TS_DEPLOY_CLIENT_ID --body '<client ID>'
+   gh variable set TS_DEPLOY_AUDIENCE --body '<audience>'
+   ```
+
+3. Add the reserved IP to Brevo's Authorised IPs, as step 3 of [Brevo's Production steps](brevo.md#production) says. Without it, every email from the VM fails.
+4. Check every key in [the Doppler keys the VM reads](#the-doppler-keys-the-vm-reads) is set, the three `BREVO__` keys included. The API refuses to start without them.
+
+Then dispatch the release tag:
+
+```sh
+gh workflow run deploy.yml --ref main -f tag=<tag>
+```
+
+The run must end with `result=deployed`, and `curl https://laneway-api.samwelomwenga.com/health/ready` must answer `Healthy`. The first deploy has no previous release to roll back to, so a failed health check ends with `result=rollback-failed`. Once the host answers, add Brevo's webhook, as step 6 of [Brevo's Production steps](brevo.md#production) says.
+
+To deploy the live digests again without Actions, run `laneway-deploy` on the VM as [the two Doppler tokens](#the-two-doppler-tokens) shows.
 
 ## A planned replace
 
