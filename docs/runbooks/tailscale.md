@@ -56,7 +56,7 @@ The VM joins on first boot with an OAuth client secret. The secret doesn't expir
 The deploy job joins through workload identity federation. GitHub's OIDC token proves which job is asking, so no secret is stored anywhere.
 
 1. In Settings, Trust credentials, create a workload identity credential named `laneway-deploy`, with GitHub as the issuer.
-2. Set the subject to `repo:Samwelomwenga/laneway-api:environment:production`. Only a job in the `production` environment can join. [The VM runbook](vm.md#deploys) creates that environment and limits it to `main` and `v*` tags.
+2. Set the subject to `repo:Samwelomwenga@88501310/laneway-api@1018933146:environment:production`. The repo uses GitHub's immutable subjects, so the owner and repo carry their IDs. `gh api repos/Samwelomwenga/laneway-api/actions/oidc/customization/sub` prints the prefix. Without the IDs, the token exchange answers 403. Only a job in the `production` environment can join. [The VM runbook](vm.md#deploys) creates that environment and limits it to `main` and `v*` tags.
 3. Give it the `auth_keys` scope with write access, and add `tag:ci` as its only tag.
 4. Copy the client ID and the audience it shows. Neither is secret. Set them as the repo variables `TS_DEPLOY_CLIENT_ID` and `TS_DEPLOY_AUDIENCE`, as [the VM runbook](vm.md#deploys) shows. The deploy workflow passes both to the Tailscale GitHub Action.
 
