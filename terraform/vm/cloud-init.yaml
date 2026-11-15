@@ -1,0 +1,238 @@
+#cloud-config
+timezone: Etc/UTC
+package_update: true
+package_upgrade: true
+packages:
+  - age
+  - jq
+  - rclone
+
+users:
+  - default
+  - name: deploy
+    shell: /bin/bash
+    lock_passwd: true
+
+write_files:
+  - path: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "journald",
+        "log-opts": {
+          "tag": "{{.Name}}"
+        }
+      }
+
+  - path: /etc/systemd/journald.conf.d/laneway.conf
+    content: |
+      [Journal]
+      SystemMaxUse=2G
+
+  - path: /etc/apt/preferences.d/alloy
+    content: |
+      Package: alloy
+      Pin: version 1.*
+      Pin-Priority: 990
+
+  - path: /etc/apt/apt.conf.d/52laneway-unattended-upgrades
+    content: |
+      Unattended-Upgrade::Origins-Pattern {
+        "origin=Ubuntu,archive=$${distro_codename}-security";
+        "site=download.docker.com";
+        "site=pkgs.tailscale.com";
+        "site=apt.grafana.com";
+        "site=packages.doppler.com";
+      };
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "04:00";
+      Unattended-Upgrade::SyslogEnable "true";
+
+  - path: /usr/local/sbin/laneway-vendor-packages
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      set -eu
+      . /etc/os-release
+      arch=$(dpkg --print-architecture)
+      fetch() { curl -fsSL --retry 5 --retry-all-errors -o "$2" "$1"; }
+
+      install -d -m 0755 /etc/apt/keyrings
+      fetch https://download.docker.com/linux/ubuntu/gpg /etc/apt/keyrings/docker.asc
+      fetch "https://pkgs.tailscale.com/stable/ubuntu/$VERSION_CODENAME.noarmor.gpg" /etc/apt/keyrings/tailscale.gpg
+      fetch https://apt.grafana.com/gpg.key /etc/apt/keyrings/grafana.asc
+      fetch https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key /etc/apt/keyrings/doppler.asc
+
+      echo "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable" >/etc/apt/sources.list.d/docker.list
+      echo "deb [arch=$arch signed-by=/etc/apt/keyrings/tailscale.gpg] https://pkgs.tailscale.com/stable/ubuntu $VERSION_CODENAME main" >/etc/apt/sources.list.d/tailscale.list
+      echo "deb [arch=$arch signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main" >/etc/apt/sources.list.d/grafana.list
+      echo "deb [arch=$arch signed-by=/etc/apt/keyrings/doppler.asc] https://packages.doppler.com/public/cli/deb/debian any-version main" >/etc/apt/sources.list.d/doppler.list
+
+      apt-get -o DPkg::Lock::Timeout=600 update
+      DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y \
+        docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+        tailscale alloy doppler
+
+  - path: /usr/local/sbin/laneway-data-volume
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      set -eu
+      device=${data_volume_device}
+
+      install -d -m 0755 /mnt/data /var/lib/laneway
+      grep -q '^LABEL=laneway-data ' /etc/fstab || cat >>/etc/fstab <<'EOF'
+      LABEL=laneway-data /mnt/data ext4 defaults,nofail 0 2
+      /mnt/data/laneway /var/lib/laneway none bind,nofail,x-systemd.requires-mounts-for=/mnt/data 0 0
+      EOF
+      systemctl daemon-reload
+
+      tries=0
+      until [ -b "$device" ]; do
+        tries=$((tries + 1))
+        if [ "$tries" -gt 120 ]; then
+          echo "laneway-data-volume: $device did not appear in 10 minutes" >&2
+          exit 1
+        fi
+        sleep 5
+      done
+
+      status=0
+      blkid -p "$device" >/dev/null || status=$?
+      case $status in
+        0) ;;
+        2)
+          signatures=$(wipefs --no-act "$device")
+          if [ -n "$signatures" ]; then
+            echo "laneway-data-volume: blkid found nothing on $device but wipefs did, not formatting" >&2
+            exit 1
+          fi
+          mkfs.ext4 -L laneway-data "$device"
+          udevadm settle
+          ;;
+        *) exit "$status" ;;
+      esac
+
+      mountpoint -q /mnt/data || mount /mnt/data
+      install -d -m 0755 /mnt/data/laneway /mnt/data/postgres
+      mountpoint -q /var/lib/laneway || mount /var/lib/laneway
+
+  - path: /etc/laneway/compose.yaml
+    content: |
+      ${indent(6, compose)}
+  - path: /etc/laneway/postgres-initdb.sh
+    permissions: "0755"
+    content: |
+      ${indent(6, postgres_initdb)}
+  - path: /etc/laneway/vm.env
+    content: |
+      REGION=${region}
+      LANEWAY_DB_DOPPLER_TOKEN_SECRET_ID=${vault_secret_ids.laneway_db_doppler_token}
+      LANEWAY_API_DOPPLER_TOKEN_SECRET_ID=${vault_secret_ids.laneway_api_doppler_token}
+      OBJECT_STORAGE_NAMESPACE=${object_storage_namespace}
+      BACKUP_BUCKET=${backup_bucket_name}
+      BACKUP_AGE_RECIPIENT=${backup_age_recipient}
+  - path: /etc/laneway/config.alloy
+    content: |
+      ${indent(6, alloy_config)}
+  - path: /etc/systemd/system/alloy.service.d/laneway.conf
+    content: |
+      [Unit]
+      RequiresMountsFor=/var/lib/laneway
+      ConditionPathExists=/var/lib/laneway/secrets/alloy.env
+
+      [Service]
+      EnvironmentFile=/var/lib/laneway/secrets/alloy.env
+      ExecStart=
+      ExecStart=/usr/bin/alloy run --disable-reporting --storage.path=/var/lib/alloy/data /etc/laneway/config.alloy
+  - path: /usr/local/sbin/laneway-secrets
+    permissions: "0700"
+    content: |
+      ${indent(6, laneway_secrets)}
+  - path: /usr/local/bin/laneway-deploy
+    permissions: "0755"
+    content: |
+      ${indent(6, laneway_deploy)}
+  - path: /usr/local/sbin/laneway-backup
+    permissions: "0700"
+    content: |
+      ${indent(6, laneway_backup)}
+  - path: /etc/systemd/system/laneway-backup.service
+    content: |
+      [Unit]
+      Description=Laneway nightly backup
+      Requires=docker.service
+      After=docker.service laneway.service
+      RequiresMountsFor=/var/lib/laneway
+      ConditionPathExists=/var/lib/laneway/images.env
+
+      [Service]
+      Type=oneshot
+      EnvironmentFile=/var/lib/laneway/secrets/backup.env
+      ExecStart=/usr/local/sbin/laneway-backup nightly
+      SyslogIdentifier=laneway-backup-output
+      StandardOutput=null
+      TimeoutStartSec=1h
+  - path: /etc/systemd/system/laneway-backup.timer
+    content: |
+      [Unit]
+      Description=Laneway nightly backup at 03:00 UTC
+
+      [Timer]
+      OnCalendar=*-*-* 03:00:00 UTC
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+  - path: /etc/sudoers.d/laneway-deploy
+    permissions: "0440"
+    content: |
+      deploy ALL=(root) NOPASSWD: /usr/local/bin/laneway-deploy
+  - path: /etc/systemd/system/laneway.service
+    content: |
+      [Unit]
+      Description=Laneway Compose project
+      Requires=docker.service
+      Wants=network-online.target
+      After=docker.service network-online.target
+      RequiresMountsFor=/mnt/data /var/lib/laneway
+      ConditionPathExists=/var/lib/laneway/images.env
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      TimeoutStartSec=15min
+      ExecStart=/usr/bin/docker compose --file /etc/laneway/compose.yaml --env-file /var/lib/laneway/images.env up --detach
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /usr/local/sbin/laneway-tailscale-join
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      set -eu
+
+      tries=0
+      until content=$(docker run --rm --network host ghcr.io/oracle/oci-cli@${bootstrap_oci_cli_digest} \
+        --auth instance_principal --region ${region} \
+        secrets secret-bundle get --secret-id ${vault_secret_ids.tailscale_client_secret} \
+        --query 'data."secret-bundle-content".content' --raw-output); do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 10 ]; then
+          echo "laneway-tailscale-join: could not read the Tailscale secret from Vault" >&2
+          exit 1
+        fi
+        sleep 30
+      done
+
+      auth_key=$(printf %s "$content" | base64 -d)
+      tailscale up --auth-key="$auth_key?ephemeral=false&preauthorized=true" \
+        --advertise-tags=tag:laneway-vm --hostname=laneway --ssh
+
+runcmd:
+  - [systemctl, restart, systemd-journald]
+  - [/usr/local/sbin/laneway-data-volume]
+  - /usr/local/sbin/laneway-vendor-packages && /usr/local/sbin/laneway-tailscale-join && systemctl mask --now ssh.service ssh.socket
+  - [systemctl, enable, --now, alloy.service]
+  - systemctl enable laneway.service && systemctl start --no-block laneway.service
+  - [systemctl, enable, --now, laneway-backup.timer]

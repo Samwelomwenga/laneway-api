@@ -169,10 +169,12 @@ jobs:
           terraform_wrapper: false
       - name: Format check
         run: terraform -chdir=terraform fmt -check -recursive
-      - name: Init
-        run: terraform -chdir=terraform/alerting init -backend=false -input=false
-      - name: Validate
-        run: terraform -chdir=terraform/alerting validate
+      - name: Init and validate each root
+        run: |
+          for root in terraform/*/; do
+            terraform -chdir="$root" init -backend=false -input=false
+            terraform -chdir="$root" validate
+          done
 
   image:
     name: Image build

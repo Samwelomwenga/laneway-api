@@ -2,7 +2,7 @@
 
 PRs run no tests. A green PR means the code builds and passes the checks below. The full suite runs after the merge, on every push to main, as [main.yml](#mainyml) says. Run `dotnet test` before you push, so main doesn't go red.
 
-Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR, except [main.yml](#mainyml), whose jobs run after the merge, [release.yml](#releaseyml), which runs on a tag, [rescan.yml](#rescanyml), which runs on a schedule, and [Terraform alerting](#terraform-alerting), which runs on `main` after a merge. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
+Every PR to main runs two workflows. `.github/workflows/ci.yml` holds the `CI` workflow with every check but one. `.github/workflows/pr-title.yml` holds `PR title`. A new push to the same PR cancels the run still going for the older commit. Each section heading is the check name GitHub shows on the PR, except [main.yml](#mainyml), whose jobs run after the merge, [release.yml](#releaseyml), which runs on a tag, [rescan.yml](#rescanyml), which runs on a schedule, and [Terraform alerting](#terraform-alerting) and [Terraform vm](#terraform-vm), which run on `main` after a merge. The `main` ruleset requires these names, and [docs/runbooks/repo-setup.md](runbooks/repo-setup.md) says what happens if one changes.
 
 ## Build & format
 
@@ -115,21 +115,22 @@ To fix a red run:
 
 ## Terraform check
 
-The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on `terraform/alerting`. It holds no secrets, has no path filter, and never runs `plan` or `apply`. `init -backend=false` skips the `cloud` block, so it needs no HCP token. [Terraform alerting](#terraform-alerting) plans and applies after the merge.
+The check runs `terraform fmt -check` over `terraform/` and `terraform validate` on every root under it. It holds no secrets, has no path filter, and never runs `plan` or `apply`. `init -backend=false` skips the `cloud` block, so it needs no HCP token. [Terraform alerting](#terraform-alerting) plans and applies after the merge.
 
 To run it locally:
 
 ```sh
 terraform -chdir=terraform fmt -check -recursive
-terraform -chdir=terraform/alerting init -backend=false
-terraform -chdir=terraform/alerting validate
+for root in terraform/*/; do
+  terraform -chdir="$root" init -backend=false && terraform -chdir="$root" validate || break
+done
 ```
 
 To fix a red run:
 
 - Format failed. Run `terraform -chdir=terraform fmt -recursive` and commit the result.
-- Init failed on a provider version. Run `terraform -chdir=terraform/alerting init -upgrade -backend=false` and commit `.terraform.lock.hcl`.
-- Validate failed. The log names the file and line. A rule entry in `rules.tf` with a missing field fails here.
+- Init failed on a provider version. Run `terraform -chdir=terraform/<root> init -upgrade -backend=false` on the failing root and commit its `.terraform.lock.hcl`.
+- Validate failed. The log names the file and line. In `alerting`, a rule entry in `rules.tf` with a missing field fails here.
 
 ## Image build / Build and scan
 
@@ -361,6 +362,20 @@ When it fires:
 
 - The summary lists changes. An output shows as `output.<name>`. Someone edited Grafana in the UI, or nobody applied a merged change. Read the addresses. To keep the code, run the workflow by hand without `drift` and approve the gate, which puts Grafana back. To keep the UI edit, copy it into `terraform/alerting` in a PR.
 - `Plan` failed with an error and no list. Read the red-run fixes above. A 401 usually means one of the three 90-day tokens expired, so the weekly run doubles as an expiry warning.
+
+## Terraform vm
+
+`.github/workflows/terraform-vm.yml` calls `terraform.yml` with `root: vm` on a push to `main` that touches `terraform/vm/**`, every Monday at 06:00 UTC as a drift check, and by hand. Everything in [Terraform alerting](#terraform-alerting) applies, with `vm-plan` and `vm` as the environments and Doppler `laneway-vm` `prd` as the secrets.
+
+An `Alloy check` job runs first, and the Terraform jobs wait for it. It runs `alloy fmt --test` and `alloy validate` on `terraform/vm/config.alloy` in a `grafana/alloy` container pinned by digest. cloud-init writes that file, so a typo that reached the VM would mean a replace to fix. `fmt` catches syntax and formatting, and `validate` catches a misspelled component or attribute.
+
+The caller also passes `id-token-audience: https://cloud.oracle.com`. Before each Terraform step, `scripts/github-id-token.sh` writes a fresh GitHub OIDC token with that audience to `$RUNNER_TEMP/id-token`, and the OCI provider trades it for a session token. Both callers grant `id-token: write`, because a called job can't ask for more than its caller gives. Alerting passes no audience, so its jobs never request a token.
+
+If it fails:
+
+- `Alloy check` failed. The log names the file, line, and column. Run the same check locally, with the image ref from `ALLOY_IMAGE` in `terraform-vm.yml`: `docker run --rm --volume "$PWD/terraform/vm:/config:ro" grafana/alloy:v1.21.3 fmt --test /config/config.alloy`. To rewrite the file, drop `:ro` and swap `fmt --test` for `fmt -w`.
+- `Plan` failed with a 401 or `NotAuthenticated` from the token exchange. The client secret in `laneway-vm` is wrong, someone regenerated it in the identity domain, or the trust's claim checks don't match. The trust checks `repository`, `ref`, `job_workflow_ref` and `aud`, so a run from any branch but `main` fails here by design.
+- `Plan` failed with `NotAuthorizedOrNotFound` on every resource. The exchange worked but the CI policy's `identityfederateddomainapp` condition didn't match. The fallback is an API key user in `oci-bootstrap`, with its key in `laneway-vm`.
 
 ## Local hooks
 

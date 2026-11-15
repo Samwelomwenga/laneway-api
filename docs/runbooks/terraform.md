@@ -1,12 +1,14 @@
 # Terraform
 
-Each Terraform root is a folder under `terraform/`. Today there is one, `alerting`. This page covers what every root shares: where state lives, where secrets come from, how CI runs it, and the tokens that expire. [The alerting runbook](alerting.md) covers what only alerting needs. [docs/ci.md](../ci.md#terraform-alerting) says how to fix a red run.
+Each Terraform root is a folder under `terraform/`. Today there are three: `alerting`, `oci-bootstrap` and `vm`. This page covers what every root shares: where state lives, where secrets come from, how CI runs it, and the tokens that expire. [The alerting runbook](alerting.md) covers what only alerting needs. [The VM runbook](vm.md) covers what only `terraform/vm` needs. [docs/ci.md](../ci.md#terraform-alerting) says how to fix a red run.
 
 | Root | HCP workspace | Doppler project | GitHub environments |
 |---|---|---|---|
 | `terraform/alerting` | `laneway-alerting` | `laneway-alerting`, config `prd` | `alerting-plan`, `alerting` |
+| `terraform/oci-bootstrap` | `laneway-oci-bootstrap` | `laneway-vm`, config `prd` | none, it runs only from the laptop |
+| `terraform/vm` | `laneway-vm` | `laneway-vm`, config `prd` | `vm-plan`, `vm` |
 
-HCP Terraform holds state and nothing else. Its workspaces run in local execution mode, so `plan` and `apply` run on the operator's machine or on a GitHub runner, never on HCP. Secrets live in Doppler, one project per root. CI loads them at job time with `doppler run`. The state holds every secret the root's resources take, such as the Telegram bot token on a contact point. HCP encrypts it.
+HCP Terraform holds state and nothing else. Its workspaces run in local execution mode, so `plan` and `apply` run on the operator's machine or on a GitHub runner, never on HCP. Secrets live in Doppler, one project per root, except that `oci-bootstrap` shares `laneway-vm` with `terraform/vm`. CI loads them at job time with `doppler run`. The state holds every secret the root's resources take, such as the Telegram bot token on a contact point. HCP encrypts it.
 
 ## The HCP organization
 
@@ -50,7 +52,74 @@ doppler run --project laneway-alerting --config prd -- bash scripts/terraform-pl
 
 `scripts/terraform-plan.sh` is the same plan CI runs. It prints the addresses and actions and nothing else. It leaves `tfplan` in the root, which holds every secret in plain text. Git ignores it. Delete it when you're done. To read the full diff locally, run `terraform -chdir=terraform/alerting show tfplan` after the script. Don't paste it anywhere public.
 
+The script also passes `-target=<address>` and `-replace=<address>` through to `terraform plan`. The VM's first build and a forced replace use them.
+
 Applying from a laptop works, but it skips the gate. Merge to `main` instead, and let CI apply.
+
+## Apply oci-bootstrap from the laptop
+
+`terraform/oci-bootstrap` holds what lives at tenancy level or in IAM. That's the `laneway` compartment and a quota that leaves only the Always Free A1 allowance in it. It's also the identity domain app and trust that CI trades its GitHub token through, and the CI policy. Last, it holds the VM's dynamic group and that group's policies. CI can't change any of it. The CI principal manages everything inside the compartment and nothing outside it. So this root has no workflow, and the operator applies it by hand with a one-hour session token.
+
+It shares the `laneway-vm` Doppler project with `terraform/vm`, for the HCP token and the tenancy OCID. The Vault secret names, the backup bucket name, the token audience and the resource type are variables with defaults. `terraform/vm` repeats the same values. Neither root reads the other's state. The VM's policy grants `read secret-bundles` by secret name, so create the three Vault secrets with exactly the names in `vault_secret_names`. A secret under any other name stays unreadable to the VM.
+
+Before the first apply:
+
+1. Create the `laneway-oci-bootstrap` workspace as in [A workspace per root](#a-workspace-per-root).
+2. Create the Doppler project `laneway-vm` if it doesn't exist yet. Add the HCP token to its `prd` config as in [The HCP token](#the-hcp-token).
+3. Add `TF_VAR_TENANCY_OCID` to `laneway-vm` `prd`. The tenancy OCID is on the console's Tenancy details page.
+4. Install the OCI CLI on the laptop.
+
+To apply:
+
+1. Start a session. It opens the browser to sign in and writes a profile named `laneway` to `~/.oci/config`:
+
+   ```sh
+   oci session authenticate --region eu-frankfurt-1 --profile-name laneway
+   ```
+
+2. Plan. The script lowercases the `TF_VAR_` names Doppler hands it, so use it rather than a bare `terraform plan`:
+
+   ```sh
+   doppler run --project laneway-vm --config prd -- bash scripts/terraform-plan.sh oci-bootstrap
+   ```
+
+3. Read the list of changes. Run `terraform -chdir=terraform/oci-bootstrap show tfplan` for the full diff. Then apply the saved plan and delete it:
+
+   ```sh
+   doppler run --project laneway-vm --config prd -- terraform -chdir=terraform/oci-bootstrap apply tfplan
+   rm terraform/oci-bootstrap/tfplan
+   ```
+
+4. On the first apply, copy the app's client ID, client secret and domain URL into `laneway-vm` `prd`. The secret goes from the output straight into Doppler, never to the screen:
+
+   ```sh
+   doppler run --project laneway-vm --config prd -- terraform -chdir=terraform/oci-bootstrap output -raw token_exchange_client_secret | doppler secrets set OCI_TOKEN_EXCHANGE_CLIENT_SECRET --project laneway-vm --config prd
+   doppler run --project laneway-vm --config prd -- terraform -chdir=terraform/oci-bootstrap output -raw token_exchange_client_id | doppler secrets set OCI_TOKEN_EXCHANGE_CLIENT_ID --project laneway-vm --config prd
+   doppler run --project laneway-vm --config prd -- terraform -chdir=terraform/oci-bootstrap output -raw token_exchange_domain_url | doppler secrets set OCI_TOKEN_EXCHANGE_DOMAIN_URL --project laneway-vm --config prd
+   ```
+
+   If the secret output comes back empty, the provider didn't return it on create. Open Identity & Security, Domains, Default, Integrated applications, `laneway-terraform-ci`, OAuth configuration, and copy the secret from there.
+
+The session lasts an hour. If it runs out mid-apply, run `oci session refresh --profile laneway` and apply again with a fresh plan.
+
+## Plan terraform/vm from the laptop
+
+`terraform/vm` holds everything inside the `laneway` compartment: the network, the A1 instance, its data volume and reserved IP, the backup bucket, and the vault. CI applies it. In CI the provider trades the job's GitHub OIDC token for a 60-minute OCI session token through the app and trust in `oci-bootstrap`. On the laptop it uses the same one-hour session token as `oci-bootstrap`.
+
+Add these to `laneway-vm` `prd` once `oci-bootstrap` is applied:
+
+- `TF_VAR_COMPARTMENT_ID`, from `terraform -chdir=terraform/oci-bootstrap output -raw compartment_id`.
+- `OCI_TOKEN_EXCHANGE_CLIENT_ID`, `OCI_TOKEN_EXCHANGE_CLIENT_SECRET` and `OCI_TOKEN_EXCHANGE_DOMAIN_URL`, from the last step of the `oci-bootstrap` apply. The provider reads them from the environment.
+- `TF_VAR_LANEWAY_DB_DOPPLER_TOKEN_SECRET_ID`, `TF_VAR_LANEWAY_API_DOPPLER_TOKEN_SECRET_ID` and `TF_VAR_TAILSCALE_CLIENT_SECRET_SECRET_ID`, the OCIDs of the three Vault secrets, once the operator creates them. Until all three are set, a plan that includes the instance fails its precondition. A later change to them changes `user_data` and replaces the VM.
+- `TF_VAR_BACKUP_AGE_RECIPIENT`, the `age1...` public key whose private key is `AGE_SECRET_KEY` in `laneway-backup` `prd`. The plan fails its precondition without it, and a later change replaces the VM. [The backup runbook](backup.md) says how the VM uses it.
+
+Start a session as in [Apply oci-bootstrap from the laptop](#apply-oci-bootstrap-from-the-laptop), then plan with `auth` switched to the session token:
+
+```sh
+TF_VAR_auth=SecurityToken doppler run --project laneway-vm --config prd -- bash scripts/terraform-plan.sh vm
+```
+
+The trust accepts the OIDC token of any `terraform.yml` job on `main`, alerting's included, since every root runs the same reusable workflow. Only `laneway-vm` holds the client secret, so only the vm jobs can complete the exchange.
 
 ## Check the egress allowlist
 
@@ -67,14 +136,40 @@ The audit run covers `plan` only, because `apply` can't run on the branch. `appl
 
 ## Rotate the tokens every 90 days
 
-The HCP team token, the Doppler service token, and the Grafana service account token share an expiry day. HCP emails the owners 30 and 7 days before its token expires, and that reminder covers all three. Rotate them together:
+Every token Laneway's infrastructure holds is in this table. The ones marked 90 days share one expiry day, and the Tunnel token gets rotated on that day too. HCP emails the owners 30 and 7 days before its token expires, and that reminder covers them all. The rest never expire, and their vendors offer no expiry to set, so rotate them only if they leak, with the runbook in the last column.
+
+| Token | Lives in | Expires | Rotate with |
+|---|---|---|---|
+| HCP owners team token | `TF_TOKEN_APP_TERRAFORM_IO` in every root's Doppler config | 90 days | step 1 below |
+| Grafana service account token, `terraform-alerting` | `TF_VAR_GRAFANA_AUTH` in `laneway-alerting` `prd` | 90 days | step 2 below |
+| Doppler service token per root | `DOPPLER_TOKEN` on both of the root's GitHub environments | 90 days | step 3 below |
+| Doppler read-only tokens for `laneway-db` `prd` and `laneway-api` `prd` | OCI Vault | 90 days | [the VM runbook](vm.md#the-two-doppler-tokens) |
+| Cloudflare Tunnel token | `TUNNEL_TOKEN` in `laneway-api` `prd` | never, but rotated every 90 days | [the Cloudflare runbook](cloudflare.md#the-tunnel-token) |
+| Cloudflare R2 token, `laneway-backup` | `R2_*` in `laneway-db` `prd` | 90 days | [the Cloudflare runbook](cloudflare.md#the-r2-token) |
+| Grafana access policy token, `laneway-vm-alloy-prd` | `ALLOY_LOKI_TOKEN` in `laneway-api` `prd` | 90 days | [the Grafana runbook](grafana.md#alloys-token) |
+| Grafana access policy token, `laneway-api-prd` | `OTEL_EXPORTER_OTLP_HEADERS` in `laneway-api` `prd` | never | [the Grafana runbook](grafana.md#the-apps-token) |
+| Telegram bot token | `TF_VAR_TELEGRAM_BOT_TOKEN` in `laneway-alerting` `prd`, and the repo's Actions secrets | never | `/revoke` to `@BotFather`, then [Doppler and Telegram](repo-setup.md#doppler-and-telegram) |
+| Grafana Synthetic Monitoring token | `TF_VAR_SM_ACCESS_TOKEN` in `laneway-alerting` `prd` | never | [the alerting runbook](alerting.md#synthetic-monitoring) |
+| OCI token exchange client secret | `OCI_TOKEN_EXCHANGE_CLIENT_SECRET` in `laneway-vm` `prd` | never | a new secret on the `laneway-terraform-ci` app's OAuth configuration |
+| Tailscale OAuth client secret, `laneway-vm` | OCI Vault | never | [the VM runbook](vm.md#the-tailscale-client-secret) |
+| Brevo API key, `laneway-api-prd` | `BREVO__APIKEY` in `laneway-api` `prd` | never | a new key in Brevo, then a redeploy |
+| Brevo webhook bearer token | Laneway's transactional webhook in Brevo | 1 year | [the Brevo runbook](brevo.md#rotate-the-token) |
+| Brevo webhook signing key | `BREVO__WEBHOOKSIGNINGKEY` in `laneway-api` `prd` | never | [the Brevo runbook](brevo.md#if-a-token-leaks) |
+| `age` private key | `AGE_SECRET_KEY` in `laneway-backup` `prd`, and the password manager | never | a new key pair, which replaces the VM and leaves old dumps on the old key |
+
+Tailscale's deploy credential is workload identity federation, so it has no secret to rotate.
+
+On the 90-day rotation day:
 
 1. Create a new HCP owners team token. Set it as `TF_TOKEN_APP_TERRAFORM_IO` in every root's Doppler config.
 2. Create a new Grafana service account token for `terraform-alerting`. Set it as `TF_VAR_GRAFANA_AUTH` in `laneway-alerting` `prd`.
 3. Generate a new Doppler service token for each root. Set it as `DOPPLER_TOKEN` on both of that root's GitHub environments.
-4. Run each root's workflow by hand from the Actions tab on `main`. `plan` must pass.
-5. Revoke the old tokens in HCP, Grafana and Doppler.
-6. Write the new expiry day here.
+4. Create a new Alloy token on the `laneway-vm-alloy` access policy, expiring on the next rotation day. Set it as `ALLOY_LOKI_TOKEN` in `laneway-api` `prd`.
+5. Refresh the Tunnel token and create a new R2 token, as in [the Cloudflare runbook](cloudflare.md#rotating-the-tokens). Stop before each one's redeploy step, since step 6 redeploys once for all of them.
+6. Rotate the `laneway-db` and `laneway-api` tokens in Vault, as in [the VM runbook](vm.md#the-two-doppler-tokens). Its redeploy also picks up the Alloy, Tunnel, and R2 tokens.
+7. Run each root's workflow by hand from the Actions tab on `main`. `plan` must pass.
+8. Revoke the old HCP, Grafana, Alloy, and R2 tokens and the old root Doppler tokens. Step 6 already revoked the old Vault ones, and the Tunnel refresh retired the old Tunnel token.
+9. Write the new expiry day here.
 
 Rotation stays manual. Automating it would need a Doppler personal token and a GitHub PAT, and both are stronger and live longer than the tokens they rotate.
 

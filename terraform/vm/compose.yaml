@@ -1,0 +1,71 @@
+name: laneway
+
+x-cloudflared-address: &cloudflared-address 172.30.0.10
+
+services:
+  postgres:
+    image: postgres@${POSTGRES_DIGEST:?}
+    restart: unless-stopped
+    env_file: /var/lib/laneway/secrets/postgres.env
+    environment:
+      POSTGRES_DB: laneway
+    command:
+      - -c
+      - log_error_verbosity=terse
+      - -c
+      - log_min_error_statement=panic
+      - -c
+      - log_connections=off
+      - -c
+      - shared_buffers=3GB
+    shm_size: 256mb
+    volumes:
+      - type: bind
+        source: /mnt/data/postgres
+        target: /var/lib/postgresql
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/laneway/postgres-initdb.sh
+        target: /docker-entrypoint-initdb.d/postgres-initdb.sh
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "pg_isready", "--host", "localhost", "--username", "postgres", "--dbname", "laneway"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 2m
+    networks:
+      - laneway
+
+  api:
+    image: ghcr.io/samwelomwenga/laneway-api@${API_DIGEST:?}
+    restart: unless-stopped
+    env_file: /var/lib/laneway/secrets/api.env
+    environment:
+      ForwardedHeaders__KnownProxies__0: *cloudflared-address
+    ports:
+      - 127.0.0.1:8080:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - laneway
+
+  cloudflared:
+    image: cloudflare/cloudflared@${CLOUDFLARED_DIGEST:?}
+    restart: unless-stopped
+    env_file: /var/lib/laneway/secrets/cloudflared.env
+    command: ["tunnel", "--loglevel", "info", "run"]
+    networks:
+      laneway:
+        ipv4_address: *cloudflared-address
+
+networks:
+  laneway:
+    name: laneway
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

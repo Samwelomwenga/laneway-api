@@ -52,6 +52,32 @@ Don't use the token the OTLP page offers to generate. Its policy may carry more 
 
 No standing token holds `logs:delete`. The [purge](#purge-a-leaked-item) section makes one when it's needed and revokes it after.
 
+## Alloy's token
+
+Alloy on the VM ships the [host sources](../security/logging-inventory.md#host-sources) with its own token, so revoking it leaves the app's telemetry alone. It pushes to Loki directly, not through the OTLP gateway.
+
+1. In the Cloud Portal, under Security, open Access Policies and create a policy named `laneway-vm-alloy`, with its realm set to the `lanewayapi` stack.
+2. Give it `logs:write` and nothing else.
+3. Add a token to it named `laneway-vm-alloy-prd`, expiring on the shared rotation day in [the Terraform runbook](terraform.md#rotate-the-tokens-every-90-days). Copy it now.
+4. On the stack's Loki card, click Details. Copy the URL and the User. The push URL is that URL plus `/loki/api/v1/push`.
+5. In the Doppler dashboard, project `laneway-api`, config `prd`, add:
+
+   ```sh
+   ALLOY_LOKI_URL=<URL from step 4>/loki/api/v1/push
+   ALLOY_LOKI_USERNAME=<User from step 4>
+   ALLOY_LOKI_TOKEN=<token from step 3>
+   ```
+
+6. Check the token. A 204 means Loki took it:
+
+   ```sh
+   doppler run --project laneway-api --config prd -- sh -c \
+     'curl -s -o /dev/null -w "%{http_code}\n" -u "$ALLOY_LOKI_USERNAME:$ALLOY_LOKI_TOKEN" \
+       -H "Content-Type: application/json" -d "{\"streams\":[]}" "$ALLOY_LOKI_URL"'
+   ```
+
+`laneway-secrets` writes every `ALLOY_` key to `/var/lib/laneway/secrets/alloy.env` and keeps them out of `api.env`. Each deploy restarts Alloy, so a rotated token takes effect on the next deploy. To pick it up sooner, run `sudo laneway-secrets <oci-cli digest>` and `sudo systemctl restart alloy` on the VM.
+
 ## Readers
 
 Each reader is a named person with their own Grafana.com login. There is no shared login.

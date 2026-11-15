@@ -1,0 +1,87 @@
+loki.relabel "journal" {
+	forward_to = []
+
+	rule {
+		source_labels = ["__journal_syslog_identifier", "__journal_priority"]
+		regex         = "laneway-api-1;3"
+		target_label  = "service_name"
+		replacement   = "laneway-boot"
+	}
+
+	rule {
+		source_labels = ["__journal_syslog_identifier"]
+		regex         = "laneway-cloudflared-1"
+		target_label  = "service_name"
+		replacement   = "laneway-cloudflared"
+	}
+
+	rule {
+		source_labels = ["__journal_syslog_identifier"]
+		regex         = "laneway-postgres-1"
+		target_label  = "service_name"
+		replacement   = "laneway-postgres"
+	}
+
+	rule {
+		source_labels = ["__journal_syslog_identifier"]
+		regex         = "laneway-deploy"
+		target_label  = "service_name"
+		replacement   = "laneway-deploy"
+	}
+
+	rule {
+		source_labels = ["__journal_syslog_identifier"]
+		regex         = "laneway-backup"
+		target_label  = "service_name"
+		replacement   = "laneway-backup"
+	}
+
+	rule {
+		source_labels = ["__journal__transport", "__journal_message"]
+		regex         = "kernel;.*(invoked oom-killer|Out of memory|oom-kill:).*"
+		target_label  = "service_name"
+		replacement   = "laneway-host"
+	}
+
+	rule {
+		source_labels = ["__journal_syslog_identifier", "__journal_message"]
+		regex         = "unattended-upgrade;(?i).*reboot.*"
+		target_label  = "service_name"
+		replacement   = "laneway-host"
+	}
+
+	rule {
+		source_labels = ["service_name"]
+		regex         = "laneway-.+"
+		action        = "keep"
+	}
+}
+
+loki.source.journal "host" {
+	relabel_rules = loki.relabel.journal.rules
+	labels        = {deployment_environment_name = "production"}
+	forward_to    = [loki.process.postgres.receiver]
+}
+
+loki.process "postgres" {
+	stage.match {
+		selector = "{service_name=\"laneway-postgres\"}"
+
+		stage.drop {
+			expression = "^(.*?\\] )?(DETAIL|STATEMENT):"
+		}
+	}
+
+	forward_to = [loki.write.grafana.receiver]
+}
+
+loki.write "grafana" {
+	endpoint {
+		url = sys.env("ALLOY_LOKI_URL")
+
+		basic_auth {
+			username = sys.env("ALLOY_LOKI_USERNAME")
+			password = sys.env("ALLOY_LOKI_TOKEN")
+		}
+	}
+}

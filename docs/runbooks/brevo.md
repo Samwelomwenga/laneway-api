@@ -67,12 +67,22 @@ A leaked token can only suppress addresses Laneway has already emailed, because 
 Only a real deployment needs these steps. In the existing Brevo account:
 
 1. Authenticate a Production subdomain, such as `laneway.samwelomwenga.com` unless Laneway has its own domain by then. Add `no-reply@` on it with the display name `Laneway`.
-2. Keep IP blocking on, and allow the host's outbound IP.
-3. Create an API key named `laneway-api-prd`. Store it in Doppler's `prd` config as `BREVO__APIKEY`, with `BREVO__SENDEREMAIL` beside it. Never put either in `ci`, which syncs every secret to GitHub.
-4. Add a fresh `BREVO__WEBHOOKSIGNINGKEY` to `prd` with `openssl rand -base64 32`. Never copy dev's.
-5. Once the API has a public URL, add a transactional webhook pointing at `https://<api host>/api/v1/webhooks/brevo`. Tick hard bounce, spam, blocked, and unsubscribed. Nothing else. Set its bearer to a token minted from the `prd` config.
+2. Add the records Brevo lists in Cloudflare's DNS with the proxy off. A proxied record hides its value. Check each record answers with the value Brevo lists:
+
+   ```sh
+   dig +short TXT laneway.samwelomwenga.com
+   dig +short TXT _dmarc.laneway.samwelomwenga.com
+   dig +short CNAME brevo1._domainkey.laneway.samwelomwenga.com
+   dig +short CNAME brevo2._domainkey.laneway.samwelomwenga.com
+   ```
+
+   If Brevo lists a DKIM record as TXT instead of CNAME, query that name with `TXT`.
+3. Keep IP blocking on, and allow the host's outbound IP. For the VM, that's its reserved IP, from `terraform -chdir=terraform/vm output -raw public_ip`. A replace keeps it.
+4. Create an API key named `laneway-api-prd`. In the Doppler dashboard, project `laneway-api`, config `prd`, store it as `BREVO__APIKEY`, with `BREVO__SENDEREMAIL` beside it. Never put either in `ci`, which syncs every secret to GitHub.
+5. Add a fresh `BREVO__WEBHOOKSIGNINGKEY` to `laneway-api` `prd` with `openssl rand -base64 32`. Never copy dev's.
+6. Once the API has a public URL, add a transactional webhook pointing at `https://<api host>/api/v1/webhooks/brevo`. Tick hard bounce, spam, blocked, and unsubscribed. Nothing else. Set its bearer to a token minted from the `prd` config.
 6. Set `WebApp:BaseUrl` and `Cors:AllowedOrigins` to the real web app origin.
 7. Check the plan's sending limit. 300 a day won't cover Production for long.
 8. Give the API a Data Protection key ring that survives a restart and that every instance shares. The unsubscribe link in an invite email is the address, protected with those keys. The API keeps them in `~/.aspnet/DataProtection-Keys` by default, so a container with no volume there makes new keys on every start, and every unsubscribe link already sent then answers 400 `invalidToken`.
 
-An event the webhook doesn't handle logs `WebhookEventIgnored`. If those show up, someone ticked an extra box in step 5.
+An event the webhook doesn't handle logs `WebhookEventIgnored`. If those show up, someone ticked an extra box in step 6.

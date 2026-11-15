@@ -2,16 +2,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-usage="usage: terraform-plan.sh <root> [--drift]"
+usage="usage: terraform-plan.sh <root> [--drift] [-target=<address>]... [-replace=<address>]..."
 root=${1:?$usage}
-case ${2:-} in
-  "") drift=false ;;
-  --drift) drift=true ;;
-  *)
-    echo "$usage" >&2
-    exit 1
-    ;;
-esac
+shift
+drift=false
+plan_args=(-input=false -lock-timeout=5m -out=tfplan)
+for arg in "$@"; do
+  case $arg in
+    --drift) drift=true ;;
+    -target=?* | -replace=?*) plan_args+=("$arg") ;;
+    *)
+      echo "$usage" >&2
+      exit 1
+      ;;
+  esac
+done
 dir="terraform/$root"
 
 for name in "${!TF_VAR_@}"; do
@@ -19,7 +24,6 @@ for name in "${!TF_VAR_@}"; do
   export "TF_VAR_${suffix,,}=${!name}"
 done
 
-plan_args=(-input=false -lock-timeout=5m -out=tfplan)
 if $drift; then
   plan_args+=(-detailed-exitcode)
 fi
