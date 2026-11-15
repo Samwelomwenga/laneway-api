@@ -54,5 +54,5 @@ variable "metrics_datasource_uid" {
 variable "production_hosted" {
   description = "Whether production runs somewhere. Until it does, the uptime check stays disabled and every rule that needs a running VM stays paused. Logging stopped and no backup in 26 hours would fire all day."
   type        = bool
-  default     = false
+  default     = true
 }

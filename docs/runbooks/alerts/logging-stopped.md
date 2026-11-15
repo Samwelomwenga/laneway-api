@@ -4,7 +4,7 @@ Tier: page. The threshold is a starting guess. Retune it once real traffic exist
 
 ## What fired
 
-Production sent no `dotnet.process.cpu.count` samples for 10 minutes. The app exports its .NET runtime metrics every 60 seconds even at zero traffic, through the same exporter as its logs and traces. So this fires when the app is down, the exporter broke, or Grafana refuses the token. The rule stays paused until `production_hosted` is true in the Terraform, since nothing runs in production before hosting exists.
+Production sent no `dotnet.process.cpu.count` samples for 10 minutes. The app exports its .NET runtime metrics every 60 seconds even at zero traffic, through the same exporter as its logs and traces. So this fires when the app is down, the exporter broke, or Grafana refuses the token. The rule pauses whenever `production_hosted` is false in the Terraform.
 
 ## The first query to run
 

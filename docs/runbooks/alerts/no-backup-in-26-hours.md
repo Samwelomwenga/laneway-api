@@ -4,7 +4,7 @@ Tier: notify. The threshold is a starting guess. Retune it once real nights have
 
 ## What fired
 
-Loki has no `result=ok` line from `laneway-backup` in the last 26 hours. The nightly dump runs at 03:00 UTC, so one missed night plus 2 hours of slack fires it. This is the dead man's switch. Failed runs fire it, and so do a timer that never ran, a VM that's down, and an Alloy that stopped shipping logs. A failed run fires [backup failed](backup-failed.md) first. This one catches the runs that never wrote a line at all. systemd fails the nightly unit before the script starts when `/var/lib/laneway/secrets/backup.env` is missing, so that case shows up here and nowhere else. The rule runs hourly and stays paused until `production_hosted` is true in the Terraform.
+Loki has no `result=ok` line from `laneway-backup` in the last 26 hours. The nightly dump runs at 03:00 UTC, so one missed night plus 2 hours of slack fires it. This is the dead man's switch. Failed runs fire it, and so do a timer that never ran, a VM that's down, and an Alloy that stopped shipping logs. A failed run fires [backup failed](backup-failed.md) first. This one catches the runs that never wrote a line at all. systemd fails the nightly unit before the script starts when `/var/lib/laneway/secrets/backup.env` is missing, so that case shows up here and nowhere else. The rule runs hourly and pauses whenever `production_hosted` is false in the Terraform.
 
 ## The first query to run
 
