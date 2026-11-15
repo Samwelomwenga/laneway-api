@@ -30,7 +30,7 @@ env:
     registry.terraform.io:443
     release-assets.githubusercontent.com:443
     releases.hashicorp.com:443
-    synthetic-monitoring-api-eu-west.grafana.net:443
+    synthetic-monitoring-api-eu-west-2.grafana.net:443
   CHECKPOINT_DISABLE: 1
   DOPPLER_ENABLE_VERSION_CHECK: false
   TF_IN_AUTOMATION: 1

@@ -10,9 +10,9 @@ variable "grafana_auth" {
 }
 
 variable "sm_url" {
-  description = "Synthetic Monitoring API for the stack's region. The stack runs in prod-eu-west-0."
+  description = "Synthetic Monitoring API host from the plugin's apiHost setting."
   type        = string
-  default     = "https://synthetic-monitoring-api-eu-west.grafana.net"
+  default     = "https://synthetic-monitoring-api-eu-west-2.grafana.net"
 }
 
 variable "sm_access_token" {
