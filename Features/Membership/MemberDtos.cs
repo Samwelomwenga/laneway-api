@@ -104,10 +104,10 @@ public interface INamesAUser
 
 public record AddWorkspaceMemberDto
 (
-    Guid? UserId,
-    string? Username,
-    string? Email,
-    WorkspaceRole? Role
+    Guid? UserId = null,
+    string? Username = null,
+    string? Email = null,
+    WorkspaceRole? Role = null
 ) : INamesAUser
 {
     public string? Username { get; init; } = Usernames.Normalize(Username);
@@ -116,10 +116,10 @@ public record AddWorkspaceMemberDto
 
 public record AddBoardMemberDto
 (
-    Guid? UserId,
-    string? Username,
-    string? Email,
-    BoardRole? Role
+    Guid? UserId = null,
+    string? Username = null,
+    string? Email = null,
+    BoardRole? Role = null
 ) : INamesAUser
 {
     public string? Username { get; init; } = Usernames.Normalize(Username);

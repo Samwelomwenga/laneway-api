@@ -35,12 +35,12 @@ public record UpdateProfileDto
     string Username,
     string FirstName,
     string LastName,
-    string? PhoneNumber,
-    string? Bio,
     string Language,
     string TimeZone,
     string Location,
-    Uri? ProfilePictureUrl
+    string? PhoneNumber = null,
+    string? Bio = null,
+    Uri? ProfilePictureUrl = null
 )
 {
     public string Username { get; init; } = Usernames.Normalize(Username);

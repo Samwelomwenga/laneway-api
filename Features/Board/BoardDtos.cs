@@ -35,11 +35,11 @@ public record BoardViewDto : BoardDto
 public record CreateBoardDto
 (
     string? Name,
-    string? Description,
-    BoardVisibility? Visibility,
-    BoardCommenting? Commenting,
-    BoardAddingMembers? AddingMembers,
-    bool? SelfJoin
+    string? Description = null,
+    BoardVisibility? Visibility = null,
+    BoardCommenting? Commenting = null,
+    BoardAddingMembers? AddingMembers = null,
+    bool? SelfJoin = null
 )
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -48,7 +48,7 @@ public record CreateBoardDto
 public record UpdateBoardDto
 (
     string? Name,
-    string? Description
+    string? Description = null
 )
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -78,8 +78,8 @@ public record MoveBoardDto
 public record CopyBoardDto
 (
     Guid? WorkspaceId,
-    string? Name,
-    List<BoardCopyPart>? Keep
+    string? Name = null,
+    List<BoardCopyPart>? Keep = null
 )
 {
     public string? Name { get; init; } = Name?.Trim();

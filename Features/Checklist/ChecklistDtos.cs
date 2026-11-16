@@ -19,9 +19,9 @@ public record ChecklistDto
 public record CreateChecklistDto
 (
     string? Name,
-    PositionValue? Position,
-    Guid? Before,
-    Guid? After
+    PositionValue? Position = null,
+    Guid? Before = null,
+    Guid? After = null
 ) : IPlacing
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -37,9 +37,9 @@ public record UpdateChecklistDto
 
 public record ReorderChecklistDto
 (
-    PositionValue? Position,
-    Guid? Before,
-    Guid? After
+    PositionValue? Position = null,
+    Guid? Before = null,
+    Guid? After = null
 ) : IPlacing;
 [ModelBinder(typeof(SearchQueryBinder<ChecklistSearchDto>))]
 public record ChecklistSearchDto

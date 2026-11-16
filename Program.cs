@@ -51,6 +51,7 @@ builder.Services.AddOpenApi(options =>
 {
     options.AddSchemaTransformer<EnumSchemaTransformer>();
     options.AddDocumentTransformer<BearerSchemeTransformer>();
+    options.AddDocumentTransformer<RequiredFieldTransformer>();
     options.AddOperationTransformer<BearerSchemeTransformer>();
 });
 

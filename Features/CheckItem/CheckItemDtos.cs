@@ -18,10 +18,10 @@ public record CheckItemDto
 public record CreateCheckItemDto
 (
     string? Name,
-    bool? IsChecked,
-    PositionValue? Position,
-    Guid? Before,
-    Guid? After
+    bool? IsChecked = null,
+    PositionValue? Position = null,
+    Guid? Before = null,
+    Guid? After = null
 ) : IPlacing
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -38,9 +38,9 @@ public record UpdateCheckItemDto
 public record MoveCheckItemDto
 (
     Guid? ChecklistId,
-    PositionValue? Position,
-    Guid? Before,
-    Guid? After
+    PositionValue? Position = null,
+    Guid? Before = null,
+    Guid? After = null
 ) : IPlacing;
 
 public record CheckedDto(bool? Value);
