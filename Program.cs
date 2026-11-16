@@ -169,13 +169,10 @@ app.UseRequestLine();
 app.UseSecurityHeaders(app.Environment);
 app.UseExceptionHandler();
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi().AllowAnonymous();
-    app.MapScalarApiReference(options => options.WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient))
-        .AllowAnonymous();
-    app.MapGet("/", () => Results.Redirect("/scalar/v1")).AllowAnonymous().ExcludeFromDescription();
-}
+app.MapOpenApi().AllowAnonymous();
+app.MapScalarApiReference(options => options.WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient))
+    .AllowAnonymous();
+app.MapGet("/", () => Results.Redirect("/scalar/v1")).AllowAnonymous().ExcludeFromDescription();
 
 app.UseCors();
 app.UseAuthentication();

@@ -7,6 +7,10 @@ namespace Laneway.Api;
 public static class HttpHardening
 {
     private const string UseHttps = "Use HTTPS.";
+    private const string ApiPolicy = "default-src 'none'; frame-ancestors 'none'";
+    private const string DocsPolicy =
+        "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.scalar.com; " +
+        "font-src https://fonts.scalar.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'";
 
     public static IServiceCollection AddHttpHardening(this IServiceCollection services, IConfiguration configuration)
     {
@@ -50,10 +54,7 @@ public static class HttpHardening
                 headers.XContentTypeOptions = "nosniff";
                 headers.XFrameOptions = "DENY";
                 headers["Referrer-Policy"] = "no-referrer";
-                if (!(environment.IsDevelopment() && IsDocs(context.Request.Path)))
-                {
-                    headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
-                }
+                headers.ContentSecurityPolicy = IsDocs(context.Request.Path) ? DocsPolicy : ApiPolicy;
 
                 if (!environment.IsDevelopment() && context.Request.IsHttps)
                 {
