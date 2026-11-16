@@ -75,22 +75,22 @@ public record CardCoverDto
 
 public record CoverDto
 (
-    Guid? AttachmentId,
-    Color? Color
+    Guid? AttachmentId = null,
+    Color? Color = null
 );
 
 public record CreateCardDto
 (
     string? Title,
-    string? Description,
-    DateTime? DueDate,
-    PositionValue? Position,
-    Guid? Before,
-    Guid? After,
     bool? IsDueComplete,
-    DateTime? StartDate,
-    int? DueReminderMinutes,
-    List<Guid?>? LabelIds
+    string? Description = null,
+    DateTime? DueDate = null,
+    PositionValue? Position = null,
+    Guid? Before = null,
+    Guid? After = null,
+    DateTime? StartDate = null,
+    int? DueReminderMinutes = null,
+    List<Guid?>? LabelIds = null
 ) : IPlacing
 {
     public string? Title { get; init; } = Title?.Trim();
@@ -99,12 +99,12 @@ public record CreateCardDto
 public record UpdateCardDto
 (
     string? Title,
-    string? Description,
-    DateTime? DueDate,
     bool? IsDueComplete,
-    DateTime? StartDate,
-    int? DueReminderMinutes,
-    List<Guid?>? LabelIds
+    string? Description = null,
+    DateTime? DueDate = null,
+    DateTime? StartDate = null,
+    int? DueReminderMinutes = null,
+    List<Guid?>? LabelIds = null
 )
 {
     public string? Title { get; init; } = Title?.Trim();
@@ -113,18 +113,18 @@ public record UpdateCardDto
 public record MoveCardDto
 (
     Guid? ListId,
-    PositionValue? Position,
-    Guid? Before,
-    Guid? After
+    PositionValue? Position = null,
+    Guid? Before = null,
+    Guid? After = null
 ) : IPlacing;
 public record CopyCardDto
 (
     Guid? ListId,
-    string? Title,
-    List<CopyPart>? Keep,
-    PositionValue? Position,
-    Guid? Before,
-    Guid? After
+    string? Title = null,
+    List<CopyPart>? Keep = null,
+    PositionValue? Position = null,
+    Guid? Before = null,
+    Guid? After = null
 ) : IPlacing
 {
     public string? Title { get; init; } = Title?.Trim();

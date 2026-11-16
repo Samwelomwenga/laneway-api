@@ -24,8 +24,8 @@ public record WorkSpaceDto
 public record CreateWorkSpaceDto
 (
     string? Name,
-    string? Description,
-    WorkspaceVisibility? Visibility
+    WorkspaceVisibility? Visibility,
+    string? Description = null
 )
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -33,8 +33,8 @@ public record CreateWorkSpaceDto
 public record UpdateWorkSpaceDto
 (
     string? Name,
-    string? Description,
-    WorkspaceVisibility? Visibility
+    WorkspaceVisibility? Visibility,
+    string? Description = null
 )
 {
     public string? Name { get; init; } = Name?.Trim();

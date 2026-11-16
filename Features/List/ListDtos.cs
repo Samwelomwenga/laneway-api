@@ -31,10 +31,10 @@ public record BoardListDto : ListDto
 public record CreateListDto
 (
     string? Name,
-    PositionValue? Position,
-    Guid? Before,
-    Guid? After,
-    Color? Color
+    PositionValue? Position = null,
+    Guid? Before = null,
+    Guid? After = null,
+    Color? Color = null
 ) : IPlacing
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -43,7 +43,7 @@ public record CreateListDto
 public record UpdateListDto
 (
     string? Name,
-    Color? Color
+    Color? Color = null
 )
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -52,18 +52,18 @@ public record UpdateListDto
 public record MoveListDto
 (
     Guid? BoardId,
-    PositionValue? Position,
-    Guid? Before,
-    Guid? After
+    PositionValue? Position = null,
+    Guid? Before = null,
+    Guid? After = null
 ) : IPlacing;
 public record CopyListDto
 (
     Guid? BoardId,
-    string? Name,
-    List<CopyPart>? Keep,
-    PositionValue? Position,
-    Guid? Before,
-    Guid? After
+    string? Name = null,
+    List<CopyPart>? Keep = null,
+    PositionValue? Position = null,
+    Guid? Before = null,
+    Guid? After = null
 ) : IPlacing
 {
     public string? Name { get; init; } = Name?.Trim();

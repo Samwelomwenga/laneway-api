@@ -16,8 +16,8 @@ public record LabelDto
 
 public record CreateLabelDto
 (
-    string? Name,
-    Color? Color
+    string? Name = null,
+    Color? Color = null
 )
 {
     public string? Name { get; init; } = Name?.Trim();
@@ -25,8 +25,8 @@ public record CreateLabelDto
 
 public record UpdateLabelDto
 (
-    string? Name,
-    Color? Color
+    string? Name = null,
+    Color? Color = null
 )
 {
     public string? Name { get; init; } = Name?.Trim();

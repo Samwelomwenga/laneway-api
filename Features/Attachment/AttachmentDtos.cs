@@ -21,7 +21,7 @@ public record AttachmentDto
 public record CreateLinkAttachmentDto
 (
     string? Url,
-    string? Name
+    string? Name = null
 )
 {
     public string? Url { get; init; } = Url?.Trim();
