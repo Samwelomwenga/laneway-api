@@ -225,7 +225,7 @@ Every change in [What a replace keeps](#what-a-replace-keeps) goes in as its own
    ```
 
    `delete+create` means Terraform destroys the old instance before it launches the new one. The free allowance has no room for two. Anything else in the list, a `delete` on `oci_core_volume.data` most of all, means stop.
-2. Pick a time away from the 03:00 UTC backup and the 04:00 UTC patch reboot, and away from a release. Take a fresh dump on the VM and check it says `result=ok`:
+2. Pick a time away from the 23:00 UTC backup and the 04:00 UTC patch reboot, and away from a release. Take a fresh dump on the VM and check it says `result=ok`:
 
    ```sh
    sudo systemctl start laneway-backup.service

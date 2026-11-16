@@ -1,6 +1,6 @@
 # Backups
 
-The VM dumps the `laneway` database every night at 03:00 UTC and before every migration. The script checks each dump, encrypts it with `age`, and uploads it twice: once to the OCI bucket `laneway-backups` and once to the R2 bucket. This page covers where the dumps go, how to read the job's logs, the monthly restore on the laptop, and password rotation.
+The VM dumps the `laneway` database every night at 23:00 UTC and before every migration. The script checks each dump, encrypts it with `age`, and uploads it twice: once to the OCI bucket `laneway-backups` and once to the R2 bucket. This page covers where the dumps go, how to read the job's logs, the monthly restore on the laptop, and password rotation.
 
 ## What runs
 
@@ -14,10 +14,10 @@ The VM dumps the `laneway` database every night at 03:00 UTC and before every mi
 
 | Mode | Started by | Prefix |
 |---|---|---|
-| `nightly` | `laneway-backup.timer`, at 03:00 UTC | `daily/`, plus `monthly/` on the 1st |
+| `nightly` | `laneway-backup.timer`, at 23:00 UTC | `daily/`, plus `monthly/` on the 1st |
 | `predeploy` | `laneway-deploy`, before the migration | `predeploy/` |
 
-Names look like `daily/laneway-20261112T030000Z.dump.age`, in UTC. Both buckets delete `daily/` and `predeploy/` after 30 days and `monthly/` after 12 months.
+Names look like `daily/laneway-20261112T230000Z.dump.age`, in UTC. Both buckets delete `daily/` and `predeploy/` after 30 days and `monthly/` after 12 months.
 
 The timer skips the run until the first deploy writes `/var/lib/laneway/images.env`. A nightly run and a deploy take the same lock, so a migration never waits on a nightly dump's table locks. `Persistent=true` runs a missed night's dump after the VM boots.
 

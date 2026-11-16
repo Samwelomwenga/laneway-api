@@ -176,7 +176,7 @@ locals {
       title         = "No backup in 26 hours"
       playbook      = "no-backup-in-26-hours"
       tier          = "notify"
-      summary       = "No database backup on the VM has succeeded in 26 hours. The nightly dump runs at 03:00 UTC."
+      summary       = "No database backup on the VM has succeeded in 26 hours. The nightly dump runs at 23:00 UTC."
       source        = "logs"
       expr          = "absent_over_time(${local.backups} |= \"result=ok\" [26h])"
       range         = 93600

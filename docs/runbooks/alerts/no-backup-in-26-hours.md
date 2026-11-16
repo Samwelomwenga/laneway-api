@@ -4,7 +4,7 @@ Tier: notify. The threshold is a starting guess. Retune it once real nights have
 
 ## What fired
 
-Loki has no `result=ok` line from `laneway-backup` in the last 26 hours. The nightly dump runs at 03:00 UTC, so one missed night plus 2 hours of slack fires it. This is the dead man's switch. Failed runs fire it, and so do a timer that never ran, a VM that's down, and an Alloy that stopped shipping logs. A failed run fires [backup failed](backup-failed.md) first. This one catches the runs that never wrote a line at all. systemd fails the nightly unit before the script starts when `/var/lib/laneway/secrets/backup.env` is missing, so that case shows up here and nowhere else. The rule runs hourly and pauses whenever `production_hosted` is false in the Terraform.
+Loki has no `result=ok` line from `laneway-backup` in the last 26 hours. The nightly dump runs at 23:00 UTC, so one missed night plus 2 hours of slack fires it. This is the dead man's switch. Failed runs fire it, and so do a timer that never ran, a VM that's down, and an Alloy that stopped shipping logs. A failed run fires [backup failed](backup-failed.md) first. This one catches the runs that never wrote a line at all. systemd fails the nightly unit before the script starts when `/var/lib/laneway/secrets/backup.env` is missing, so that case shows up here and nowhere else. The rule runs hourly and pauses whenever `production_hosted` is false in the Terraform.
 
 ## The first query to run
 
@@ -18,7 +18,7 @@ No lines at all means the job never started, logs stopped reaching Loki, or the 
 
 ## Telling noise from attack
 
-Noise looks like the VM rebooting across 03:00 UTC. `Persistent=true` runs the missed dump after boot, so the alert clears on the next hourly check. Alloy losing its Loki token is noise too, but it stays until someone fixes the token. Logging stopped won't fire for it, since the app ships its own telemetry. Right after the flip, the rule can fire before the first nightly run if no predeploy dump reached Loki in the last 26 hours.
+Noise looks like the VM rebooting across 23:00 UTC. `Persistent=true` runs the missed dump after boot, so the alert clears on the next hourly check. Alloy losing its Loki token is noise too, but it stays until someone fixes the token. Logging stopped won't fire for it, since the app ships its own telemetry. Right after the flip, the rule can fire before the first nightly run if no predeploy dump reached Loki in the last 26 hours.
 
 An attack looks like the timer disabled, or Alloy stopped, and nobody on the rota did it. Someone who wants a change to stay unrecoverable stops the backups first. Check the [logging stopped](logging-stopped.md) alert too, since an attacker who stops one may stop both.
 
