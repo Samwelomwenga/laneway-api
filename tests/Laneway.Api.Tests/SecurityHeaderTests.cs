@@ -55,12 +55,12 @@ public class SecurityHeaderTests : ApiTests
     }
 
     [Fact]
-    public async Task The_development_docs_skip_only_the_content_security_policy()
+    public async Task The_docs_get_a_content_security_policy_that_lets_the_reference_page_load()
     {
         using var response = await GetAsync("/openapi/v1.json");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.False(response.Headers.Contains("Content-Security-Policy"));
+        Assert.Contains("script-src 'self' 'unsafe-inline'", Header(response, "Content-Security-Policy"));
         Assert.Equal("nosniff", Header(response, "X-Content-Type-Options"));
     }
 

@@ -47,9 +47,15 @@ public partial class AnonymousAccessTests : ApiTests
         Assert.True(routes.Count > 50, $"Only {routes.Count} routes were found.");
         Assert.Equal(
             [
+                "GET /",
                 "GET /api/v1/auth/username-available",
                 "GET /health/live",
                 "GET /health/ready",
+                "GET /openapi/{documentName}.json",
+                "GET /scalar/favicon.svg",
+                "GET /scalar/scalar.aspnetcore.js",
+                "GET /scalar/scalar.js",
+                "GET /scalar/{documentName?}",
                 "POST /api/v1/auth/confirm-email-change",
                 "POST /api/v1/auth/forgot-password",
                 "POST /api/v1/auth/refresh",
@@ -98,7 +104,7 @@ public partial class AnonymousAccessTests : ApiTests
     }
 
     [Fact]
-    public async Task The_development_openapi_document_is_anonymous_and_declares_a_bearer_scheme()
+    public async Task The_openapi_document_is_anonymous_and_declares_a_bearer_scheme()
     {
         using var response = await SendAnonymousAsync(HttpMethod.Get, "/openapi/v1.json", null);
 
@@ -115,7 +121,7 @@ public partial class AnonymousAccessTests : ApiTests
     }
 
     [Fact]
-    public async Task The_development_openapi_document_lists_enum_names_as_strings()
+    public async Task The_openapi_document_lists_enum_names_as_strings()
     {
         using var response = await SendAnonymousAsync(HttpMethod.Get, "/openapi/v1.json", null);
 
@@ -128,7 +134,7 @@ public partial class AnonymousAccessTests : ApiTests
     }
 
     [Fact]
-    public async Task The_development_api_reference_is_anonymous()
+    public async Task The_api_reference_is_anonymous()
     {
         using var response = await SendAnonymousAsync(HttpMethod.Get, "/scalar/v1", null);
 
@@ -145,16 +151,14 @@ public partial class AnonymousAccessTests : ApiTests
     }
 
     [Fact]
-    public async Task The_root_is_not_mapped_outside_development()
+    public async Task The_root_redirects_to_the_api_reference_outside_development()
     {
-        var (client, services) = ProductionHost(OverHttps);
-        var token = services.GetRequiredService<AccessTokens>().Issue(ActorId, ActorUser.SessionId).Value;
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/");
-        request.Headers.Authorization = new("Bearer", token);
+        var (client, _) = ProductionHost(OverHttps);
 
-        using var response = await client.SendAsync(request);
+        using var response = await client.GetAsync(new Uri("/", UriKind.Relative));
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/scalar/v1", response.Headers.Location!.OriginalString);
     }
 
     [Fact]
