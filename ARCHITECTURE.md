@@ -78,7 +78,6 @@ The local Supabase stack config. Production uses Supabase for attachment storage
 These hold everywhere in the code today.
 
 - **Services do the authorization.** Every route needs a signed-in user unless it opts out with `AllowAnonymous`. A service then asks `Readable` whether that user may act on that item, and returns the denial if not. No controller names a role or a policy. [ADR 0007](docs/adr/0007-hand-written-authorization-in-services.md) says why.
-- **No raw SQL.** `BannedSymbols.txt` bans `FromSqlRaw`, `ExecuteSqlRaw`, `SqlQueryRaw`, and `EnableSensitiveDataLogging`, and the build fails on them. Raw SQL could put a request value into `db.statement` on a span.
 - **A change and its activity entry commit together.** A service opens a transaction, writes the change, adds the activity entry through `ActivityWriter`, and commits once.
 - **A position is only an order.** `Placements` turns `top`, `bottom`, or a `before` or `after` neighbor into a number with gaps of 65536 between items. Placing locks the board and list rows first, so two moves at once can't land on the same spot.
 - **Archived items are read-only.** Writes to an archived item, or creates under one, fail with an error from `ArchiveErrors`.

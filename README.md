@@ -2,7 +2,7 @@
 
 A REST API for a kanban board app, built with ASP.NET Core on .NET 10 and PostgreSQL.
 
-[Live app](https://laneway-app.samwelomwenga.com) · [API reference](https://laneway-api.samwelomwenga.com/scalar/v1) · [Architecture](ARCHITECTURE.md) · [Frontend repo](https://github.com/Samwelomwenga/laneway-ui)
+[Live app](https://laneway-api.samwelomwenga.com) · [API reference](https://laneway-api.samwelomwenga.com/scalar/v1) · [Architecture](ARCHITECTURE.md) · [Frontend repo](https://github.com/Samwelomwenga/laneway-ui)
 
 [![Main](https://github.com/Samwelomwenga/laneway-api/actions/workflows/main.yml/badge.svg)](https://github.com/Samwelomwenga/laneway-api/actions/workflows/main.yml)
 [![Deploy](https://github.com/Samwelomwenga/laneway-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/Samwelomwenga/laneway-api/actions/workflows/deploy.yml)
@@ -53,7 +53,7 @@ The [ADRs](docs/adr) record each decision and the options it beat. These are the
 - [List and board copies run as background jobs](docs/adr/0003-list-and-board-copies-run-as-background-jobs.md). A big copy can take minutes, too long for a request to wait. Card copies stay in the request because they're small and common.
 - [Comments are activity entries that outlive their items](docs/adr/0002-activity-entries-hold-comments-and-outlive-items.md). A card's comments and history read through one route and survive the card's deletion.
 - [Production Postgres runs in a container on the VM](docs/adr/0013-production-postgres-runs-in-a-container-on-the-vm.md). It was the only free option that stays up all month. The cost is running backups myself.
-- [Telemetry goes to Grafana Cloud, without Sentry](docs/adr/0012-grafana-cloud-for-telemetry-without-sentry.md). It was the only free tier that takes logs, traces, and metrics in the EU with enough alert rules.
+- [Telemetry goes to Grafana Cloud](docs/adr/0012-grafana-cloud-for-telemetry-without-sentry.md). It was the only free tier that takes logs, traces, and metrics in the EU with enough alert rules.
 
 ## Tech stack
 
@@ -72,11 +72,10 @@ The [ADRs](docs/adr) record each decision and the options it beat. These are the
 
 ## Engineering highlights
 
-- More than 1,000 integration tests run against a real Postgres 18 in Testcontainers. The access tests run each route once for every kind of caller.
+- Integration tests run against a real Postgres 18 in Testcontainers. The access tests run each route once for every kind of caller.
 - Every PR runs CodeQL, Trivy, gitleaks, a vulnerable package check, and zizmor over the workflows.
 - Releases build an arm64 image with SLSA provenance and a CycloneDX SBOM, and deploy to the VM from GitHub Actions.
 - Terraform manages the VM and the Grafana alert rules. Each alert links to a playbook in [docs/runbooks/alerts](docs/runbooks/alerts).
-- The build bans raw SQL, so no request value can end up in a span's `db.statement`.
 
 ## Running locally
 
@@ -86,10 +85,10 @@ You need the .NET 10 SDK, Docker, the Supabase CLI, and the Doppler CLI.
 doppler setup --project laneway-api --config dev
 supabase start
 doppler run -- dotnet ef database update --project Laneway.Api.csproj
-doppler run -- dotnet run --launch-profile https
+doppler run -- dotnet run
 ```
 
-Then open https://localhost:7287/scalar/v1. To run the tests:
+Then open http://localhost:5062/scalar/v1. To run the tests:
 
 ```sh
 DOTNET_USE_POLLING_FILE_WATCHER=1 dotnet test Laneway.Api.sln

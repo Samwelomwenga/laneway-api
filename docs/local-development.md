@@ -22,10 +22,10 @@ Without Doppler access, export the same names in your shell. [The Brevo runbook]
 doppler setup --project laneway-api --config dev
 supabase start
 doppler run -- dotnet ef database update --project Laneway.Api.csproj
-doppler run -- dotnet run --launch-profile https
+doppler run -- dotnet run
 ```
 
-The API listens on https://localhost:7287. The API reference is at https://localhost:7287/scalar/v1.
+The API listens on http://localhost:5062. The API reference is at http://localhost:5062/scalar/v1.
 
 ## Run the tests
 
