@@ -8,10 +8,6 @@ A REST API for a kanban board app, built with ASP.NET Core on .NET 10 and Postgr
 [![Deploy](https://github.com/Samwelomwenga/laneway-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/Samwelomwenga/laneway-api/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Why I built this
-
-I wanted one project that goes all the way from domain model to production, the parts tutorials skip included. That meant authorization that holds up against a test of every route, a security target I could point to, real email, telemetry, alerts, backups, and a deploy pipeline I run myself. Laneway works the way a familiar kanban tool works, so the product questions have known answers and the work goes into the engineering.
-
 You can sign up through the live API with a real inbox. Laneway sends a verification email before the first sign-in.
 
 ![The Laneway API reference in Scalar](docs/images/scalar.png)
